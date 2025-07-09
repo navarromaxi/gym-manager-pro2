@@ -51,23 +51,61 @@ export default function GymManagementSystem() {
   const loadData = async (gymId: string) => {
     setLoading(true)
     try {
+      console.log("Cargando datos para gym:", gymId)
+
       // Cargar miembros
-      const { data: membersData } = await supabase.from("members").select("*").eq("gym_id", gymId)
+      const { data: membersData, error: membersError } = await supabase.from("members").select("*").eq("gym_id", gymId)
+
+      if (membersError) {
+        console.error("Error cargando miembros:", membersError)
+      }
 
       // Cargar pagos
-      const { data: paymentsData } = await supabase.from("payments").select("*").eq("gym_id", gymId)
+      const { data: paymentsData, error: paymentsError } = await supabase
+        .from("payments")
+        .select("*")
+        .eq("gym_id", gymId)
+
+      if (paymentsError) {
+        console.error("Error cargando pagos:", paymentsError)
+      }
 
       // Cargar gastos
-      const { data: expensesData } = await supabase.from("expenses").select("*").eq("gym_id", gymId)
+      const { data: expensesData, error: expensesError } = await supabase
+        .from("expenses")
+        .select("*")
+        .eq("gym_id", gymId)
+
+      if (expensesError) {
+        console.error("Error cargando gastos:", expensesError)
+      }
 
       // Cargar interesados
-      const { data: prospectsData } = await supabase.from("prospects").select("*").eq("gym_id", gymId)
+      const { data: prospectsData, error: prospectsError } = await supabase
+        .from("prospects")
+        .select("*")
+        .eq("gym_id", gymId)
+
+      if (prospectsError) {
+        console.error("Error cargando interesados:", prospectsError)
+      }
 
       // Cargar planes
-      const { data: plansData } = await supabase.from("plans").select("*").eq("gym_id", gymId)
+      const { data: plansData, error: plansError } = await supabase.from("plans").select("*").eq("gym_id", gymId)
+
+      if (plansError) {
+        console.error("Error cargando planes:", plansError)
+      }
 
       // Cargar actividades
-      const { data: activitiesData } = await supabase.from("activities").select("*").eq("gym_id", gymId)
+      const { data: activitiesData, error: activitiesError } = await supabase
+        .from("activities")
+        .select("*")
+        .eq("gym_id", gymId)
+
+      if (activitiesError) {
+        console.error("Error cargando actividades:", activitiesError)
+      }
 
       // Actualizar estados
       setMembers(membersData || [])
@@ -77,8 +115,16 @@ export default function GymManagementSystem() {
       setPlans(plansData || [])
       setActivities(activitiesData || [])
 
+      console.log("Datos cargados:", {
+        members: membersData?.length || 0,
+        payments: paymentsData?.length || 0,
+        plans: plansData?.length || 0,
+        activities: activitiesData?.length || 0,
+      })
+
       // Si no hay datos, crear datos de ejemplo
       if (!membersData?.length && !plansData?.length && !activitiesData?.length) {
+        console.log("No hay datos, creando datos de ejemplo...")
         await createSampleData(gymId)
       }
     } catch (error) {
@@ -91,6 +137,8 @@ export default function GymManagementSystem() {
   // CREAR DATOS DE EJEMPLO SI NO EXISTEN
   const createSampleData = async (gymId: string) => {
     try {
+      console.log("Creando datos de ejemplo para:", gymId)
+
       // Crear actividades de ejemplo
       const sampleActivities = [
         {
@@ -128,7 +176,10 @@ export default function GymManagementSystem() {
         },
       ]
 
-      await supabase.from("activities").insert(sampleActivities)
+      const { error: activitiesError } = await supabase.from("activities").insert(sampleActivities)
+      if (activitiesError) {
+        console.error("Error creando actividades:", activitiesError)
+      }
 
       // Crear planes de ejemplo
       const samplePlans = [
@@ -156,7 +207,10 @@ export default function GymManagementSystem() {
         },
       ]
 
-      await supabase.from("plans").insert(samplePlans)
+      const { error: plansError } = await supabase.from("plans").insert(samplePlans)
+      if (plansError) {
+        console.error("Error creando planes:", plansError)
+      }
 
       // Crear miembros de ejemplo
       const sampleMembers = [
@@ -188,7 +242,10 @@ export default function GymManagementSystem() {
         },
       ]
 
-      await supabase.from("members").insert(sampleMembers)
+      const { error: membersError } = await supabase.from("members").insert(sampleMembers)
+      if (membersError) {
+        console.error("Error creando miembros:", membersError)
+      }
 
       // Crear pagos de ejemplo
       const samplePayments = [
@@ -204,7 +261,12 @@ export default function GymManagementSystem() {
         },
       ]
 
-      await supabase.from("payments").insert(samplePayments)
+      const { error: paymentsError } = await supabase.from("payments").insert(samplePayments)
+      if (paymentsError) {
+        console.error("Error creando pagos:", paymentsError)
+      }
+
+      console.log("Datos de ejemplo creados exitosamente")
 
       // Recargar datos
       await loadData(gymId)
@@ -308,7 +370,7 @@ export default function GymManagementSystem() {
 
       {loading && (
         <div className="text-center py-8">
-          <p>Cargando datos...</p>
+          <p>Cargando datos desde la base de datos...</p>
         </div>
       )}
 

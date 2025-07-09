@@ -17,39 +17,8 @@ import {
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Search, DollarSign } from "lucide-react"
-
-interface Member {
-  id: string
-  name: string
-  email: string
-  phone: string
-  joinDate: string
-  plan: string
-  planPrice: number
-  lastPayment: string
-  nextPayment: string
-  status: "active" | "expired" | "inactive"
-  inactiveLevel?: "green" | "yellow" | "red"
-}
-
-interface Payment {
-  id: string
-  memberId: string
-  memberName: string
-  amount: number
-  date: string
-  plan: string
-  method: string
-}
-
-interface Plan {
-  id: string
-  name: string
-  price: number
-  duration: number
-  durationType: "days" | "months" | "years"
-  isActive: boolean
-}
+import { supabase } from "@/lib/supabase"
+import type { Member, Payment, Plan } from "@/lib/supabase"
 
 interface PaymentManagementProps {
   payments: Payment[]
@@ -90,7 +59,7 @@ export function PaymentManagement({
   // Función para obtener pagos filtrados actualizada
   const getFilteredPayments = () => {
     let filtered = (payments || []).filter((payment) =>
-      payment.memberName.toLowerCase().includes(searchTerm.toLowerCase()),
+      payment.member_name.toLowerCase().includes(searchTerm.toLowerCase()),
     )
 
     // Filtro por método de pago
@@ -133,59 +102,84 @@ export function PaymentManagement({
   const filteredPayments = getFilteredPayments()
 
   // FUNCIÓN ACTUALIZADA PARA REGISTRAR PAGO Y RENOVAR SOCIO
-  const handleAddPayment = () => {
-    const selectedMember = members.find((m) => m.id === newPayment.memberId)
-    const selectedPlan = plans.find((p) => p.id === newPayment.planId)
+  const handleAddPayment = async () => {
+    try {
+      const selectedMember = members.find((m) => m.id === newPayment.memberId)
+      const selectedPlan = plans.find((p) => p.id === newPayment.planId)
 
-    if (!selectedMember || !selectedPlan) return
+      if (!selectedMember || !selectedPlan) return
 
-    // Crear el pago
-    const payment: Payment = {
-      id: Date.now().toString(),
-      memberId: newPayment.memberId,
-      memberName: selectedMember.name,
-      amount: selectedPlan.price,
-      date: newPayment.date,
-      plan: selectedPlan.name,
-      method: newPayment.method,
+      // Crear el pago
+      const paymentId = `${gymId}_payment_${Date.now()}`
+      const payment: Payment = {
+        id: paymentId,
+        gym_id: gymId,
+        member_id: newPayment.memberId,
+        member_name: selectedMember.name,
+        amount: selectedPlan.price,
+        date: newPayment.date,
+        plan: selectedPlan.name,
+        method: newPayment.method,
+      }
+
+      // Guardar pago en Supabase
+      const { error: paymentError } = await supabase.from("payments").insert([payment])
+
+      if (paymentError) throw paymentError
+
+      // ACTUALIZAR EL SOCIO CON EL NUEVO PLAN
+      const paymentDate = new Date(newPayment.date)
+      const nextPayment = new Date(paymentDate)
+
+      // Calcular próximo vencimiento según el plan
+      if (selectedPlan.duration_type === "days") {
+        nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration)
+      } else if (selectedPlan.duration_type === "months") {
+        nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration)
+      } else if (selectedPlan.duration_type === "years") {
+        nextPayment.setFullYear(nextPayment.getFullYear() + selectedPlan.duration)
+      }
+
+      // Actualizar el socio en Supabase
+      const { error: memberError } = await supabase
+        .from("members")
+        .update({
+          plan: selectedPlan.name,
+          plan_price: selectedPlan.price,
+          last_payment: newPayment.date,
+          next_payment: nextPayment.toISOString().split("T")[0],
+          status: "active", // Al pagar se vuelve activo
+        })
+        .eq("id", selectedMember.id)
+
+      if (memberError) throw memberError
+
+      // Actualizar estados locales
+      const updatedMember = {
+        ...selectedMember,
+        plan: selectedPlan.name,
+        plan_price: selectedPlan.price,
+        last_payment: newPayment.date,
+        next_payment: nextPayment.toISOString().split("T")[0],
+        status: "active" as const,
+      }
+
+      setPayments([...payments, payment])
+      setMembers(members.map((m) => (m.id === selectedMember.id ? updatedMember : m)))
+
+      // Limpiar formulario
+      setNewPayment({
+        memberId: "",
+        planId: "",
+        method: "",
+        date: new Date().toISOString().split("T")[0],
+      })
+      setMemberSearchTerm("")
+      setIsAddDialogOpen(false)
+    } catch (error) {
+      console.error("Error registrando pago:", error)
+      alert("Error al registrar el pago. Inténtalo de nuevo.")
     }
-
-    // ACTUALIZAR EL SOCIO CON EL NUEVO PLAN
-    const paymentDate = new Date(newPayment.date)
-    const nextPayment = new Date(paymentDate)
-
-    // Calcular próximo vencimiento según el plan
-    if (selectedPlan.durationType === "days") {
-      nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration)
-    } else if (selectedPlan.durationType === "months") {
-      nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration)
-    } else if (selectedPlan.durationType === "years") {
-      nextPayment.setFullYear(nextPayment.getFullYear() + selectedPlan.duration)
-    }
-
-    // Actualizar el socio
-    const updatedMember = {
-      ...selectedMember,
-      plan: selectedPlan.name,
-      planPrice: selectedPlan.price,
-      lastPayment: newPayment.date,
-      nextPayment: nextPayment.toISOString().split("T")[0],
-      status: "active" as const, // Al pagar se vuelve activo
-    }
-
-    // Actualizar estados
-    setPayments([...payments, payment])
-    setMembers(members.map((m) => (m.id === selectedMember.id ? updatedMember : m)))
-
-    // Limpiar formulario
-    setNewPayment({
-      memberId: "",
-      planId: "",
-      method: "",
-      date: new Date().toISOString().split("T")[0],
-    })
-    setMemberSearchTerm("")
-    setIsAddDialogOpen(false)
   }
 
   const totalPayments = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0)
@@ -278,7 +272,7 @@ export function PaymentManagement({
                   </SelectTrigger>
                   <SelectContent>
                     {plans
-                      .filter((plan) => plan.isActive)
+                      .filter((plan) => plan.is_active)
                       .map((plan) => (
                         <SelectItem key={plan.id} value={plan.id}>
                           {plan.name} - ${plan.price.toLocaleString()}
@@ -481,7 +475,7 @@ export function PaymentManagement({
                 .map((payment) => (
                   <TableRow key={payment.id}>
                     <TableCell>{new Date(payment.date).toLocaleDateString()}</TableCell>
-                    <TableCell className="font-medium">{payment.memberName}</TableCell>
+                    <TableCell className="font-medium">{payment.member_name}</TableCell>
                     <TableCell>{payment.plan}</TableCell>
                     <TableCell className="font-medium text-green-600">${payment.amount.toLocaleString()}</TableCell>
                     <TableCell>{payment.method}</TableCell>

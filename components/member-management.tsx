@@ -18,42 +18,8 @@ import {
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Edit, Trash2, Search } from "lucide-react"
-
-interface Member {
-  id: string
-  gymId: string
-  name: string
-  email: string
-  phone: string
-  joinDate: string
-  plan: string
-  planPrice: number
-  lastPayment: string
-  nextPayment: string
-  status: "active" | "expired" | "inactive"
-  inactiveLevel?: "green" | "yellow" | "red"
-}
-
-interface Payment {
-  id: string
-  gymId: string
-  memberId: string
-  memberName: string
-  amount: number
-  date: string
-  plan: string
-  method: string
-}
-
-interface Plan {
-  id: string
-  gymId: string
-  name: string
-  price: number
-  duration: number
-  durationType: "days" | "months" | "years"
-  isActive: boolean
-}
+import { supabase } from "@/lib/supabase"
+import type { Member, Payment, Plan } from "@/lib/supabase"
 
 interface MemberManagementProps {
   members: Member[]
@@ -87,8 +53,8 @@ export function MemberManagement({
     phone: "",
     plan: "",
     planPrice: 0,
-    joinDate: new Date().toISOString().split("T")[0], // FECHA PERSONALIZABLE
-    paymentMethod: "Efectivo", // NUEVO CAMPO
+    joinDate: new Date().toISOString().split("T")[0],
+    paymentMethod: "Efectivo",
   })
 
   const paymentMethods = ["Efectivo", "Transferencia", "Tarjeta de Débito", "Tarjeta de Crédito"]
@@ -110,7 +76,7 @@ export function MemberManagement({
 
     let matchesStatus = true
     if (statusFilter === "expiring_soon") {
-      const nextPayment = new Date(member.nextPayment)
+      const nextPayment = new Date(member.next_payment)
       const today = new Date()
       const diffTime = nextPayment.getTime() - today.getTime()
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -122,101 +88,145 @@ export function MemberManagement({
     return matchesSearch && matchesStatus
   })
 
-  const handleAddMember = () => {
-    // USAR LA FECHA PERSONALIZADA EN LUGAR DE HOY
-    const joinDate = new Date(newMember.joinDate)
-    const nextPayment = new Date(joinDate)
-    const selectedPlan = plans.find((p) => p.name === newMember.plan)
+  const handleAddMember = async () => {
+    try {
+      const joinDate = new Date(newMember.joinDate)
+      const nextPayment = new Date(joinDate)
+      const selectedPlan = plans.find((p) => p.name === newMember.plan)
 
-    if (selectedPlan) {
-      // Calculate next payment based on plan FROM JOIN DATE
-      if (selectedPlan.durationType === "days") {
-        nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration)
-      } else if (selectedPlan.durationType === "months") {
-        nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration)
-      } else if (selectedPlan.durationType === "years") {
-        nextPayment.setFullYear(nextPayment.getFullYear() + selectedPlan.duration)
+      if (selectedPlan) {
+        if (selectedPlan.duration_type === "days") {
+          nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration)
+        } else if (selectedPlan.duration_type === "months") {
+          nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration)
+        } else if (selectedPlan.duration_type === "years") {
+          nextPayment.setFullYear(nextPayment.getFullYear() + selectedPlan.duration)
+        }
       }
-    }
 
-    // CALCULAR EL ESTADO CORRECTO BASADO EN LA FECHA ACTUAL
-    const today = new Date()
-    const diffTime = today.getTime() - nextPayment.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      const today = new Date()
+      const diffTime = today.getTime() - nextPayment.getTime()
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-    let memberStatus: "active" | "expired" | "inactive" = "active"
-    let inactiveLevel: "green" | "yellow" | "red" | undefined = undefined
+      let memberStatus: "active" | "expired" | "inactive" = "active"
+      let inactiveLevel: "green" | "yellow" | "red" | undefined = undefined
 
-    // Si el próximo pago es en el futuro, está activo
-    if (nextPayment > today) {
-      memberStatus = "active"
-    } else if (diffDays > 0) {
-      // Si está vencido
-      if (diffDays > 30) {
-        // Más de 30 días vencido = inactivo
-        memberStatus = "inactive"
-        inactiveLevel = "yellow"
+      if (nextPayment > today) {
+        memberStatus = "active"
+      } else if (diffDays > 0) {
+        if (diffDays > 30) {
+          memberStatus = "inactive"
+          inactiveLevel = "yellow"
+        } else {
+          memberStatus = "expired"
+        }
       } else {
-        // Entre 1 y 30 días vencido = expired
         memberStatus = "expired"
       }
-    } else {
-      // Si es exactamente hoy
-      memberStatus = "expired"
-    }
 
-    const member: Member = {
-      id: Date.now().toString(),
-      gymId: gymId,
-      name: newMember.name,
-      email: newMember.email,
-      phone: newMember.phone,
-      plan: newMember.plan,
-      planPrice: newMember.planPrice,
-      joinDate: newMember.joinDate,
-      lastPayment: newMember.joinDate,
-      nextPayment: nextPayment.toISOString().split("T")[0],
-      status: memberStatus, // USAR EL ESTADO CALCULADO
-      inactiveLevel: inactiveLevel, // AGREGAR NIVEL SI ES INACTIVO
-    }
+      const memberId = `${gymId}_member_${Date.now()}`
 
-    // Add initial payment ON JOIN DATE
-    const payment: Payment = {
-      id: Date.now().toString(),
-      gymId: gymId,
-      memberId: member.id,
-      memberName: member.name,
-      amount: member.planPrice,
-      date: newMember.joinDate,
-      plan: member.plan,
-      method: newMember.paymentMethod,
-    }
+      const member: Member = {
+        id: memberId,
+        gym_id: gymId,
+        name: newMember.name,
+        email: newMember.email,
+        phone: newMember.phone,
+        plan: newMember.plan,
+        plan_price: newMember.planPrice,
+        join_date: newMember.joinDate,
+        last_payment: newMember.joinDate,
+        next_payment: nextPayment.toISOString().split("T")[0],
+        status: memberStatus,
+        inactive_level: inactiveLevel,
+      }
 
-    setMembers([...members, member])
-    setPayments([...payments, payment])
-    setNewMember({
-      name: "",
-      email: "",
-      phone: "",
-      plan: "",
-      planPrice: 0,
-      joinDate: new Date().toISOString().split("T")[0],
-      paymentMethod: "Efectivo",
-    })
-    setIsAddDialogOpen(false)
+      // Guardar en Supabase
+      const { error: memberError } = await supabase.from("members").insert([member])
+
+      if (memberError) throw memberError
+
+      // Crear pago inicial
+      const payment: Payment = {
+        id: `${gymId}_payment_${Date.now()}`,
+        gym_id: gymId,
+        member_id: memberId,
+        member_name: member.name,
+        amount: member.plan_price,
+        date: newMember.joinDate,
+        plan: member.plan,
+        method: newMember.paymentMethod,
+      }
+
+      const { error: paymentError } = await supabase.from("payments").insert([payment])
+
+      if (paymentError) throw paymentError
+
+      // Actualizar estados locales
+      setMembers([...members, member])
+      setPayments([...payments, payment])
+
+      setNewMember({
+        name: "",
+        email: "",
+        phone: "",
+        plan: "",
+        planPrice: 0,
+        joinDate: new Date().toISOString().split("T")[0],
+        paymentMethod: "Efectivo",
+      })
+      setIsAddDialogOpen(false)
+    } catch (error) {
+      console.error("Error agregando miembro:", error)
+      alert("Error al agregar el miembro. Inténtalo de nuevo.")
+    }
   }
 
-  const handleEditMember = () => {
+  const handleEditMember = async () => {
     if (!editingMember) return
 
-    setMembers(members.map((m) => (m.id === editingMember.id ? editingMember : m)))
-    setIsEditDialogOpen(false)
-    setEditingMember(null)
+    try {
+      const { error } = await supabase
+        .from("members")
+        .update({
+          name: editingMember.name,
+          email: editingMember.email,
+          phone: editingMember.phone,
+        })
+        .eq("id", editingMember.id)
+
+      if (error) throw error
+
+      setMembers(members.map((m) => (m.id === editingMember.id ? editingMember : m)))
+      setIsEditDialogOpen(false)
+      setEditingMember(null)
+    } catch (error) {
+      console.error("Error editando miembro:", error)
+      alert("Error al editar el miembro. Inténtalo de nuevo.")
+    }
   }
 
-  const handleDeleteMember = (id: string) => {
-    setMembers(members.filter((m) => m.id !== id))
-    setPayments(payments.filter((p) => p.memberId !== id))
+  const handleDeleteMember = async (id: string) => {
+    if (!confirm("¿Estás seguro de que quieres eliminar este miembro?")) return
+
+    try {
+      // Eliminar pagos relacionados
+      const { error: paymentsError } = await supabase.from("payments").delete().eq("member_id", id)
+
+      if (paymentsError) throw paymentsError
+
+      // Eliminar miembro
+      const { error: memberError } = await supabase.from("members").delete().eq("id", id)
+
+      if (memberError) throw memberError
+
+      // Actualizar estados locales
+      setMembers(members.filter((m) => m.id !== id))
+      setPayments(payments.filter((p) => p.member_id !== id))
+    } catch (error) {
+      console.error("Error eliminando miembro:", error)
+      alert("Error al eliminar el miembro. Inténtalo de nuevo.")
+    }
   }
 
   const getStatusBadge = (member: Member) => {
@@ -227,9 +237,9 @@ export function MemberManagement({
         return <Badge variant="destructive">Vencido</Badge>
       case "inactive":
         const color =
-          member.inactiveLevel === "green"
+          member.inactive_level === "green"
             ? "bg-green-500"
-            : member.inactiveLevel === "yellow"
+            : member.inactive_level === "yellow"
               ? "bg-yellow-500"
               : "bg-red-500"
         return <Badge className={`${color} text-white`}>Inactivo</Badge>
@@ -294,7 +304,6 @@ export function MemberManagement({
                   placeholder="099123456"
                 />
               </div>
-              {/* FECHA DE INGRESO PERSONALIZABLE */}
               <div className="grid gap-2">
                 <Label htmlFor="joinDate">Fecha de Ingreso</Label>
                 <Input
@@ -325,7 +334,7 @@ export function MemberManagement({
                   </SelectTrigger>
                   <SelectContent>
                     {plans
-                      .filter((plan) => plan.isActive)
+                      .filter((plan) => plan.is_active)
                       .map((plan) => (
                         <SelectItem key={plan.id} value={plan.name}>
                           {plan.name} - ${plan.price}
@@ -416,16 +425,16 @@ export function MemberManagement({
             </TableHeader>
             <TableBody>
               {filteredMembers.map((member) => {
-                const daysUntilExpiration = getDaysUntilExpiration(member.nextPayment)
+                const daysUntilExpiration = getDaysUntilExpiration(member.next_payment)
                 return (
                   <TableRow key={member.id}>
                     <TableCell className="font-medium">{member.name}</TableCell>
                     <TableCell>{member.email}</TableCell>
                     <TableCell>
-                      {member.plan} - ${member.planPrice}
+                      {member.plan} - ${member.plan_price}
                     </TableCell>
                     <TableCell>{getStatusBadge(member)}</TableCell>
-                    <TableCell>{new Date(member.nextPayment).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(member.next_payment).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <span
                         className={`font-medium ${
