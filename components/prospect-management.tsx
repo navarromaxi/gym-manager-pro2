@@ -50,6 +50,7 @@ export function ProspectManagement({
   const [convertingProspect, setConvertingProspect] = useState<Prospect | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [priorityFilter, setPriorityFilter] = useState("all") // Nuevo estado para el filtro de prioridad
   const [newProspect, setNewProspect] = useState({
     name: "",
     email: "",
@@ -58,6 +59,7 @@ export function ProspectManagement({
     interest: "",
     status: "new" as Prospect["status"],
     notes: "",
+    priority_level: "green" as "green" | "yellow" | "red", // Nuevo campo con valor por defecto
   })
   const [conversionPlan, setConversionPlan] = useState<string>("")
   const [conversionPaymentMethod, setConversionPaymentMethod] = useState("Efectivo")
@@ -69,7 +71,8 @@ export function ProspectManagement({
       prospect.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prospect.notes.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === "all" || prospect.status === statusFilter
-    return matchesSearch && matchesStatus
+    const matchesPriority = priorityFilter === "all" || prospect.priority_level === priorityFilter // Nuevo filtro
+    return matchesSearch && matchesStatus && matchesPriority
   })
 
   const handleAddProspect = async () => {
@@ -83,6 +86,7 @@ export function ProspectManagement({
         interest: newProspect.interest,
         status: newProspect.status,
         notes: newProspect.notes,
+        priority_level: newProspect.priority_level, // Incluir el nuevo campo
       }
 
       const { data, error } = await supabase.from("prospects").insert([prospectToAdd]).select()
@@ -100,12 +104,16 @@ export function ProspectManagement({
           interest: "",
           status: "new",
           notes: "",
+          priority_level: "green", // Resetear a verde por defecto
         })
         setIsAddDialogOpen(false)
       }
-    } catch (error) {
-      console.error("Error agregando interesado:", error)
-      alert("Error al agregar el interesado. Inténtalo de nuevo.")
+    } catch (error: any) {
+      // Usar 'any' para acceder a 'message'
+      console.error("Error agregando interesado:", error.message || error)
+      alert(
+        `Error al agregar el interesado: ${error.message || "Error desconocido"}. Revisa la consola para más detalles.`,
+      )
     }
   }
 
@@ -122,6 +130,7 @@ export function ProspectManagement({
           interest: editingProspect.interest,
           status: editingProspect.status,
           notes: editingProspect.notes,
+          priority_level: editingProspect.priority_level, // Incluir el nuevo campo
         })
         .eq("id", editingProspect.id)
         .eq("gym_id", gymId)
@@ -261,6 +270,20 @@ export function ProspectManagement({
     }
   }
 
+  // Nueva función para obtener el badge de prioridad
+  const getPriorityBadge = (priority: Prospect["priority_level"]) => {
+    switch (priority) {
+      case "red":
+        return <Badge className="bg-red-500 hover:bg-red-500 text-white">Rojo</Badge>
+      case "yellow":
+        return <Badge className="bg-yellow-500 hover:bg-yellow-500 text-black">Amarillo</Badge>
+      case "green":
+        return <Badge className="bg-green-500 hover:bg-green-500 text-white">Verde</Badge>
+      default:
+        return <Badge variant="secondary">N/A</Badge>
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -346,6 +369,25 @@ export function ProspectManagement({
                   </SelectContent>
                 </Select>
               </div>
+              {/* Nuevo campo para la prioridad */}
+              <div className="grid gap-2">
+                <Label htmlFor="priority_level">Prioridad</Label>
+                <Select
+                  value={newProspect.priority_level}
+                  onValueChange={(value: "green" | "yellow" | "red") =>
+                    setNewProspect({ ...newProspect, priority_level: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona prioridad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="red">Rojo (Alta)</SelectItem>
+                    <SelectItem value="yellow">Amarillo (Media)</SelectItem>
+                    <SelectItem value="green">Verde (Baja)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="notes">Notas</Label>
                 <Textarea
@@ -397,6 +439,18 @@ export function ProspectManagement({
                 <SelectItem value="contact_later">Contactar Después</SelectItem>
               </SelectContent>
             </Select>
+            {/* Nuevo filtro por prioridad */}
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Prioridad" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las Prioridades</SelectItem>
+                <SelectItem value="red">Rojo (Alta)</SelectItem>
+                <SelectItem value="yellow">Amarillo (Media)</SelectItem>
+                <SelectItem value="green">Verde (Baja)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -415,6 +469,7 @@ export function ProspectManagement({
                 <TableHead>Fecha Contacto</TableHead>
                 <TableHead>Interés</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead>Prioridad</TableHead> {/* Nueva columna en la tabla */}
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -427,6 +482,7 @@ export function ProspectManagement({
                   <TableCell>{new Date(prospect.contact_date).toLocaleDateString()}</TableCell>
                   <TableCell className="max-w-xs truncate">{prospect.interest}</TableCell>
                   <TableCell>{getStatusBadge(prospect.status)}</TableCell>
+                  <TableCell>{getPriorityBadge(prospect.priority_level)}</TableCell> {/* Mostrar prioridad */}
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button
@@ -530,6 +586,25 @@ export function ProspectManagement({
                     <SelectItem value="waiting_info">Esperando Info</SelectItem>
                     <SelectItem value="not_interested">No Interesado</SelectItem>
                     <SelectItem value="contact_later">Contactar Después</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Campo de edición para la prioridad */}
+              <div className="grid gap-2">
+                <Label htmlFor="edit-priority_level">Prioridad</Label>
+                <Select
+                  value={editingProspect.priority_level}
+                  onValueChange={(value: "green" | "yellow" | "red") =>
+                    setEditingProspect({ ...editingProspect, priority_level: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona prioridad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="red">Rojo (Alta)</SelectItem>
+                    <SelectItem value="yellow">Amarillo (Media)</SelectItem>
+                    <SelectItem value="green">Verde (Baja)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -53,6 +53,7 @@ export interface Prospect {
   interest: string
   status: "new" | "contacted" | "waiting_response" | "waiting_info" | "not_interested" | "contact_later"
   notes: string
+  priority_level?: "green" | "yellow" | "red" // ¡NUEVA PROPIEDAD!
 }
 
 export interface Plan {
