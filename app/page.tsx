@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/auth"
-import { redirect } from "next/navigation"
+// import { redirect } from "next/navigation" // ¡ELIMINAR ESTA IMPORTACIÓN!
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ProspectManagement } from "@/components/prospect-management"
 import { MemberManagement } from "@/components/member-management"
@@ -23,7 +23,7 @@ export default function GymManagementSystem() {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push("/login")
+      router.push("/login") // Esta es la redirección correcta en el cliente
     }
   }, [user, loading, router])
 
@@ -35,7 +35,6 @@ export default function GymManagementSystem() {
           if (response.ok) {
             const data = await response.json()
             if (data && data.length > 0) {
-              // Asegurarse de que data no sea null/undefined
               setGymData(data[0])
             } else {
               // If no gym exists, create one for the user
@@ -76,34 +75,34 @@ export default function GymManagementSystem() {
           const response = await fetch(`/api/${dataType}?gymId=${gymData.id}`)
           if (response.ok) {
             const data = await response.json()
-            setter(data || []) // ¡CAMBIO CLAVE AQUÍ! Asegura que siempre sea un array
+            setter(data || [])
           } else {
             console.error(`Failed to fetch ${dataType}:`, response.statusText)
-            setter([]) // En caso de error, también establecer a un array vacío
+            setter([])
           }
         } catch (error) {
           console.error(`Error fetching ${dataType}:`, error)
-          setter([]) // En caso de error, también establecer a un array vacío
+          setter([])
         }
       }
     }
 
-    // Solo cargar datos si gymData.id está disponible
     if (gymData?.id) {
       fetchData("prospects", setProspects)
       fetchData("members", setMembers)
       fetchData("payments", setPayments)
       fetchData("plans", setPlans)
     }
-  }, [gymData]) // Dependencia de gymData para recargar cuando se obtiene el ID
+  }, [gymData])
 
   if (loading) {
     return <div>Cargando...</div>
   }
 
-  if (!user) {
-    redirect("/login")
-  }
+  // ¡ELIMINAR ESTE BLOQUE!
+  // if (!user) {
+  //   redirect("/login")
+  // }
 
   return (
     <div className="container mx-auto py-10">
@@ -114,8 +113,6 @@ export default function GymManagementSystem() {
           <GymDetails gymData={gymData} setGymData={setGymData} />
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            {" "}
-            {/* Cambiado a w-full para mejor responsividad */}
             <TabsList>
               <TabsTrigger value="prospects">Interesados</TabsTrigger>
               <TabsTrigger value="members">Socios</TabsTrigger>
@@ -154,7 +151,7 @@ export default function GymManagementSystem() {
                   payments={payments}
                   setPayments={setPayments}
                   members={members}
-                  setMembers={setMembers} // Aseguramos que setMembers se pase aquí
+                  setMembers={setMembers}
                   plans={plans}
                   gymId={gymData?.id || ""}
                 />
@@ -164,9 +161,9 @@ export default function GymManagementSystem() {
               {activeTab === "plans" && (
                 <PlanManagement
                   gymId={gymData?.id || ""}
-                  initialPlans={plans} // Pasamos los planes como initialPlans
-                  activities={[]} // Asumiendo que las actividades se cargarán en otro lugar o no son críticas aquí
-                  onPlansUpdate={setPlans} // Pasamos setPlans como callback de actualización
+                  initialPlans={plans}
+                  activities={[]}
+                  onPlansUpdate={setPlans}
                 />
               )}
             </TabsContent>
