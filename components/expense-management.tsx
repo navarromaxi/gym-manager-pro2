@@ -1,466 +1,432 @@
 "use client"
-
+import type React from "react"
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Trash2, Search, DollarSign, TrendingDown, RefreshCw } from "lucide-react"
-
-interface Expense {
-  id: string
-  gymId: string
-  description: string
-  amount: number
-  date: string
-  category: string
-  isRecurring: boolean
-}
+import { CalendarIcon, Search, X } from "lucide-react"
+import { format, parseISO } from "date-fns"
+import { es } from "date-fns/locale"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+import { supabase } from "@/lib/supabase"
+import type { Expense } from "@/lib/supabase"
 
 interface ExpenseManagementProps {
   expenses: Expense[]
-  setExpenses: (expenses: Expense[]) => void
+  setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>
   gymId: string
 }
 
 export function ExpenseManagement({ expenses, setExpenses, gymId }: ExpenseManagementProps) {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [categoryFilter, setCategoryFilter] = useState("all")
-  const [newExpense, setNewExpense] = useState({
+  const [isAddExpenseDialogOpen, setIsAddExpenseDialogOpen] = useState(false)
+  const [isEditExpenseDialogOpen, setIsEditExpenseDialogOpen] = useState(false)
+  const [currentExpense, setCurrentExpense] = useState<Expense | null>(null)
+  const [newExpense, setNewExpense] = useState<Omit<Expense, "id" | "gym_id">>({
     description: "",
     amount: 0,
-    category: "",
-    date: new Date().toISOString().split("T")[0],
-    isRecurring: false,
+    date: format(new Date(), "yyyy-MM-dd"),
+    category: "Otros",
+    is_recurring: false,
   })
-  const [monthFilter, setMonthFilter] = useState("all")
-  const [selectedRecurringExpense, setSelectedRecurringExpense] = useState("")
-  const [yearFilter, setYearFilter] = useState("all")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterCategory, setFilterCategory] = useState("all")
+  const [filterRecurring, setFilterRecurring] = useState("all")
 
-  const categories = ["Fijos", "Equipos", "Mantenimiento", "Servicios", "Marketing", "Personal", "Otros"]
+  const expenseCategories = ["Alquiler", "Servicios", "Sueldos", "Mantenimiento", "Marketing", "Insumos", "Otros"]
+
+  const handleAddExpense = async () => {
+    if (!newExpense.description || newExpense.amount <= 0 || !newExpense.date) {
+      alert("Por favor, completa todos los campos obligatorios y asegúrate que el monto sea mayor a 0.")
+      return
+    }
+
+    const expenseToAdd: Omit<Expense, "id"> = {
+      ...newExpense,
+      gym_id: gymId,
+    }
+
+    try {
+      const { data, error } = await supabase.from("expenses").insert(expenseToAdd).select().single()
+      if (error) throw error
+      setExpenses((prev) => [...prev, data])
+      setIsAddExpenseDialogOpen(false)
+      setNewExpense({
+        description: "",
+        amount: 0,
+        date: format(new Date(), "yyyy-MM-dd"),
+        category: "Otros",
+        is_recurring: false,
+      })
+    } catch (error) {
+      console.error("Error adding expense:", error)
+      alert("Error al agregar gasto. Inténtalo de nuevo.")
+    }
+  }
+
+  const handleEditExpense = async () => {
+    if (!currentExpense || !currentExpense.description || currentExpense.amount <= 0 || !currentExpense.date) {
+      alert("Por favor, completa todos los campos obligatorios y asegúrate que el monto sea mayor a 0.")
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("expenses")
+        .update(currentExpense)
+        .eq("id", currentExpense.id)
+        .select()
+        .single()
+      if (error) throw error
+      setExpenses((prev) => prev.map((e) => (e.id === data.id ? data : e)))
+      setIsEditExpenseDialogOpen(false)
+      setCurrentExpense(null)
+    } catch (error) {
+      console.error("Error editing expense:", error)
+      alert("Error al editar gasto. Inténtalo de nuevo.")
+    }
+  }
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!confirm("¿Estás seguro de que quieres eliminar este gasto?")) return
+    try {
+      const { error } = await supabase.from("expenses").delete().eq("id", id)
+      if (error) throw error
+      setExpenses((prev) => prev.filter((e) => e.id !== id))
+    } catch (error) {
+      console.error("Error deleting expense:", error)
+      alert("Error al eliminar gasto. Inténtalo de nuevo.")
+    }
+  }
 
   const filteredExpenses = expenses.filter((expense) => {
-    const matchesSearch = expense.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = categoryFilter === "all" || expense.category === categoryFilter
-    let matchesMonth = true
-    let matchesYear = true
+    const matchesSearch = searchTerm ? expense.description.toLowerCase().includes(searchTerm.toLowerCase()) : true
+    const matchesCategory = filterCategory === "all" ? true : expense.category === filterCategory
+    const matchesRecurring =
+      filterRecurring === "all" ? true : filterRecurring === "true" ? expense.is_recurring : !expense.is_recurring
 
-    if (monthFilter === "current") {
-      const currentDate = new Date()
-      const expenseDate = new Date(expense.date)
-      matchesMonth =
-        expenseDate.getMonth() === currentDate.getMonth() && expenseDate.getFullYear() === currentDate.getFullYear()
-    } else if (monthFilter === "previous") {
-      const currentDate = new Date()
-      const previousMonth = currentDate.getMonth() === 0 ? 11 : currentDate.getMonth() - 1
-      const previousYear = currentDate.getMonth() === 0 ? currentDate.getFullYear() - 1 : currentDate.getFullYear()
-      const expenseDate = new Date(expense.date)
-      matchesMonth = expenseDate.getMonth() === previousMonth && expenseDate.getFullYear() === previousYear
-    }
-
-    if (yearFilter === "current") {
-      const currentYear = new Date().getFullYear()
-      const expenseDate = new Date(expense.date)
-      matchesYear = expenseDate.getFullYear() === currentYear
-    } else if (yearFilter === "previous") {
-      const previousYear = new Date().getFullYear() - 1
-      const expenseDate = new Date(expense.date)
-      matchesYear = expenseDate.getFullYear() === previousYear
-    }
-
-    return matchesSearch && matchesCategory && matchesMonth && matchesYear
+    return matchesSearch && matchesCategory && matchesRecurring
   })
-
-  const handleAddExpense = () => {
-    const expense: Expense = {
-      id: Date.now().toString(),
-      gymId: gymId,
-      ...newExpense,
-    }
-
-    setExpenses([...expenses, expense])
-    setNewExpense({
-      description: "",
-      amount: 0,
-      category: "",
-      date: new Date().toISOString().split("T")[0],
-      isRecurring: false,
-    })
-    setIsAddDialogOpen(false)
-  }
-
-  const handleDeleteExpense = (id: string) => {
-    setExpenses(expenses.filter((e) => e.id !== id))
-  }
-
-  // FUNCIÓN PARA GENERAR UN GASTO FIJO ESPECÍFICO
-  const generateSpecificRecurringExpense = () => {
-    if (!selectedRecurringExpense) return
-
-    const recurringExpense = expenses.find((e) => e.id === selectedRecurringExpense)
-    if (!recurringExpense) return
-
-    const today = new Date()
-    const currentMonth = today.getMonth()
-    const currentYear = today.getFullYear()
-
-    // Verificar si ya existe este gasto específico este mes
-    const alreadyExists = expenses.some(
-      (expense) =>
-        expense.description.includes(recurringExpense.description) &&
-        expense.category === recurringExpense.category &&
-        expense.amount === recurringExpense.amount &&
-        !expense.isRecurring &&
-        new Date(expense.date).getMonth() === currentMonth &&
-        new Date(expense.date).getFullYear() === currentYear,
-    )
-
-    if (!alreadyExists) {
-      const newExpense: Expense = {
-        id: Date.now().toString(),
-        gymId: gymId,
-        description: `${recurringExpense.description} (${today.getMonth() + 1}/${today.getFullYear()})`,
-        amount: recurringExpense.amount,
-        date: today.toISOString().split("T")[0],
-        category: recurringExpense.category,
-        isRecurring: false,
-      }
-
-      setExpenses((prev) => [...prev, newExpense])
-      setSelectedRecurringExpense("")
-      setIsGenerateDialogOpen(false)
-    } else {
-      alert("Este gasto fijo ya fue generado este mes")
-    }
-  }
-
-  const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0)
-  const currentMonthExpenses = filteredExpenses.filter((expense) => {
-    const expenseDate = new Date(expense.date)
-    const currentDate = new Date()
-    return expenseDate.getMonth() === currentDate.getMonth() && expenseDate.getFullYear() === currentDate.getFullYear()
-  })
-  const monthlyTotal = currentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
-
-  const expensesByCategory = categories
-    .map((category) => ({
-      category,
-      total: expenses.filter((e) => e.category === category).reduce((sum, e) => sum + e.amount, 0),
-      count: expenses.filter((e) => e.category === category).length,
-    }))
-    .filter((item) => item.total > 0)
-
-  const recurringExpenses = expenses.filter((e) => e.isRecurring)
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Gestión de Gastos</h2>
-          <p className="text-muted-foreground">Registra y controla los egresos del gimnasio</p>
-        </div>
-        <div className="flex gap-2">
-          {/* BOTÓN PARA GENERAR GASTO FIJO ESPECÍFICO */}
-          <Dialog open={isGenerateDialogOpen} onOpenChange={setIsGenerateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Generar Gasto Fijo
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Generar Gasto Fijo</DialogTitle>
-                <DialogDescription>Selecciona qué gasto fijo quieres generar para este mes.</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="recurring-expense">Gasto Fijo a Generar</Label>
-                  <Select value={selectedRecurringExpense} onValueChange={setSelectedRecurringExpense}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un gasto fijo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {recurringExpenses.map((expense) => (
-                        <SelectItem key={expense.id} value={expense.id}>
-                          {expense.description} - ${expense.amount.toLocaleString()} ({expense.category})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {recurringExpenses.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      No hay gastos fijos configurados. Crea uno marcando "Gasto fijo mensual" al agregar un gasto.
-                    </p>
-                  )}
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={generateSpecificRecurringExpense} disabled={!selectedRecurringExpense}>
-                  Generar Gasto
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo Gasto
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Registrar Nuevo Gasto</DialogTitle>
-                <DialogDescription>Registra un egreso del gimnasio.</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="description">Descripción</Label>
-                  <Input
-                    id="description"
-                    value={newExpense.description}
-                    onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
-                    placeholder="Alquiler del local"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="amount">Monto</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    value={newExpense.amount}
-                    onChange={(e) => setNewExpense({ ...newExpense, amount: Number(e.target.value) })}
-                    placeholder="25000"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="category">Categoría</Label>
-                  <Select
-                    value={newExpense.category}
-                    onValueChange={(value) => setNewExpense({ ...newExpense, category: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona categoría" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="date">Fecha</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={newExpense.date}
-                    onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={newExpense.isRecurring}
-                      onChange={(e) => setNewExpense({ ...newExpense, isRecurring: e.target.checked })}
-                      className="rounded"
-                    />
-                    <span className="text-sm">
-                      Gasto fijo mensual (podrás generarlo manualmente cada mes cuando lo pagues)
-                    </span>
-                  </label>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="submit" onClick={handleAddExpense}>
-                  Registrar Gasto
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold tracking-tight">Gestión de Gastos</h2>
+        <Button onClick={() => setIsAddExpenseDialogOpen(true)}>Agregar Gasto</Button>
       </div>
 
-      {/* Summary Cards - SIN TOTAL HISTÓRICO */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gastos del Mes</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">${monthlyTotal.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">{currentMonthExpenses.length} gastos este mes</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Promedio Mensual</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${expenses.length > 0 ? Math.round(totalExpenses / 12).toLocaleString() : 0}
-            </div>
-            <p className="text-xs text-muted-foreground">Estimado mensual</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gastos Fijos</CardTitle>
-            <RefreshCw className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{recurringExpenses.length}</div>
-            <p className="text-xs text-muted-foreground">Se generan manualmente</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Category Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Gastos por Categoría</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {expensesByCategory.map((item) => (
-              <div key={item.category} className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <span className="font-medium">{item.category}</span>
-                  <span className="text-sm text-muted-foreground">({item.count} gastos)</span>
-                </div>
-                <span className="font-bold text-red-600">${item.total.toLocaleString()}</span>
-              </div>
+      {/* Filters and Search */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar gasto por descripción..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 pr-8"
+          />
+          {searchTerm && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+              onClick={() => setSearchTerm("")}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        <Select value={filterCategory} onValueChange={setFilterCategory}>
+          <SelectTrigger className="w-[180px] sm:w-[160px]">
+            <SelectValue placeholder="Filtrar por categoría" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las Categorías</SelectItem>
+            {expenseCategories.map((category) => (
+              <SelectItem key={category} value={category}>
+                {category}
+              </SelectItem>
             ))}
-          </div>
-        </CardContent>
-      </Card>
+          </SelectContent>
+        </Select>
+        <Select value={filterRecurring} onValueChange={setFilterRecurring}>
+          <SelectTrigger className="w-[180px] sm:w-[160px]">
+            <SelectValue placeholder="Filtrar por recurrencia" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="true">Recurrentes</SelectItem>
+            <SelectItem value="false">No Recurrentes</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+      {/* Expenses Table */}
+      <div className="rounded-md border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Descripción</TableHead>
+              <TableHead>Monto</TableHead>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Categoría</TableHead>
+              <TableHead>Recurrente</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredExpenses.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  No se encontraron gastos.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredExpenses.map((expense) => (
+                <TableRow key={expense.id}>
+                  <TableCell className="font-medium">{expense.description}</TableCell>
+                  <TableCell>${expense.amount.toLocaleString()}</TableCell>
+                  <TableCell>{format(parseISO(expense.date), "dd/MM/yyyy", { locale: es })}</TableCell>
+                  <TableCell>{expense.category}</TableCell>
+                  <TableCell>{expense.is_recurring ? "Sí" : "No"}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setCurrentExpense(expense)
+                          setIsEditExpenseDialogOpen(true)
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDeleteExpense(expense.id)}>
+                        Eliminar
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Add Expense Dialog */}
+      <Dialog open={isAddExpenseDialogOpen} onOpenChange={setIsAddExpenseDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Agregar Nuevo Gasto</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="description" className="text-right">
+                Descripción
+              </Label>
+              <Input
+                id="description"
+                value={newExpense.description}
+                onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="amount" className="text-right">
+                Monto
+              </Label>
+              <Input
+                id="amount"
+                type="number"
+                value={newExpense.amount}
+                onChange={(e) => setNewExpense({ ...newExpense, amount: Number.parseFloat(e.target.value) || 0 })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="date" className="text-right">
+                Fecha
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "col-span-3 justify-start text-left font-normal",
+                      !newExpense.date && "text-muted-foreground",
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {newExpense.date ? (
+                      format(parseISO(newExpense.date), "dd/MM/yyyy", { locale: es })
+                    ) : (
+                      <span>Selecciona una fecha</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={parseISO(newExpense.date)}
+                    onSelect={(date) => date && setNewExpense({ ...newExpense, date: format(date, "yyyy-MM-dd") })}
+                    initialFocus
+                    locale={es}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="category" className="text-right">
+                Categoría
+              </Label>
+              <Select
+                value={newExpense.category}
+                onValueChange={(value) => setNewExpense({ ...newExpense, category: value })}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Selecciona una categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  {expenseCategories.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="is_recurring" className="text-right">
+                Recurrente
+              </Label>
+              <Checkbox
+                id="is_recurring"
+                checked={newExpense.is_recurring}
+                onCheckedChange={(checked) => setNewExpense({ ...newExpense, is_recurring: !!checked })}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit" onClick={handleAddExpense}>
+              Guardar Gasto
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Expense Dialog */}
+      <Dialog open={isEditExpenseDialogOpen} onOpenChange={setIsEditExpenseDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Editar Gasto</DialogTitle>
+          </DialogHeader>
+          {currentExpense && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-description" className="text-right">
+                  Descripción
+                </Label>
                 <Input
-                  placeholder="Buscar por descripción..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
+                  id="edit-description"
+                  value={currentExpense.description}
+                  onChange={(e) => setCurrentExpense({ ...currentExpense, description: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-amount" className="text-right">
+                  Monto
+                </Label>
+                <Input
+                  id="edit-amount"
+                  type="number"
+                  value={currentExpense.amount}
+                  onChange={(e) =>
+                    setCurrentExpense({ ...currentExpense, amount: Number.parseFloat(e.target.value) || 0 })
+                  }
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-date" className="text-right">
+                  Fecha
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "col-span-3 justify-start text-left font-normal",
+                        !currentExpense.date && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {currentExpense.date ? (
+                        format(parseISO(currentExpense.date), "dd/MM/yyyy", { locale: es })
+                      ) : (
+                        <span>Selecciona una fecha</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={parseISO(currentExpense.date)}
+                      onSelect={(date) =>
+                        date && setCurrentExpense({ ...currentExpense, date: format(date, "yyyy-MM-dd") })
+                      }
+                      initialFocus
+                      locale={es}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-category" className="text-right">
+                  Categoría
+                </Label>
+                <Select
+                  value={currentExpense.category}
+                  onValueChange={(value) => setCurrentExpense({ ...currentExpense, category: value })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Selecciona una categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {expenseCategories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-is_recurring" className="text-right">
+                  Recurrente
+                </Label>
+                <Checkbox
+                  id="edit-is_recurring"
+                  checked={currentExpense.is_recurring}
+                  onCheckedChange={(checked) => setCurrentExpense({ ...currentExpense, is_recurring: !!checked })}
+                  className="col-span-3"
                 />
               </div>
             </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Categoría" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={monthFilter} onValueChange={setMonthFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Mes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los meses</SelectItem>
-                <SelectItem value="current">Mes actual</SelectItem>
-                <SelectItem value="previous">Mes anterior</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={yearFilter} onValueChange={setYearFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Año" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los años</SelectItem>
-                <SelectItem value="current">Año actual</SelectItem>
-                <SelectItem value="previous">Año anterior</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Expenses Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Historial de Gastos ({filteredExpenses.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Categoría</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Monto</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredExpenses
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                .map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
-                    <TableCell className="font-medium">{expense.description}</TableCell>
-                    <TableCell>{expense.category}</TableCell>
-                    <TableCell>
-                      {expense.isRecurring ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          <RefreshCw className="w-3 h-3 mr-1" />
-                          Fijo
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
-                          Único
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium text-red-600">${expense.amount.toLocaleString()}</TableCell>
-                    <TableCell>
-                      <Button variant="outline" size="sm" onClick={() => handleDeleteExpense(expense.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          )}
+          <DialogFooter>
+            <Button type="submit" onClick={handleEditExpense}>
+              Guardar Cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

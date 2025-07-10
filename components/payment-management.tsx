@@ -1,490 +1,471 @@
 "use client"
-
+import type React from "react"
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Search, DollarSign } from "lucide-react"
+import { CalendarIcon, Search, X } from "lucide-react"
+import { format, parseISO } from "date-fns"
+import { es } from "date-fns/locale"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabase"
-import type { Member, Payment, Plan } from "@/lib/supabase"
+import type { Payment, Member, Plan } from "@/lib/supabase"
 
 interface PaymentManagementProps {
   payments: Payment[]
-  setPayments: (payments: Payment[]) => void
+  setPayments: React.Dispatch<React.SetStateAction<Payment[]>>
   members: Member[]
-  setMembers: (members: Member[]) => void
+  setMembers: React.Dispatch<React.SetStateAction<Member[]>>
   plans: Plan[]
   gymId: string
 }
 
 export function PaymentManagement({
-  payments = [],
+  payments,
   setPayments,
-  members = [],
+  members,
   setMembers,
-  plans = [],
+  plans,
   gymId,
 }: PaymentManagementProps) {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [periodFilter, setPeriodFilter] = useState("all")
-  const [memberSearchTerm, setMemberSearchTerm] = useState("")
-  const [newPayment, setNewPayment] = useState({
-    memberId: "",
-    planId: "",
-    method: "",
-    date: new Date().toISOString().split("T")[0],
+  const [isAddPaymentDialogOpen, setIsAddPaymentDialogOpen] = useState(false)
+  const [isEditPaymentDialogOpen, setIsEditPaymentDialogOpen] = useState(false)
+  const [currentPayment, setCurrentPayment] = useState<Payment | null>(null)
+  const [newPayment, setNewPayment] = useState<Omit<Payment, "id" | "gym_id">>({
+    member_id: "",
+    member_name: "",
+    amount: 0,
+    date: format(new Date(), "yyyy-MM-dd"),
+    plan: "",
+    method: "Efectivo",
   })
-  const [methodFilter, setMethodFilter] = useState("all")
+  const [searchTerm, setSearchTerm] = useState("")
 
-  const paymentMethods = ["Efectivo", "Transferencia", "Tarjeta de Débito", "Tarjeta de Crédito"]
-
-  // Filtrar miembros para el buscador
-  const filteredMembersForSearch = members.filter((member) =>
-    member.name.toLowerCase().includes(memberSearchTerm.toLowerCase()),
-  )
-
-  // Función para obtener pagos filtrados actualizada
-  const getFilteredPayments = () => {
-    let filtered = (payments || []).filter((payment) =>
-      payment.member_name.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
-
-    // Filtro por método de pago
-    if (methodFilter !== "all") {
-      filtered = filtered.filter((payment) => payment.method === methodFilter)
-    }
-
-    if (periodFilter !== "all") {
-      const currentDate = new Date()
-
-      filtered = filtered.filter((payment) => {
-        const paymentDate = new Date(payment.date)
-
-        switch (periodFilter) {
-          case "current_month":
-            return (
-              paymentDate.getMonth() === currentDate.getMonth() &&
-              paymentDate.getFullYear() === currentDate.getFullYear()
-            )
-          case "previous_month":
-            const previousMonth = currentDate.getMonth() === 0 ? 11 : currentDate.getMonth() - 1
-            const previousYear =
-              currentDate.getMonth() === 0 ? currentDate.getFullYear() - 1 : currentDate.getFullYear()
-            return paymentDate.getMonth() === previousMonth && paymentDate.getFullYear() === previousYear
-          case "last_6_months":
-            const sixMonthsAgo = new Date()
-            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-            return paymentDate >= sixMonthsAgo
-          case "current_year":
-            return paymentDate.getFullYear() === currentDate.getFullYear()
-          default:
-            return true
-        }
-      })
-    }
-
-    return filtered
-  }
-
-  const filteredPayments = getFilteredPayments()
-
-  // FUNCIÓN ACTUALIZADA PARA REGISTRAR PAGO Y RENOVAR SOCIO
   const handleAddPayment = async () => {
-    try {
-      const selectedMember = members.find((m) => m.id === newPayment.memberId)
-      const selectedPlan = plans.find((p) => p.id === newPayment.planId)
+    if (!newPayment.member_id || !newPayment.amount || !newPayment.date || !newPayment.plan) {
+      alert("Por favor, completa todos los campos obligatorios.")
+      return
+    }
 
-      if (!selectedMember || !selectedPlan) return
+    const member = members.find((m) => m.id === newPayment.member_id)
+    if (!member) {
+      alert("Socio no encontrado.")
+      return
+    }
 
-      // Crear el pago
-      const paymentId = `${gymId}_payment_${Date.now()}`
-      const payment: Payment = {
-        id: paymentId,
-        gym_id: gymId,
-        member_id: newPayment.memberId,
-        member_name: selectedMember.name,
-        amount: selectedPlan.price,
-        date: newPayment.date,
-        plan: selectedPlan.name,
-        method: newPayment.method,
+    const paymentToAdd: Omit<Payment, "id"> = {
+      ...newPayment,
+      gym_id: gymId,
+      member_name: member.name, // Ensure member_name is set
+    }
+
+    // Calculate next payment date for the member
+    const selectedPlan = plans.find((p) => p.name === newPayment.plan)
+    const nextPaymentDate = parseISO(member.next_payment || member.last_payment || member.join_date)
+
+    if (selectedPlan) {
+      if (selectedPlan.duration_type === "months") {
+        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + selectedPlan.duration)
+      } else if (selectedPlan.duration_type === "years") {
+        nextPaymentDate.setFullYear(nextPaymentDate.getFullYear() + selectedPlan.duration)
+      } else {
+        nextPaymentDate.setDate(nextPaymentDate.getDate() + selectedPlan.duration)
       }
+    } else {
+      // Fallback if plan not found, e.g., add 1 month
+      nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1)
+    }
 
-      // Guardar pago en Supabase
-      const { error: paymentError } = await supabase.from("payments").insert([payment])
+    const updatedMember: Member = {
+      ...member,
+      last_payment: paymentToAdd.date,
+      next_payment: format(nextPaymentDate, "yyyy-MM-dd"),
+      status: "active", // Set member to active after payment
+    }
 
+    try {
+      const { data: paymentData, error: paymentError } = await supabase
+        .from("payments")
+        .insert(paymentToAdd)
+        .select()
+        .single()
       if (paymentError) throw paymentError
 
-      // ACTUALIZAR EL SOCIO CON EL NUEVO PLAN
-      const paymentDate = new Date(newPayment.date)
-      const nextPayment = new Date(paymentDate)
-
-      // Calcular próximo vencimiento según el plan
-      if (selectedPlan.duration_type === "days") {
-        nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration)
-      } else if (selectedPlan.duration_type === "months") {
-        nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration)
-      } else if (selectedPlan.duration_type === "years") {
-        nextPayment.setFullYear(nextPayment.getFullYear() + selectedPlan.duration)
-      }
-
-      // Actualizar el socio en Supabase
-      const { error: memberError } = await supabase
+      const { data: memberData, error: memberError } = await supabase
         .from("members")
-        .update({
-          plan: selectedPlan.name,
-          plan_price: selectedPlan.price,
-          last_payment: newPayment.date,
-          next_payment: nextPayment.toISOString().split("T")[0],
-          status: "active", // Al pagar se vuelve activo
-        })
-        .eq("id", selectedMember.id)
-
+        .update(updatedMember)
+        .eq("id", updatedMember.id)
+        .select()
+        .single()
       if (memberError) throw memberError
 
-      // Actualizar estados locales
-      const updatedMember = {
-        ...selectedMember,
-        plan: selectedPlan.name,
-        plan_price: selectedPlan.price,
-        last_payment: newPayment.date,
-        next_payment: nextPayment.toISOString().split("T")[0],
-        status: "active" as const,
-      }
-
-      setPayments([...payments, payment])
-      setMembers(members.map((m) => (m.id === selectedMember.id ? updatedMember : m)))
-
-      // Limpiar formulario
+      setPayments((prev) => [...prev, paymentData])
+      setMembers((prev) => prev.map((m) => (m.id === memberData.id ? memberData : m)))
+      setIsAddPaymentDialogOpen(false)
       setNewPayment({
-        memberId: "",
-        planId: "",
-        method: "",
-        date: new Date().toISOString().split("T")[0],
+        member_id: "",
+        member_name: "",
+        amount: 0,
+        date: format(new Date(), "yyyy-MM-dd"),
+        plan: "",
+        method: "Efectivo",
       })
-      setMemberSearchTerm("")
-      setIsAddDialogOpen(false)
     } catch (error) {
-      console.error("Error registrando pago:", error)
-      alert("Error al registrar el pago. Inténtalo de nuevo.")
+      console.error("Error adding payment:", error)
+      alert("Error al agregar pago. Inténtalo de nuevo.")
     }
   }
 
-  const totalPayments = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0)
-  const currentMonthPayments = payments.filter((payment) => {
-    const paymentDate = new Date(payment.date)
-    const currentDate = new Date()
-    return paymentDate.getMonth() === currentDate.getMonth() && paymentDate.getFullYear() === currentDate.getFullYear()
-  })
+  const handleEditPayment = async () => {
+    if (!currentPayment || !currentPayment.member_id || !currentPayment.amount || !currentPayment.date) {
+      alert("Por favor, completa todos los campos obligatorios.")
+      return
+    }
 
-  // Calcular estadísticas por método de pago del mes actual
-  const currentMonthPaymentsByMethod = currentMonthPayments.reduce(
-    (acc, payment) => {
-      acc[payment.method] = (acc[payment.method] || 0) + 1
-      return acc
-    },
-    {} as Record<string, number>,
+    try {
+      const { data, error } = await supabase
+        .from("payments")
+        .update(currentPayment)
+        .eq("id", currentPayment.id)
+        .select()
+        .single()
+      if (error) throw error
+      setPayments((prev) => prev.map((p) => (p.id === data.id ? data : p)))
+      setIsEditPaymentDialogOpen(false)
+      setCurrentPayment(null)
+    } catch (error) {
+      console.error("Error editing payment:", error)
+      alert("Error al editar pago. Inténtalo de nuevo.")
+    }
+  }
+
+  const handleDeletePayment = async (id: string) => {
+    if (!confirm("¿Estás seguro de que quieres eliminar este pago?")) return
+    try {
+      const { error } = await supabase.from("payments").delete().eq("id", id)
+      if (error) throw error
+      setPayments((prev) => prev.filter((p) => p.id !== id))
+    } catch (error) {
+      console.error("Error deleting payment:", error)
+      alert("Error al eliminar pago. Inténtalo de nuevo.")
+    }
+  }
+
+  const filteredPayments = payments.filter((payment) =>
+    searchTerm
+      ? payment.member_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payment.plan.toLowerCase().includes(searchTerm.toLowerCase())
+      : true,
   )
-
-  const monthlyTotal = currentMonthPayments.reduce((sum, payment) => sum + payment.amount, 0)
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Gestión de Pagos</h2>
-          <p className="text-muted-foreground">Registra pagos y renueva planes de socios existentes</p>
-        </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Registrar Pago
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Registrar Pago de Socio</DialogTitle>
-              <DialogDescription>Registra el pago de un socio existente y renueva su plan.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              {/* BUSCADOR DE SOCIOS */}
-              <div className="grid gap-2">
-                <Label htmlFor="member-search">Buscar Socio</Label>
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="member-search"
-                    placeholder="Buscar por nombre..."
-                    value={memberSearchTerm}
-                    onChange={(e) => setMemberSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
-                </div>
-                {memberSearchTerm && (
-                  <div className="max-h-32 overflow-y-auto border rounded-md">
-                    {filteredMembersForSearch.length > 0 ? (
-                      filteredMembersForSearch.map((member) => (
-                        <div
-                          key={member.id}
-                          className={`p-2 cursor-pointer hover:bg-gray-50 border-b last:border-b-0 ${
-                            newPayment.memberId === member.id ? "bg-blue-50" : ""
-                          }`}
-                          onClick={() => {
-                            setNewPayment({ ...newPayment, memberId: member.id })
-                            setMemberSearchTerm(member.name)
-                          }}
-                        >
-                          <div className="font-medium">{member.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Plan actual: {member.plan} - Estado: {member.status}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-2 text-sm text-muted-foreground">No se encontraron socios</div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* SELECCIÓN DE PLAN */}
-              <div className="grid gap-2">
-                <Label htmlFor="plan">Nuevo Plan</Label>
-                <Select
-                  value={newPayment.planId}
-                  onValueChange={(value) => setNewPayment({ ...newPayment, planId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona el plan a renovar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plans
-                      .filter((plan) => plan.is_active)
-                      .map((plan) => (
-                        <SelectItem key={plan.id} value={plan.id}>
-                          {plan.name} - ${plan.price.toLocaleString()}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* MÉTODO DE PAGO */}
-              <div className="grid gap-2">
-                <Label htmlFor="method">Método de Pago</Label>
-                <Select
-                  value={newPayment.method}
-                  onValueChange={(value) => setNewPayment({ ...newPayment, method: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona método" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {paymentMethods.map((method) => (
-                      <SelectItem key={method} value={method}>
-                        {method}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* FECHA */}
-              <div className="grid gap-2">
-                <Label htmlFor="date">Fecha del Pago</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={newPayment.date}
-                  onChange={(e) => setNewPayment({ ...newPayment, date: e.target.value })}
-                />
-              </div>
-
-              {/* RESUMEN */}
-              {newPayment.memberId && newPayment.planId && (
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <h4 className="font-medium text-green-800 mb-2">Resumen de Renovación</h4>
-                  <div className="text-sm text-green-700">
-                    <p>
-                      <strong>Socio:</strong> {members.find((m) => m.id === newPayment.memberId)?.name}
-                    </p>
-                    <p>
-                      <strong>Plan:</strong> {plans.find((p) => p.id === newPayment.planId)?.name}
-                    </p>
-                    <p>
-                      <strong>Monto:</strong> ${plans.find((p) => p.id === newPayment.planId)?.price.toLocaleString()}
-                    </p>
-                    <p className="mt-1 text-xs">✅ El socio se activará y se actualizará su próximo vencimiento</p>
-                  </div>
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button
-                type="submit"
-                onClick={handleAddPayment}
-                disabled={!newPayment.memberId || !newPayment.planId || !newPayment.method}
-              >
-                Registrar Pago y Renovar
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold tracking-tight">Gestión de Pagos</h2>
+        <Button onClick={() => setIsAddPaymentDialogOpen(true)}>Registrar Pago</Button>
       </div>
 
-      {/* Summary Cards - AGREGAR TARJETAS DE MÉTODOS */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pagos (Filtrado)</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${totalPayments.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">{filteredPayments.length} pagos</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Mes Actual</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${monthlyTotal.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">{currentMonthPayments.length} pagos este mes</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Efectivo (Mes)</CardTitle>
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{currentMonthPaymentsByMethod["Efectivo"] || 0}</div>
-            <p className="text-xs text-muted-foreground">pagos en efectivo</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Débito (Mes)</CardTitle>
-            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {currentMonthPaymentsByMethod["Tarjeta de Débito"] || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">pagos con débito</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Crédito (Mes)</CardTitle>
-            <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
-              {currentMonthPaymentsByMethod["Tarjeta de Crédito"] || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">pagos con crédito</p>
-          </CardContent>
-        </Card>
+      {/* Search */}
+      <div className="relative flex-1">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar pago por nombre de socio o plan..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-9 pr-8"
+        />
+        {searchTerm && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+            onClick={() => setSearchTerm("")}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nombre del socio..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-            </div>
-            <Select value={methodFilter} onValueChange={setMethodFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Método de pago" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los métodos</SelectItem>
-                <SelectItem value="Efectivo">Efectivo</SelectItem>
-                <SelectItem value="Transferencia">Transferencia</SelectItem>
-                <SelectItem value="Tarjeta de Débito">Tarjeta de Débito</SelectItem>
-                <SelectItem value="Tarjeta de Crédito">Tarjeta de Crédito</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={periodFilter} onValueChange={setPeriodFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Período" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los períodos</SelectItem>
-                <SelectItem value="current_month">Mes actual</SelectItem>
-                <SelectItem value="previous_month">Mes anterior</SelectItem>
-                <SelectItem value="last_6_months">Últimos 6 meses</SelectItem>
-                <SelectItem value="current_year">Año actual</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Payments Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Historial de Pagos ({filteredPayments.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
+      <div className="rounded-md border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Socio</TableHead>
+              <TableHead>Plan</TableHead>
+              <TableHead>Monto</TableHead>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Método</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredPayments.length === 0 ? (
               <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Socio</TableHead>
-                <TableHead>Plan</TableHead>
-                <TableHead>Monto</TableHead>
-                <TableHead>Método</TableHead>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  No se encontraron pagos.
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredPayments
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                .map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>{new Date(payment.date).toLocaleDateString()}</TableCell>
-                    <TableCell className="font-medium">{payment.member_name}</TableCell>
-                    <TableCell>{payment.plan}</TableCell>
-                    <TableCell className="font-medium text-green-600">${payment.amount.toLocaleString()}</TableCell>
-                    <TableCell>{payment.method}</TableCell>
-                  </TableRow>
-                ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            ) : (
+              filteredPayments.map((payment) => (
+                <TableRow key={payment.id}>
+                  <TableCell className="font-medium">{payment.member_name}</TableCell>
+                  <TableCell>{payment.plan}</TableCell>
+                  <TableCell>${payment.amount.toLocaleString()}</TableCell>
+                  <TableCell>{format(parseISO(payment.date), "dd/MM/yyyy", { locale: es })}</TableCell>
+                  <TableCell>{payment.method}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setCurrentPayment(payment)
+                          setIsEditPaymentDialogOpen(true)
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDeletePayment(payment.id)}>
+                        Eliminar
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Add Payment Dialog */}
+      <Dialog open={isAddPaymentDialogOpen} onOpenChange={setIsAddPaymentDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Registrar Nuevo Pago</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="member" className="text-right">
+                Socio
+              </Label>
+              <Select
+                value={newPayment.member_id}
+                onValueChange={(value) => {
+                  const selectedMember = members.find((m) => m.id === value)
+                  const memberPlan = selectedMember ? plans.find((p) => p.name === selectedMember.plan) : null
+                  setNewPayment({
+                    ...newPayment,
+                    member_id: value,
+                    member_name: selectedMember ? selectedMember.name : "",
+                    amount: memberPlan ? memberPlan.price : 0,
+                    plan: selectedMember ? selectedMember.plan : "",
+                  })
+                }}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Selecciona un socio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.name} ({member.plan})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="amount" className="text-right">
+                Monto
+              </Label>
+              <Input
+                id="amount"
+                type="number"
+                value={newPayment.amount}
+                onChange={(e) => setNewPayment({ ...newPayment, amount: Number.parseFloat(e.target.value) })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="plan" className="text-right">
+                Plan
+              </Label>
+              <Input
+                id="plan"
+                value={newPayment.plan}
+                onChange={(e) => setNewPayment({ ...newPayment, plan: e.target.value })}
+                className="col-span-3"
+                disabled // Usually derived from member's current plan
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="date" className="text-right">
+                Fecha
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "col-span-3 justify-start text-left font-normal",
+                      !newPayment.date && "text-muted-foreground",
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {newPayment.date ? (
+                      format(parseISO(newPayment.date), "dd/MM/yyyy", { locale: es })
+                    ) : (
+                      <span>Selecciona una fecha</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={parseISO(newPayment.date)}
+                    onSelect={(date) => date && setNewPayment({ ...newPayment, date: format(date, "yyyy-MM-dd") })}
+                    initialFocus
+                    locale={es}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="method" className="text-right">
+                Método
+              </Label>
+              <Select
+                value={newPayment.method}
+                onValueChange={(value) => setNewPayment({ ...newPayment, method: value })}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Selecciona un método" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Efectivo">Efectivo</SelectItem>
+                  <SelectItem value="Tarjeta">Tarjeta</SelectItem>
+                  <SelectItem value="Transferencia">Transferencia</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit" onClick={handleAddPayment}>
+              Registrar Pago
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Payment Dialog */}
+      <Dialog open={isEditPaymentDialogOpen} onOpenChange={setIsEditPaymentDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Editar Pago</DialogTitle>
+          </DialogHeader>
+          {currentPayment && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-member" className="text-right">
+                  Socio
+                </Label>
+                <Input
+                  id="edit-member"
+                  value={currentPayment.member_name}
+                  className="col-span-3"
+                  disabled // Member name should not be editable directly here
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-amount" className="text-right">
+                  Monto
+                </Label>
+                <Input
+                  id="edit-amount"
+                  type="number"
+                  value={currentPayment.amount}
+                  onChange={(e) => setCurrentPayment({ ...currentPayment, amount: Number.parseFloat(e.target.value) })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-plan" className="text-right">
+                  Plan
+                </Label>
+                <Input
+                  id="edit-plan"
+                  value={currentPayment.plan}
+                  onChange={(e) => setCurrentPayment({ ...currentPayment, plan: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-date" className="text-right">
+                  Fecha
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "col-span-3 justify-start text-left font-normal",
+                        !currentPayment.date && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {currentPayment.date ? (
+                        format(parseISO(currentPayment.date), "dd/MM/yyyy", { locale: es })
+                      ) : (
+                        <span>Selecciona una fecha</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={parseISO(currentPayment.date)}
+                      onSelect={(date) =>
+                        date && setCurrentPayment({ ...currentPayment, date: format(date, "yyyy-MM-dd") })
+                      }
+                      initialFocus
+                      locale={es}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-method" className="text-right">
+                  Método
+                </Label>
+                <Select
+                  value={currentPayment.method}
+                  onValueChange={(value) => setCurrentPayment({ ...currentPayment, method: value })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Selecciona un método" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Efectivo">Efectivo</SelectItem>
+                    <SelectItem value="Tarjeta">Tarjeta</SelectItem>
+                    <SelectItem value="Transferencia">Transferencia</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="submit" onClick={handleEditPayment}>
+              Guardar Cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
