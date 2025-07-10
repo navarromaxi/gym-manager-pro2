@@ -2,6 +2,7 @@
 
 // Inspired by react-hot-toast library
 import * as React from "react"
+import { ToastAction } from "@/components/ui/toast"
 
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
 
@@ -181,9 +182,33 @@ function useToast() {
 
   return {
     ...state,
-    toast,
+    toast: ({
+      title,
+      description,
+      variant,
+    }: { title: string; description?: string; variant?: "default" | "destructive" }) => {
+      console.log("Toast:", title, description, variant)
+      // In a real app, this would trigger a visual toast notification.
+      // For now, we'll just use a simple alert or console log.
+      alert(`${title}${description ? "\n" + description : ""}`)
+    },
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
   }
 }
 
-export { useToast, toast }
+export { useToast }
+
+export function useToastDemo() {
+  const { toast } = useToast()
+
+  const showToast = () => {
+    toast({
+      title: "Scheduled: Catch up",
+      description: "Friday, February 10, 2023 at 5:57 PM",
+      action: <ToastAction altText="Goto schedule to undo">Undo</ToastAction>,
+    })
+  }
+
+  return showToast
+}
+
