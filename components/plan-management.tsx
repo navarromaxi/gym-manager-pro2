@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,42 +19,18 @@ import {
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Edit, Trash2, Search } from "lucide-react"
-
-interface Plan {
-  id: string
-  name: string
-  description: string
-  price: number
-  duration: number
-  durationType: "days" | "months" | "years"
-  activities: string[]
-  isActive: boolean
-  createdDate: string
-}
-
-interface Activity {
-  id: string
-  name: string
-  description: string
-  instructor: string
-  capacity: number
-  duration: number
-  schedule: {
-    day: string
-    startTime: string
-    endTime: string
-  }[]
-  isActive: boolean
-  createdDate: string
-}
+import { supabase } from "@/lib/supabase"
+import type { Plan, Activity } from "@/lib/supabase"
 
 interface PlanManagementProps {
-  plans: Plan[]
-  setPlans: (plans: Plan[]) => void
+  gymId: string
+  initialPlans: Plan[]
   activities: Activity[]
+  onPlansUpdate: (plans: Plan[]) => void
 }
 
-export function PlanManagement({ plans, setPlans, activities }: PlanManagementProps) {
+export function PlanManagement({ gymId, initialPlans, activities, onPlansUpdate }: PlanManagementProps) {
+  const [plans, setPlans] = useState<Plan[]>(initialPlans)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null)
@@ -64,12 +40,15 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
     description: "",
     price: 0,
     duration: 1,
-    durationType: "months" as "days" | "months" | "years",
+    duration_type: "months" as "days" | "months" | "years",
     activities: [] as string[],
   })
 
-  // Usar las actividades que vienen como prop en lugar de hardcodear
-  const availableActivities = activities.filter((activity) => activity.isActive).map((activity) => activity.name)
+  useEffect(() => {
+    setPlans(initialPlans)
+  }, [initialPlans])
+
+  const availableActivities = activities.filter((activity) => activity.is_active).map((activity) => activity.name)
 
   const filteredPlans = plans.filter(
     (plan) =>
@@ -77,40 +56,106 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
       plan.description.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const handleAddPlan = () => {
-    const plan: Plan = {
-      id: Date.now().toString(),
-      ...newPlan,
-      isActive: true,
-      createdDate: new Date().toISOString().split("T")[0],
+  const handleAddPlan = async () => {
+    try {
+      const planToAdd: Omit<Plan, "id"> = {
+        gym_id: gymId,
+        name: newPlan.name,
+        description: newPlan.description,
+        price: newPlan.price,
+        duration: newPlan.duration,
+        duration_type: newPlan.duration_type,
+        activities: newPlan.activities,
+        is_active: true,
+      }
+
+      const { data, error } = await supabase.from("plans").insert([planToAdd]).select()
+
+      if (error) throw error
+
+      if (data && data.length > 0) {
+        const addedPlan = data[0] as Plan
+        const updatedPlans = [...plans, addedPlan]
+        setPlans(updatedPlans)
+        onPlansUpdate(updatedPlans)
+        setNewPlan({
+          name: "",
+          description: "",
+          price: 0,
+          duration: 1,
+          duration_type: "months",
+          activities: [],
+        })
+        setIsAddDialogOpen(false)
+      }
+    } catch (error) {
+      console.error("Error agregando plan:", error)
+      alert("Error al agregar el plan. Inténtalo de nuevo.")
     }
-
-    setPlans([...plans, plan])
-    setNewPlan({
-      name: "",
-      description: "",
-      price: 0,
-      duration: 1,
-      durationType: "months",
-      activities: [],
-    })
-    setIsAddDialogOpen(false)
   }
 
-  const handleEditPlan = () => {
+  const handleEditPlan = async () => {
     if (!editingPlan) return
+    try {
+      const { error } = await supabase
+        .from("plans")
+        .update({
+          name: editingPlan.name,
+          description: editingPlan.description,
+          price: editingPlan.price,
+          duration: editingPlan.duration,
+          duration_type: editingPlan.duration_type,
+          activities: editingPlan.activities,
+          is_active: editingPlan.is_active,
+        })
+        .eq("id", editingPlan.id)
+        .eq("gym_id", gymId)
 
-    setPlans(plans.map((p) => (p.id === editingPlan.id ? editingPlan : p)))
-    setIsEditDialogOpen(false)
-    setEditingPlan(null)
+      if (error) throw error
+
+      const updatedPlans = plans.map((p) => (p.id === editingPlan.id ? editingPlan : p))
+      setPlans(updatedPlans)
+      onPlansUpdate(updatedPlans)
+      setIsEditDialogOpen(false)
+      setEditingPlan(null)
+    } catch (error) {
+      console.error("Error editando plan:", error)
+      alert("Error al editar el plan. Inténtalo de nuevo.")
+    }
   }
 
-  const handleDeletePlan = (id: string) => {
-    setPlans(plans.filter((p) => p.id !== id))
+  const handleDeletePlan = async (id: string) => {
+    if (!confirm("¿Estás seguro de que quieres eliminar este plan?")) return
+    try {
+      const { error } = await supabase.from("plans").delete().eq("id", id).eq("gym_id", gymId)
+      if (error) throw error
+
+      const updatedPlans = plans.filter((p) => p.id !== id)
+      setPlans(updatedPlans)
+      onPlansUpdate(updatedPlans)
+    } catch (error) {
+      console.error("Error eliminando plan:", error)
+      alert("Error al eliminar el plan. Inténtalo de nuevo.")
+    }
   }
 
-  const togglePlanStatus = (id: string) => {
-    setPlans(plans.map((p) => (p.id === id ? { ...p, isActive: !p.isActive } : p)))
+  const togglePlanStatus = async (id: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("plans")
+        .update({ is_active: !currentStatus })
+        .eq("id", id)
+        .eq("gym_id", gymId)
+
+      if (error) throw error
+
+      const updatedPlans = plans.map((p) => (p.id === id ? { ...p, is_active: !currentStatus } : p))
+      setPlans(updatedPlans)
+      onPlansUpdate(updatedPlans)
+    } catch (error) {
+      console.error("Error cambiando estado del plan:", error)
+      alert("Error al cambiar el estado del plan. Inténtalo de nuevo.")
+    }
   }
 
   const getDurationText = (duration: number, type: string) => {
@@ -178,9 +223,9 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                       className="w-20"
                     />
                     <Select
-                      value={newPlan.durationType}
+                      value={newPlan.duration_type}
                       onValueChange={(value: "days" | "months" | "years") =>
-                        setNewPlan({ ...newPlan, durationType: value })
+                        setNewPlan({ ...newPlan, duration_type: value })
                       }
                     >
                       <SelectTrigger className="w-24">
@@ -236,7 +281,6 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
           </DialogContent>
         </Dialog>
       </div>
-
       {/* Search */}
       <Card>
         <CardHeader>
@@ -254,7 +298,6 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
           </div>
         </CardContent>
       </Card>
-
       {/* Plans Table */}
       <Card>
         <CardHeader>
@@ -279,7 +322,7 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                   <TableCell className="font-medium">{plan.name}</TableCell>
                   <TableCell className="max-w-xs truncate">{plan.description}</TableCell>
                   <TableCell className="font-bold text-green-600">${plan.price.toLocaleString()}</TableCell>
-                  <TableCell>{getDurationText(plan.duration, plan.durationType)}</TableCell>
+                  <TableCell>{getDurationText(plan.duration, plan.duration_type)}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {plan.activities.slice(0, 2).map((activity) => (
@@ -298,10 +341,10 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => togglePlanStatus(plan.id)}
-                      className={plan.isActive ? "text-green-600" : "text-red-600"}
+                      onClick={() => togglePlanStatus(plan.id, plan.is_active)}
+                      className={plan.is_active ? "text-green-600" : "text-red-600"}
                     >
-                      {plan.isActive ? "Activo" : "Inactivo"}
+                      {plan.is_active ? "Activo" : "Inactivo"}
                     </Button>
                   </TableCell>
                   <TableCell>
@@ -327,7 +370,6 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
           </Table>
         </CardContent>
       </Card>
-
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
@@ -374,9 +416,9 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                       className="w-20"
                     />
                     <Select
-                      value={editingPlan.durationType}
+                      value={editingPlan.duration_type}
                       onValueChange={(value: "days" | "months" | "years") =>
-                        setEditingPlan({ ...editingPlan, durationType: value })
+                        setEditingPlan({ ...editingPlan, duration_type: value })
                       }
                     >
                       <SelectTrigger className="w-24">

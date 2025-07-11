@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/auth"
-// import { redirect } from "next/navigation" // ¡ELIMINAR ESTA IMPORTACIÓN!
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ProspectManagement } from "@/components/prospect-management"
 import { MemberManagement } from "@/components/member-management"
@@ -15,23 +14,26 @@ export default function GymManagementSystem() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("prospects")
-  const [gymData, setGymData] = useState<any>(null) // Usar any por simplicidad, o definir un tipo Gym
+  const [gymData, setGymData] = useState<any>(null)
   const [prospects, setProspects] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
-  const [plans, setPlans] = useState<any[]>([]) // Aseguramos que siempre sea un array
+  const [plans, setPlans] = useState<any[]>([])
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push("/login") // Esta es la redirección correcta en el cliente
+      router.push("/login")
     }
   }, [user, loading, router])
 
   useEffect(() => {
     const fetchGymData = async () => {
       if (user) {
+        console.log("User object in fetchGymData:", user) // DEBUG: Ver el objeto user
+        console.log("User ID:", user.id) // DEBUG: Ver el user.id
+
         try {
-          const response = await fetch(`/api/gyms?ownerId=${user.uid}`)
+          const response = await fetch(`/api/gyms?ownerId=${user.id}`)
           if (response.ok) {
             const data = await response.json()
             if (data && data.length > 0) {
@@ -44,8 +46,8 @@ export default function GymManagementSystem() {
                   "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                  name: `${user.email}'s Gym`, // Default name
-                  ownerId: user.uid,
+                  name: `${user.email}'s Gym`,
+                  ownerId: user.id,
                 }),
               })
 
@@ -98,11 +100,6 @@ export default function GymManagementSystem() {
   if (loading) {
     return <div>Cargando...</div>
   }
-
-  // ¡ELIMINAR ESTE BLOQUE!
-  // if (!user) {
-  //   redirect("/login")
-  // }
 
   return (
     <div className="container mx-auto py-10">
@@ -162,7 +159,7 @@ export default function GymManagementSystem() {
                 <PlanManagement
                   gymId={gymData?.id || ""}
                   initialPlans={plans}
-                  activities={[]}
+                  activities={[]} // Asegúrate de pasar las actividades correctas aquí si las tienes
                   onPlansUpdate={setPlans}
                 />
               )}
