@@ -13,13 +13,15 @@ export async function GET(request: Request) {
   const supabase = createClient()
   const { data, error } = await supabase.from("gyms").select("*").eq("owner_id", ownerId).single()
 
-  if (error && error.code !== "PGRST116") {
-    // PGRST116 means no rows found (expected for new users)
-    console.error("Error fetching gym:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // PGRST116 means no rows found (expected for new users), so we don't treat it as a critical error
+    if (error.code === "PGRST116") {
+      return NextResponse.json([], { status: 200 }) // Return empty array if no gym found
+    }
+    console.error("Error fetching gym from Supabase:", error) // Log the detailed Supabase error
+    return NextResponse.json({ error: error.message, details: error.details, hint: error.hint }, { status: 500 })
   }
 
-  // If no gym found, data will be null, which is handled by the client
   return NextResponse.json(data ? [data] : [], { status: 200 })
 }
 
@@ -39,8 +41,8 @@ export async function POST(request: Request) {
     .single()
 
   if (error) {
-    console.error("Error creating gym:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("Error creating gym in Supabase:", error) // Log the detailed Supabase error
+    return NextResponse.json({ error: error.message, details: error.details, hint: error.hint }, { status: 500 })
   }
 
   return NextResponse.json(data, { status: 201 })
@@ -58,8 +60,8 @@ export async function PUT(request: Request) {
   const { data, error } = await supabase.from("gyms").update({ name }).eq("id", id).select().single()
 
   if (error) {
-    console.error("Error updating gym:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("Error updating gym in Supabase:", error) // Log the detailed Supabase error
+    return NextResponse.json({ error: error.message, details: error.details, hint: error.hint }, { status: 500 })
   }
 
   return NextResponse.json(data, { status: 200 })
