@@ -78,4 +78,5 @@ export interface Activity {
   duration: number
   schedule: { day: string; startTime: string; endTime: string }[]
   is_active: boolean
+  created_at: string // 👈 AGREGAR ESTO
 }

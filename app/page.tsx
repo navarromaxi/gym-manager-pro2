@@ -1,143 +1,169 @@
 "use client";
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Users, DollarSign, AlertTriangle, TrendingUp, Calendar, UserPlus } from "lucide-react"
-import { MemberManagement } from "@/components/member-management"
-import { PaymentManagement } from "@/components/payment-management"
-import { ProspectManagement } from "@/components/prospect-management"
-import { ExpenseManagement } from "@/components/expense-management"
-import { ReportsSection } from "@/components/reports-section"
-import { LoginSystem } from "@/components/login-system"
-import { PlanManagement } from "@/components/plan-management"
-import { ActivityManagement } from "@/components/activity-management"
-import { RoutineManagement } from "@/components/routine-management"
-import { InactiveManagement } from "@/components/inactive-management"
-import { supabase } from "@/lib/supabase"
-import type { Member, Payment, Prospect, Expense, Plan, Activity } from "@/lib/supabase"
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Users,
+  DollarSign,
+  AlertTriangle,
+  TrendingUp,
+  Calendar,
+  UserPlus,
+} from "lucide-react";
+import { MemberManagement } from "@/components/member-management";
+import { PaymentManagement } from "@/components/payment-management";
+import { ProspectManagement } from "@/components/prospect-management";
+import { ExpenseManagement } from "@/components/expense-management";
+import { ReportsSection } from "@/components/reports-section";
+import { LoginSystem } from "@/components/login-system";
+import { PlanManagement } from "@/components/plan-management";
+import { ActivityManagement } from "@/components/activity-management";
+import { RoutineManagement } from "@/components/routine-management";
+import { InactiveManagement } from "@/components/inactive-management";
+import { supabase } from "@/lib/supabase";
+import type {
+  Member,
+  Payment,
+  Prospect,
+  Expense,
+  Plan,
+  Activity,
+} from "@/lib/supabase";
 
 export default function GymManagementSystem() {
-  const [activeTab, setActiveTab] = useState("dashboard")
-  const [members, setMembers] = useState<Member[]>([])
-  const [payments, setPayments] = useState<Payment[]>([])
-  const [prospects, setProspects] = useState<Prospect[]>([])
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [plans, setPlans] = useState<Plan[]>([])
-  const [activities, setActivities] = useState<Activity[]>([])
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [gymData, setGymData] = useState<{ name: string; id: string } | null>(null)
-  const [memberFilter, setMemberFilter] = useState("all")
-  const [loading, setLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [members, setMembers] = useState<Member[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [gymData, setGymData] = useState<{ name: string; id: string } | null>(
+    null
+  );
+  const [memberFilter, setMemberFilter] = useState("all");
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = (data: { name: string; id: string }) => {
-    setGymData(data)
-    setIsAuthenticated(true)
-  }
+    setGymData(data);
+    setIsAuthenticated(true);
+  };
 
   const handleLogout = () => {
-    setIsAuthenticated(false)
-    setGymData(null)
-    setMembers([])
-    setPayments([])
-    setProspects([])
-    setExpenses([])
-    setPlans([])
-    setActivities([])
-  }
+    setIsAuthenticated(false);
+    setGymData(null);
+    setMembers([]);
+    setPayments([]);
+    setProspects([]);
+    setExpenses([]);
+    setPlans([]);
+    setActivities([]);
+  };
 
   // CARGAR DATOS DESDE SUPABASE
   const loadData = async (gymId: string) => {
-    setLoading(true)
+    setLoading(true);
     try {
-      console.log("Cargando datos para gym:", gymId)
+      console.log("Cargando datos para gym:", gymId);
 
       // Cargar miembros
-      const { data: membersData, error: membersError } = await supabase.from("members").select("*").eq("gym_id", gymId)
+      const { data: membersData, error: membersError } = await supabase
+        .from("members")
+        .select("*")
+        .eq("gym_id", gymId);
 
       if (membersError) {
-        console.error("Error cargando miembros:", membersError)
+        console.error("Error cargando miembros:", membersError);
       }
 
       // Cargar pagos
       const { data: paymentsData, error: paymentsError } = await supabase
         .from("payments")
         .select("*")
-        .eq("gym_id", gymId)
+        .eq("gym_id", gymId);
 
       if (paymentsError) {
-        console.error("Error cargando pagos:", paymentsError)
+        console.error("Error cargando pagos:", paymentsError);
       }
 
       // Cargar gastos
       const { data: expensesData, error: expensesError } = await supabase
         .from("expenses")
         .select("*")
-        .eq("gym_id", gymId)
+        .eq("gym_id", gymId);
 
       if (expensesError) {
-        console.error("Error cargando gastos:", expensesError)
+        console.error("Error cargando gastos:", expensesError);
       }
 
       // Cargar interesados
       const { data: prospectsData, error: prospectsError } = await supabase
         .from("prospects")
         .select("*")
-        .eq("gym_id", gymId)
+        .eq("gym_id", gymId);
 
       if (prospectsError) {
-        console.error("Error cargando interesados:", prospectsError)
+        console.error("Error cargando interesados:", prospectsError);
       }
 
       // Cargar planes
-      const { data: plansData, error: plansError } = await supabase.from("plans").select("*").eq("gym_id", gymId)
+      const { data: plansData, error: plansError } = await supabase
+        .from("plans")
+        .select("*")
+        .eq("gym_id", gymId);
 
       if (plansError) {
-        console.error("Error cargando planes:", plansError)
+        console.error("Error cargando planes:", plansError);
       }
 
       // Cargar actividades
       const { data: activitiesData, error: activitiesError } = await supabase
         .from("activities")
         .select("*")
-        .eq("gym_id", gymId)
+        .eq("gym_id", gymId);
 
       if (activitiesError) {
-        console.error("Error cargando actividades:", activitiesError)
+        console.error("Error cargando actividades:", activitiesError);
       }
 
       // Actualizar estados
-      setMembers(membersData || [])
-      setPayments(paymentsData || [])
-      setExpenses(expensesData || [])
-      setProspects(prospectsData || [])
-      setPlans(plansData || [])
-      setActivities(activitiesData || [])
+      setMembers(membersData || []);
+      setPayments(paymentsData || []);
+      setExpenses(expensesData || []);
+      setProspects(prospectsData || []);
+      setPlans(plansData || []);
+      setActivities(activitiesData || []);
 
       console.log("Datos cargados:", {
         members: membersData?.length || 0,
         payments: paymentsData?.length || 0,
         plans: plansData?.length || 0,
         activities: activitiesData?.length || 0,
-      })
+      });
 
       // Si no hay datos, crear datos de ejemplo
-      if (!membersData?.length && !plansData?.length && !activitiesData?.length) {
-        console.log("No hay datos, creando datos de ejemplo...")
-        await createSampleData(gymId)
+      if (
+        !membersData?.length &&
+        !plansData?.length &&
+        !activitiesData?.length
+      ) {
+        console.log("No hay datos, creando datos de ejemplo...");
+        await createSampleData(gymId);
       }
     } catch (error) {
-      console.error("Error cargando datos:", error)
+      console.error("Error cargando datos:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // CREAR DATOS DE EJEMPLO SI NO EXISTEN
   const createSampleData = async (gymId: string) => {
     try {
-      console.log("Creando datos de ejemplo para:", gymId)
+      console.log("Creando datos de ejemplo para:", gymId);
 
       // Crear actividades de ejemplo
       const sampleActivities = [
@@ -174,11 +200,13 @@ export default function GymManagementSystem() {
           ],
           is_active: true,
         },
-      ]
+      ];
 
-      const { error: activitiesError } = await supabase.from("activities").insert(sampleActivities)
+      const { error: activitiesError } = await supabase
+        .from("activities")
+        .insert(sampleActivities);
       if (activitiesError) {
-        console.error("Error creando actividades:", activitiesError)
+        console.error("Error creando actividades:", activitiesError);
       }
 
       // Crear planes de ejemplo
@@ -205,11 +233,13 @@ export default function GymManagementSystem() {
           activities: ["Sala de musculacion", "Pilates"],
           is_active: true,
         },
-      ]
+      ];
 
-      const { error: plansError } = await supabase.from("plans").insert(samplePlans)
+      const { error: plansError } = await supabase
+        .from("plans")
+        .insert(samplePlans);
       if (plansError) {
-        console.error("Error creando planes:", plansError)
+        console.error("Error creando planes:", plansError);
       }
 
       // Crear miembros de ejemplo
@@ -240,11 +270,13 @@ export default function GymManagementSystem() {
           next_payment: "2024-12-15",
           status: "expired",
         },
-      ]
+      ];
 
-      const { error: membersError } = await supabase.from("members").insert(sampleMembers)
+      const { error: membersError } = await supabase
+        .from("members")
+        .insert(sampleMembers);
       if (membersError) {
-        console.error("Error creando miembros:", membersError)
+        console.error("Error creando miembros:", membersError);
       }
 
       // Crear pagos de ejemplo
@@ -259,39 +291,41 @@ export default function GymManagementSystem() {
           plan: "Mensual",
           method: "Efectivo",
         },
-      ]
+      ];
 
-      const { error: paymentsError } = await supabase.from("payments").insert(samplePayments)
+      const { error: paymentsError } = await supabase
+        .from("payments")
+        .insert(samplePayments);
       if (paymentsError) {
-        console.error("Error creando pagos:", paymentsError)
+        console.error("Error creando pagos:", paymentsError);
       }
 
-      console.log("Datos de ejemplo creados exitosamente")
+      console.log("Datos de ejemplo creados exitosamente");
 
       // Recargar datos
-      await loadData(gymId)
+      await loadData(gymId);
     } catch (error) {
-      console.error("Error creando datos de ejemplo:", error)
+      console.error("Error creando datos de ejemplo:", error);
     }
-  }
+  };
 
   // Cargar datos cuando se autentica
   useEffect(() => {
     if (gymData?.id) {
-      loadData(gymData.id)
+      loadData(gymData.id);
     }
-  }, [gymData])
+  }, [gymData]);
 
   // Función para actualizar estados de miembros
   const updateMemberStatuses = (members: Member[]) => {
-    const today = new Date()
+    const today = new Date();
     return members.map((member) => {
-      const nextPayment = new Date(member.next_payment)
-      const diffTime = today.getTime() - nextPayment.getTime()
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      const nextPayment = new Date(member.next_payment);
+      const diffTime = today.getTime() - nextPayment.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       if (nextPayment > today) {
-        return { ...member, status: "active" as const }
+        return { ...member, status: "active" as const };
       }
 
       if (diffDays > 0) {
@@ -300,72 +334,80 @@ export default function GymManagementSystem() {
             ...member,
             status: "inactive" as const,
             inactive_level: member.inactive_level || ("yellow" as const),
-          }
+          };
         } else {
-          return { ...member, status: "expired" as const }
+          return { ...member, status: "expired" as const };
         }
       }
 
-      return { ...member, status: "expired" as const }
-    })
-  }
+      return { ...member, status: "expired" as const };
+    });
+  };
 
   // Aplicar actualización de estados
   useEffect(() => {
     if (members.length > 0) {
-      const updatedMembers = updateMemberStatuses(members)
+      const updatedMembers = updateMemberStatuses(members);
       if (JSON.stringify(updatedMembers) !== JSON.stringify(members)) {
-        setMembers(updatedMembers)
+        setMembers(updatedMembers);
       }
     }
-  }, [gymData])
+  }, [gymData]);
 
   // Calculate dashboard metrics
-  const activeMembers = members.filter((m) => m.status === "active").length
-  const expiredMembers = members.filter((m) => m.status === "expired").length
-  const inactiveMembers = members.filter((m) => m.status === "inactive").length
+  const activeMembers = members.filter((m) => m.status === "active").length;
+  const expiredMembers = members.filter((m) => m.status === "expired").length;
+  const inactiveMembers = members.filter((m) => m.status === "inactive").length;
 
-  const currentMonth = new Date().getMonth()
-  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
 
   const monthlyIncome = payments
     .filter((p) => {
-      const paymentDate = new Date(p.date)
-      return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear
+      const paymentDate = new Date(p.date);
+      return (
+        paymentDate.getMonth() === currentMonth &&
+        paymentDate.getFullYear() === currentYear
+      );
     })
-    .reduce((sum, p) => sum + p.amount, 0)
+    .reduce((sum, p) => sum + p.amount, 0);
 
   const monthlyExpenses = expenses
     .filter((e) => {
-      const expenseDate = new Date(e.date)
-      return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear
+      const expenseDate = new Date(e.date);
+      return (
+        expenseDate.getMonth() === currentMonth &&
+        expenseDate.getFullYear() === currentYear
+      );
     })
-    .reduce((sum, e) => sum + e.amount, 0)
+    .reduce((sum, e) => sum + e.amount, 0);
 
-  const monthlyProfit = monthlyIncome - monthlyExpenses
+  const monthlyProfit = monthlyIncome - monthlyExpenses;
 
   const upcomingExpirations = members.filter((m) => {
-    const nextPayment = new Date(m.next_payment)
-    const today = new Date()
-    const diffTime = nextPayment.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays <= 7 && diffDays >= 0
-  }).length
+    const nextPayment = new Date(m.next_payment);
+    const today = new Date();
+    const diffTime = nextPayment.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays <= 7 && diffDays >= 0;
+  }).length;
 
   const goToMembersWithFilter = (filter: string) => {
-    setMemberFilter(filter)
-    setActiveTab("members")
-  }
+    setMemberFilter(filter);
+    setActiveTab("members");
+  };
 
   const goToProspects = () => {
-    setActiveTab("prospects")
-  }
+    setActiveTab("prospects");
+  };
 
   const renderDashboard = () => (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-        <p className="text-muted-foreground">Resumen general de {gymData?.name}</p>
+        <p className="text-muted-foreground">
+          Resumen general de {gymData?.name}
+        </p>
       </div>
 
       {loading && (
@@ -381,33 +423,51 @@ export default function GymManagementSystem() {
           onClick={() => goToMembersWithFilter("active")}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Socios Activos</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Socios Activos
+            </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{activeMembers}</div>
-            <p className="text-xs text-muted-foreground">Haz clic para ver detalles</p>
+            <div className="text-2xl font-bold text-green-600">
+              {activeMembers}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Haz clic para ver detalles
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ingresos del Mes</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Ingresos del Mes
+            </CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${monthlyIncome.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Gastos: ${monthlyExpenses.toLocaleString()}</p>
+            <div className="text-2xl font-bold">
+              ${monthlyIncome.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Gastos: ${monthlyExpenses.toLocaleString()}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ganancia Mensual</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Ganancia Mensual
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${monthlyProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+            <div
+              className={`text-2xl font-bold ${
+                monthlyProfit >= 0 ? "text-green-600" : "text-red-600"
+              }`}
+            >
               ${monthlyProfit.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">Ingresos - Gastos</p>
@@ -419,12 +479,18 @@ export default function GymManagementSystem() {
           onClick={() => goToMembersWithFilter("expired")}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Vencimientos Próximos</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Vencimientos Próximos
+            </CardTitle>
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{upcomingExpirations}</div>
-            <p className="text-xs text-muted-foreground">Haz clic para ver detalles</p>
+            <div className="text-2xl font-bold text-orange-600">
+              {upcomingExpirations}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Haz clic para ver detalles
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -490,7 +556,9 @@ export default function GymManagementSystem() {
                 onClick={() => goToMembersWithFilter("expired")}
               >
                 <AlertTriangle className="h-4 w-4" />
-                <span>{upcomingExpirations} socios con vencimiento próximo</span>
+                <span>
+                  {upcomingExpirations} socios con vencimiento próximo
+                </span>
               </div>
             )}
             {expiredMembers > 0 && (
@@ -508,7 +576,10 @@ export default function GymManagementSystem() {
                 onClick={goToProspects}
               >
                 <UserPlus className="h-4 w-4" />
-                <span>{prospects.filter((p) => p.status === "new").length} nuevos interesados por contactar</span>
+                <span>
+                  {prospects.filter((p) => p.status === "new").length} nuevos
+                  interesados por contactar
+                </span>
               </div>
             )}
             {upcomingExpirations === 0 &&
@@ -522,10 +593,10 @@ export default function GymManagementSystem() {
         </Card>
       </div>
     </div>
-  )
+  );
 
   if (!isAuthenticated) {
-    return <LoginSystem onLogin={handleLogin} />
+    return <LoginSystem onLogin={handleLogin} />;
   }
 
   return (
@@ -535,8 +606,12 @@ export default function GymManagementSystem() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">GymManagerPro 2.0</h1>
-              <p className="text-sm text-gray-500">{gymData?.name || "Sistema de Gestión Multi-Gimnasio"}</p>
+              <h1 className="text-2xl font-bold text-gray-900">
+                GymManagerPro 2.0
+              </h1>
+              <p className="text-sm text-gray-500">
+                {gymData?.name || "Sistema de Gestión Multi-Gimnasio"}
+              </p>
             </div>
             <Button variant="outline" onClick={handleLogout}>
               Cerrar Sesión
@@ -614,22 +689,44 @@ export default function GymManagementSystem() {
           />
         )}
         {activeTab === "expenses" && (
-          <ExpenseManagement expenses={expenses} setExpenses={setExpenses} gymId={gymData?.id || ""} />
+          <ExpenseManagement
+            expenses={expenses}
+            setExpenses={setExpenses}
+            gymId={gymData?.id || ""}
+          />
         )}
         {activeTab === "reports" && (
-          <ReportsSection members={members} payments={payments} expenses={expenses} gymName={gymData?.name || ""} />
+          <ReportsSection
+            members={members}
+            payments={payments}
+            expenses={expenses}
+            gymName={gymData?.name || ""}
+          />
         )}
         {activeTab === "plans" && (
-          <PlanManagement plans={plans} setPlans={setPlans} activities={activities} gymId={gymData?.id || ""} />
+          <PlanManagement
+            plans={plans}
+            setPlans={setPlans}
+            activities={activities}
+            gymId={gymData?.id || ""}
+          />
         )}
         {activeTab === "activities" && (
-          <ActivityManagement activities={activities} setActivities={setActivities} gymId={gymData?.id || ""} />
+          <ActivityManagement
+            activities={activities}
+            setActivities={setActivities}
+            gymId={gymData?.id || ""}
+          />
         )}
         {activeTab === "routines" && <RoutineManagement />}
         {activeTab === "inactives" && (
-          <InactiveManagement members={members} setMembers={setMembers} payments={payments} />
+          <InactiveManagement
+            members={members}
+            setMembers={setMembers}
+            payments={payments}
+          />
         )}
       </main>
     </div>
-  )
+  );
 }

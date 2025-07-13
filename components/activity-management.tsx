@@ -1,13 +1,19 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -16,36 +22,34 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Edit, Trash2, Search, Clock, Users } from "lucide-react"
-
-interface Activity {
-  id: string
-  name: string
-  description: string
-  instructor: string
-  capacity: number
-  duration: number // en minutos
-  schedule: {
-    day: string
-    startTime: string
-    endTime: string
-  }[]
-  isActive: boolean
-  createdDate: string
-}
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Plus, Edit, Trash2, Search, Clock, Users } from "lucide-react";
+import type { Activity } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 interface ActivityManagementProps {
-  activities: Activity[]
-  setActivities: (activities: Activity[]) => void
+  activities: Activity[];
+  setActivities: (activities: Activity[]) => void;
+  gymId: string; // 👈 agregalo acá
 }
 
-export function ActivityManagement({ activities, setActivities }: ActivityManagementProps) {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [editingActivity, setEditingActivity] = useState<Activity | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
+export function ActivityManagement({
+  activities,
+  setActivities,
+  gymId,
+}: ActivityManagementProps) {
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const [newActivity, setNewActivity] = useState({
     name: "",
     description: "",
@@ -53,25 +57,43 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
     capacity: 10,
     duration: 60,
     schedule: [] as { day: string; startTime: string; endTime: string }[],
-  })
+  });
 
-  const daysOfWeek = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+  const daysOfWeek = [
+    "Lunes",
+    "Martes",
+    "Miércoles",
+    "Jueves",
+    "Viernes",
+    "Sábado",
+    "Domingo",
+  ];
 
   const filteredActivities = activities.filter(
     (activity) =>
       activity.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.instructor.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+      activity.instructor.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const handleAddActivity = () => {
+  const handleAddActivity = async () => {
     const activity: Activity = {
-      id: Date.now().toString(),
+      id: `${gymId}_activity_${Date.now()}`,
+      gym_id: gymId,
       ...newActivity,
-      isActive: true,
-      createdDate: new Date().toISOString().split("T")[0],
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+
+    // 👇 GUARDAR EN SUPABASE
+    const { error } = await supabase.from("activities").insert([activity]);
+
+    if (error) {
+      console.error("Error al guardar en Supabase:", error);
+      return;
     }
 
-    setActivities([...activities, activity])
+    // Si se guarda bien, actualizá la UI
+    setActivities([...activities, activity]);
     setNewActivity({
       name: "",
       description: "",
@@ -79,52 +101,77 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
       capacity: 10,
       duration: 60,
       schedule: [],
-    })
-    setIsAddDialogOpen(false)
-  }
+    });
+    setIsAddDialogOpen(false);
+  };
 
   const handleEditActivity = () => {
-    if (!editingActivity) return
+    if (!editingActivity) return;
 
-    setActivities(activities.map((a) => (a.id === editingActivity.id ? editingActivity : a)))
-    setIsEditDialogOpen(false)
-    setEditingActivity(null)
-  }
+    setActivities(
+      activities.map((a) => (a.id === editingActivity.id ? editingActivity : a))
+    );
+    setIsEditDialogOpen(false);
+    setEditingActivity(null);
+  };
 
   const handleDeleteActivity = (id: string) => {
-    setActivities(activities.filter((a) => a.id !== id))
-  }
+    setActivities(activities.filter((a) => a.id !== id));
+  };
 
   const toggleActivityStatus = (id: string) => {
-    setActivities(activities.map((a) => (a.id === id ? { ...a, isActive: !a.isActive } : a)))
-  }
+    setActivities(
+      activities.map((a) =>
+        a.id === id ? { ...a, isActive: !a.is_active } : a
+      )
+    );
+  };
 
   const addScheduleSlot = (activityData: any, setActivityData: any) => {
     setActivityData({
       ...activityData,
-      schedule: [...activityData.schedule, { day: "Lunes", startTime: "08:00", endTime: "09:00" }],
-    })
-  }
+      schedule: [
+        ...activityData.schedule,
+        { day: "Lunes", startTime: "08:00", endTime: "09:00" },
+      ],
+    });
+  };
 
-  const removeScheduleSlot = (index: number, activityData: any, setActivityData: any) => {
+  const removeScheduleSlot = (
+    index: number,
+    activityData: any,
+    setActivityData: any
+  ) => {
     setActivityData({
       ...activityData,
-      schedule: activityData.schedule.filter((_: any, i: number) => i !== index),
-    })
-  }
+      schedule: activityData.schedule.filter(
+        (_: any, i: number) => i !== index
+      ),
+    });
+  };
 
-  const updateScheduleSlot = (index: number, field: string, value: string, activityData: any, setActivityData: any) => {
-    const updatedSchedule = [...activityData.schedule]
-    updatedSchedule[index] = { ...updatedSchedule[index], [field]: value }
-    setActivityData({ ...activityData, schedule: updatedSchedule })
-  }
+  const updateScheduleSlot = (
+    index: number,
+    field: string,
+    value: string,
+    activityData: any,
+    setActivityData: any
+  ) => {
+    const updatedSchedule = [...activityData.schedule];
+    updatedSchedule[index] = { ...updatedSchedule[index], [field]: value };
+    setActivityData({ ...activityData, schedule: updatedSchedule });
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Gestión de Actividades</h2>
-          <p className="text-muted-foreground">Administra las clases y actividades del gimnasio</p>
+          <h2 className="text-3xl font-bold tracking-tight">
+            Gestión de Actividades
+          </h2>
+          <p className="text-muted-foreground">
+            Administra las clases y actividades del gimnasio
+          </p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
@@ -136,7 +183,9 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
           <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Crear Nueva Actividad</DialogTitle>
-              <DialogDescription>Define una nueva clase o actividad para el gimnasio.</DialogDescription>
+              <DialogDescription>
+                Define una nueva clase o actividad para el gimnasio.
+              </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
@@ -144,7 +193,9 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                 <Input
                   id="name"
                   value={newActivity.name}
-                  onChange={(e) => setNewActivity({ ...newActivity, name: e.target.value })}
+                  onChange={(e) =>
+                    setNewActivity({ ...newActivity, name: e.target.value })
+                  }
                   placeholder="Pilates Matutino"
                 />
               </div>
@@ -153,7 +204,12 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                 <Textarea
                   id="description"
                   value={newActivity.description}
-                  onChange={(e) => setNewActivity({ ...newActivity, description: e.target.value })}
+                  onChange={(e) =>
+                    setNewActivity({
+                      ...newActivity,
+                      description: e.target.value,
+                    })
+                  }
                   placeholder="Describe la actividad..."
                   className="min-h-[80px]"
                 />
@@ -164,7 +220,12 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                   <Input
                     id="instructor"
                     value={newActivity.instructor}
-                    onChange={(e) => setNewActivity({ ...newActivity, instructor: e.target.value })}
+                    onChange={(e) =>
+                      setNewActivity({
+                        ...newActivity,
+                        instructor: e.target.value,
+                      })
+                    }
                     placeholder="María González"
                   />
                 </div>
@@ -174,7 +235,12 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                     id="capacity"
                     type="number"
                     value={newActivity.capacity}
-                    onChange={(e) => setNewActivity({ ...newActivity, capacity: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setNewActivity({
+                        ...newActivity,
+                        capacity: Number(e.target.value),
+                      })
+                    }
                     placeholder="15"
                   />
                 </div>
@@ -185,7 +251,12 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                   id="duration"
                   type="number"
                   value={newActivity.duration}
-                  onChange={(e) => setNewActivity({ ...newActivity, duration: Number(e.target.value) })}
+                  onChange={(e) =>
+                    setNewActivity({
+                      ...newActivity,
+                      duration: Number(e.target.value),
+                    })
+                  }
                   placeholder="60"
                 />
               </div>
@@ -207,7 +278,15 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                     <div key={index} className="flex gap-2 items-center">
                       <Select
                         value={slot.day}
-                        onValueChange={(value) => updateScheduleSlot(index, "day", value, newActivity, setNewActivity)}
+                        onValueChange={(value) =>
+                          updateScheduleSlot(
+                            index,
+                            "day",
+                            value,
+                            newActivity,
+                            setNewActivity
+                          )
+                        }
                       >
                         <SelectTrigger className="w-32">
                           <SelectValue />
@@ -224,7 +303,13 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                         type="time"
                         value={slot.startTime}
                         onChange={(e) =>
-                          updateScheduleSlot(index, "startTime", e.target.value, newActivity, setNewActivity)
+                          updateScheduleSlot(
+                            index,
+                            "startTime",
+                            e.target.value,
+                            newActivity,
+                            setNewActivity
+                          )
                         }
                         className="w-24"
                       />
@@ -233,7 +318,13 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                         type="time"
                         value={slot.endTime}
                         onChange={(e) =>
-                          updateScheduleSlot(index, "endTime", e.target.value, newActivity, setNewActivity)
+                          updateScheduleSlot(
+                            index,
+                            "endTime",
+                            e.target.value,
+                            newActivity,
+                            setNewActivity
+                          )
                         }
                         className="w-24"
                       />
@@ -241,7 +332,9 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => removeScheduleSlot(index, newActivity, setNewActivity)}
+                        onClick={() =>
+                          removeScheduleSlot(index, newActivity, setNewActivity)
+                        }
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -280,7 +373,9 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
       {/* Activities Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Actividades ({filteredActivities.length})</CardTitle>
+          <CardTitle>
+            Lista de Actividades ({filteredActivities.length})
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -301,7 +396,9 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                   <TableCell>
                     <div>
                       <div className="font-medium">{activity.name}</div>
-                      <div className="text-sm text-muted-foreground truncate max-w-xs">{activity.description}</div>
+                      <div className="text-sm text-muted-foreground truncate max-w-xs">
+                        {activity.description}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>{activity.instructor}</TableCell>
@@ -320,7 +417,11 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                   <TableCell>
                     <div className="space-y-1">
                       {activity.schedule.slice(0, 2).map((slot, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
+                        <Badge
+                          key={index}
+                          variant="outline"
+                          className="text-xs"
+                        >
                           {slot.day} {slot.startTime}-{slot.endTime}
                         </Badge>
                       ))}
@@ -336,9 +437,11 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                       variant="outline"
                       size="sm"
                       onClick={() => toggleActivityStatus(activity.id)}
-                      className={activity.isActive ? "text-green-600" : "text-red-600"}
+                      className={
+                        activity.is_active ? "text-green-600" : "text-red-600"
+                      }
                     >
-                      {activity.isActive ? "Activa" : "Inactiva"}
+                      {activity.is_active ? "Activa" : "Inactiva"}
                     </Button>
                   </TableCell>
                   <TableCell>
@@ -347,13 +450,17 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setEditingActivity(activity)
-                          setIsEditDialogOpen(true)
+                          setEditingActivity(activity);
+                          setIsEditDialogOpen(true);
                         }}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeleteActivity(activity.id)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteActivity(activity.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -370,7 +477,9 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
         <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Actividad</DialogTitle>
-            <DialogDescription>Modifica los datos de la actividad.</DialogDescription>
+            <DialogDescription>
+              Modifica los datos de la actividad.
+            </DialogDescription>
           </DialogHeader>
           {editingActivity && (
             <div className="grid gap-4 py-4">
@@ -379,7 +488,12 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                 <Input
                   id="edit-name"
                   value={editingActivity.name}
-                  onChange={(e) => setEditingActivity({ ...editingActivity, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditingActivity({
+                      ...editingActivity,
+                      name: e.target.value,
+                    })
+                  }
                 />
               </div>
               <div className="grid gap-2">
@@ -387,7 +501,12 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                 <Textarea
                   id="edit-description"
                   value={editingActivity.description}
-                  onChange={(e) => setEditingActivity({ ...editingActivity, description: e.target.value })}
+                  onChange={(e) =>
+                    setEditingActivity({
+                      ...editingActivity,
+                      description: e.target.value,
+                    })
+                  }
                   className="min-h-[80px]"
                 />
               </div>
@@ -397,7 +516,12 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                   <Input
                     id="edit-instructor"
                     value={editingActivity.instructor}
-                    onChange={(e) => setEditingActivity({ ...editingActivity, instructor: e.target.value })}
+                    onChange={(e) =>
+                      setEditingActivity({
+                        ...editingActivity,
+                        instructor: e.target.value,
+                      })
+                    }
                   />
                 </div>
                 <div className="grid gap-2">
@@ -406,7 +530,12 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                     id="edit-capacity"
                     type="number"
                     value={editingActivity.capacity}
-                    onChange={(e) => setEditingActivity({ ...editingActivity, capacity: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setEditingActivity({
+                        ...editingActivity,
+                        capacity: Number(e.target.value),
+                      })
+                    }
                   />
                 </div>
               </div>
@@ -416,7 +545,12 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                   id="edit-duration"
                   type="number"
                   value={editingActivity.duration}
-                  onChange={(e) => setEditingActivity({ ...editingActivity, duration: Number(e.target.value) })}
+                  onChange={(e) =>
+                    setEditingActivity({
+                      ...editingActivity,
+                      duration: Number(e.target.value),
+                    })
+                  }
                 />
               </div>
               <div className="grid gap-2">
@@ -426,7 +560,9 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => addScheduleSlot(editingActivity, setEditingActivity)}
+                    onClick={() =>
+                      addScheduleSlot(editingActivity, setEditingActivity)
+                    }
                   >
                     <Plus className="h-4 w-4 mr-1" />
                     Agregar Horario
@@ -438,7 +574,13 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                       <Select
                         value={slot.day}
                         onValueChange={(value) =>
-                          updateScheduleSlot(index, "day", value, editingActivity, setEditingActivity)
+                          updateScheduleSlot(
+                            index,
+                            "day",
+                            value,
+                            editingActivity,
+                            setEditingActivity
+                          )
                         }
                       >
                         <SelectTrigger className="w-32">
@@ -456,7 +598,13 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                         type="time"
                         value={slot.startTime}
                         onChange={(e) =>
-                          updateScheduleSlot(index, "startTime", e.target.value, editingActivity, setEditingActivity)
+                          updateScheduleSlot(
+                            index,
+                            "startTime",
+                            e.target.value,
+                            editingActivity,
+                            setEditingActivity
+                          )
                         }
                         className="w-24"
                       />
@@ -465,7 +613,13 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                         type="time"
                         value={slot.endTime}
                         onChange={(e) =>
-                          updateScheduleSlot(index, "endTime", e.target.value, editingActivity, setEditingActivity)
+                          updateScheduleSlot(
+                            index,
+                            "endTime",
+                            e.target.value,
+                            editingActivity,
+                            setEditingActivity
+                          )
                         }
                         className="w-24"
                       />
@@ -473,7 +627,13 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => removeScheduleSlot(index, editingActivity, setEditingActivity)}
+                        onClick={() =>
+                          removeScheduleSlot(
+                            index,
+                            editingActivity,
+                            setEditingActivity
+                          )
+                        }
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -491,5 +651,5 @@ export function ActivityManagement({ activities, setActivities }: ActivityManage
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
