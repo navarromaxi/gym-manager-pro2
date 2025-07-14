@@ -72,6 +72,7 @@ export function ExpenseManagement({
     date: new Date().toISOString().split("T")[0],
     isRecurring: false,
   });
+  const [generatedExpenseDate, setGeneratedExpenseDate] = useState(new Date().toISOString().split("T")[0]);
   const [monthFilter, setMonthFilter] = useState("all");
   const [selectedRecurringExpense, setSelectedRecurringExpense] = useState("");
   const [yearFilter, setYearFilter] = useState("all");
@@ -92,7 +93,7 @@ export function ExpenseManagement({
       const { data, error } = await supabase
         .from("expenses")
         .select("*")
-        .eq("gymId", gymId)
+        .eq("gym_id", gymId)
         .order("date", { ascending: false });
 
       if (error) {
@@ -158,9 +159,24 @@ export function ExpenseManagement({
       ...newExpense,
     };
 
-    const { error } = await supabase.from("expenses").insert([expense]);
+    const expenseForSupabase = {
+      id: expense.id,
+      gym_id: gymId,
+      description: expense.description,
+      amount: expense.amount,
+      date: expense.date,
+      category: expense.category,
+      is_recurring: expense.isRecurring, // ✅ renombrado bien
+    };
+    console.log("Objeto que voy a insertar en Supabase:", expenseForSupabase);
+
+    const { error } = await supabase
+      .from("expenses")
+      .insert([expenseForSupabase]);
+    console.log("Objeto que voy a insertar en Supabase:", expenseForSupabase);
 
     if (error) {
+      console.error("Error exacto desde Supabase:", error.message);
       console.error("Error al guardar gasto:", error);
       alert("Hubo un error al guardar el gasto en Supabase");
       return;
@@ -193,8 +209,7 @@ export function ExpenseManagement({
     const updatedExpenses = expenses.filter((e) => e.id !== id);
     setExpenses(updatedExpenses);
   };
-  
-  // FUNCIÓN PARA GENERAR UN GASTO FIJO ESPECÍFICO
+
   const generateSpecificRecurringExpense = async () => {
     if (!selectedRecurringExpense) return;
 
@@ -207,7 +222,6 @@ export function ExpenseManagement({
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
 
-    // Verificar si ya existe este gasto específico este mes
     const alreadyExists = expenses.some(
       (expense) =>
         expense.description.includes(recurringExpense.description) &&
@@ -231,9 +245,23 @@ export function ExpenseManagement({
         isRecurring: false,
       };
 
+      // ✨ Eliminamos gymId y construimos gym_id
+      const expenseForSupabase = {
+        id: generatedExpense.id,
+        gym_id: gymId,
+        description: generatedExpense.description,
+        amount: generatedExpense.amount,
+        date: generatedExpense.date,
+        category: generatedExpense.category,
+        is_recurring: generatedExpense.isRecurring, // 🟢 CAMBIO CLAVE
+      };
+
+      console.log("Insertando gasto fijo en Supabase:", expenseForSupabase);
+
       const { error } = await supabase
         .from("expenses")
-        .insert([generatedExpense]);
+        .insert([expenseForSupabase]);
+
       if (error) {
         console.error("Error insertando gasto fijo generado:", error);
         alert("No se pudo guardar el gasto fijo generado.");
