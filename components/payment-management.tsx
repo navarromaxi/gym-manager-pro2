@@ -219,7 +219,7 @@ export function PaymentManagement({
               <DialogTitle>Registrar Pago de Socio</DialogTitle>
               <DialogDescription>Registra el pago de un socio existente y renueva su plan.</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
               {/* BUSCADOR DE SOCIOS */}
               <div className="grid gap-2">
                 <Label htmlFor="member-search">Buscar Socio</Label>

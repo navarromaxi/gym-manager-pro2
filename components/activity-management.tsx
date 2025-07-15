@@ -105,17 +105,41 @@ export function ActivityManagement({
     setIsAddDialogOpen(false);
   };
 
-  const handleEditActivity = () => {
-    if (!editingActivity) return;
+  const handleEditActivity = async () => {
+  if (!editingActivity) return;
 
-    setActivities(
-      activities.map((a) => (a.id === editingActivity.id ? editingActivity : a))
-    );
-    setIsEditDialogOpen(false);
-    setEditingActivity(null);
-  };
+  const { error } = await supabase
+    .from("activities")
+    .update({
+      name: editingActivity.name,
+      description: editingActivity.description,
+      instructor: editingActivity.instructor,
+      capacity: editingActivity.capacity,
+      duration: editingActivity.duration,
+      schedule: editingActivity.schedule,
+    })
+    .eq("id", editingActivity.id);
 
-  const handleDeleteActivity = (id: string) => {
+  if (error) {
+    console.error("Error al editar actividad en Supabase:", error);
+    return;
+  }
+
+  setActivities(
+    activities.map((a) => (a.id === editingActivity.id ? editingActivity : a))
+  );
+  setIsEditDialogOpen(false);
+  setEditingActivity(null);
+};
+
+  const handleDeleteActivity = async (id: string) => {
+    const { error } = await supabase.from("activities").delete().eq("id", id);
+
+    if (error) {
+      console.error("Error al eliminar la actividad en Supabase:", error);
+      return;
+    }
+
     setActivities(activities.filter((a) => a.id !== id));
   };
 

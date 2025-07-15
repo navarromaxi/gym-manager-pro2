@@ -1,13 +1,20 @@
-"use client"
-
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+"use client";
+import { useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -16,114 +23,199 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Edit, Trash2, Search } from "lucide-react"
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Plus, Edit, Trash2, Search } from "lucide-react";
 
 interface Plan {
-  id: string
-  name: string
-  description: string
-  price: number
-  duration: number
-  durationType: "days" | "months" | "years"
-  activities: string[]
-  isActive: boolean
-  createdDate: string
+  id: string;
+  gym_id: string;
+  name: string;
+  description: string;
+  price: number;
+  duration: number;
+  duration_type: "days" | "months" | "years"; // ⬅️ este cambio
+  activities: string[];
+  is_active: boolean;
+  created_at?: string;
 }
 
 interface Activity {
-  id: string
-  name: string
-  description: string
-  instructor: string
-  capacity: number
-  duration: number
+  id: string;
+  name: string;
+  description: string;
+  instructor: string;
+  capacity: number;
+  duration: number;
   schedule: {
-    day: string
-    startTime: string
-    endTime: string
-  }[]
-  isActive: boolean
-  createdDate: string
+    day: string;
+    startTime: string;
+    endTime: string;
+  }[];
+  isActive: boolean;
+  createdDate: string;
 }
 
 interface PlanManagementProps {
-  plans: Plan[]
-  setPlans: (plans: Plan[]) => void
-  activities: Activity[]
+  plans: Plan[];
+  setPlans: (plans: Plan[]) => void;
+  activities: Activity[];
+  gymId: string; // ✅ AGREGALO AQUÍ
 }
 
-export function PlanManagement({ plans, setPlans, activities }: PlanManagementProps) {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [editingPlan, setEditingPlan] = useState<Plan | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
+export function PlanManagement({
+  plans,
+  setPlans,
+  activities,
+  gymId,
+}: PlanManagementProps) {
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const [newPlan, setNewPlan] = useState({
     name: "",
     description: "",
     price: 0,
     duration: 1,
-    durationType: "months" as "days" | "months" | "years",
+    duration_type: "months" as "days" | "months" | "years", // ⬅️ este cambio
     activities: [] as string[],
-  })
+  });
 
-  // Usar las actividades que vienen como prop en lugar de hardcodear
-  const availableActivities = activities.filter((activity) => activity.isActive).map((activity) => activity.name)
+  // 🔄 ACTIVIDADES DISPONIBLES
+  const [availableActivities, setAvailableActivities] = useState<Activity[]>(
+    []
+  );
 
+  useEffect(() => {
+    const fetchActivities = async () => {
+      const { data, error } = await supabase
+        .from("activities")
+        .select("*")
+        .eq("gym_id", gymId)
+        .eq("is_active", true);
+
+      if (error) {
+        console.error("Error al cargar actividades desde Supabase:", error);
+      } else {
+        setAvailableActivities(data as Activity[]);
+      }
+    };
+
+    fetchActivities();
+  }, []);
+
+  // 🔍 FILTRADO
   const filteredPlans = plans.filter(
     (plan) =>
       plan.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      plan.description.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+      plan.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const handleAddPlan = () => {
-    const plan: Plan = {
-      id: Date.now().toString(),
-      ...newPlan,
-      isActive: true,
-      createdDate: new Date().toISOString().split("T")[0],
+  // ✅ CARGAR PLANES DESDE SUPABASE
+  useEffect(() => {
+    const fetchPlans = async () => {
+      const { data, error } = await supabase
+        .from("plans")
+        .select("*")
+        .eq("gym_id", gymId);
+
+      if (error) {
+        console.error("Error al cargar planes desde Supabase:", error);
+        return;
+      }
+
+      if (data) {
+        setPlans(data as Plan[]);
+      }
+    };
+
+    fetchPlans();
+  }, []);
+
+  // ✅ GUARDAR PLAN NUEVO
+  const handleAddPlan = async () => {
+    const newId = `${gymId}_plan_${Date.now()}`;
+
+    const plan: any = {
+      id: newId,
+      gym_id: gymId,
+      name: newPlan.name,
+      description: newPlan.description,
+      price: newPlan.price,
+      duration: newPlan.duration,
+      duration_type: newPlan.duration_type,
+      activities: newPlan.activities,
+      is_active: true, // ✅ nombre correcto
+    };
+
+    const { error } = await supabase.from("plans").insert([plan]);
+
+    if (error) {
+      console.error("Error al guardar el plan en Supabase:", error);
+      return;
     }
 
-    setPlans([...plans, plan])
+    setPlans([...plans, plan]);
     setNewPlan({
       name: "",
       description: "",
       price: 0,
       duration: 1,
-      durationType: "months",
+      duration_type: "months", // ✅ cambiamos aquí
       activities: [],
-    })
-    setIsAddDialogOpen(false)
-  }
+    });
+    setIsAddDialogOpen(false);
+  };
 
   const handleEditPlan = () => {
-    if (!editingPlan) return
+    if (!editingPlan) return;
 
-    setPlans(plans.map((p) => (p.id === editingPlan.id ? editingPlan : p)))
-    setIsEditDialogOpen(false)
-    setEditingPlan(null)
-  }
+    setPlans(plans.map((p) => (p.id === editingPlan.id ? editingPlan : p)));
+    setIsEditDialogOpen(false);
+    setEditingPlan(null);
+  };
 
-  const handleDeletePlan = (id: string) => {
-    setPlans(plans.filter((p) => p.id !== id))
-  }
+  const handleDeletePlan = async (id: string) => {
+    const { error } = await supabase.from("plans").delete().eq("id", id);
+
+    if (error) {
+      console.error("Error al eliminar plan de Supabase:", error);
+      return;
+    }
+
+    setPlans(plans.filter((p) => p.id !== id));
+  };
 
   const togglePlanStatus = (id: string) => {
-    setPlans(plans.map((p) => (p.id === id ? { ...p, isActive: !p.isActive } : p)))
-  }
+    setPlans(
+      plans.map((p) => (p.id === id ? { ...p, is_active: !p.is_active } : p))
+    );
+  };
 
   const getDurationText = (duration: number, type: string) => {
-    const typeText = type === "days" ? "día(s)" : type === "months" ? "mes(es)" : "año(s)"
-    return `${duration} ${typeText}`
-  }
+    const typeText =
+      type === "days" ? "día(s)" : type === "months" ? "mes(es)" : "año(s)";
+    return `${duration} ${typeText}`;
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Gestión de Planes</h2>
-          <p className="text-muted-foreground">Administra los planes de suscripción del gimnasio</p>
+          <h2 className="text-3xl font-bold tracking-tight">
+            Gestión de Planes
+          </h2>
+          <p className="text-muted-foreground">
+            Administra los planes de suscripción del gimnasio
+          </p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
@@ -135,7 +227,9 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Crear Nuevo Plan</DialogTitle>
-              <DialogDescription>Define un nuevo plan de suscripción para el gimnasio.</DialogDescription>
+              <DialogDescription>
+                Define un nuevo plan de suscripción para el gimnasio.
+              </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
@@ -143,7 +237,9 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                 <Input
                   id="name"
                   value={newPlan.name}
-                  onChange={(e) => setNewPlan({ ...newPlan, name: e.target.value })}
+                  onChange={(e) =>
+                    setNewPlan({ ...newPlan, name: e.target.value })
+                  }
                   placeholder="Plan Mensual Completo"
                 />
               </div>
@@ -152,7 +248,9 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                 <Textarea
                   id="description"
                   value={newPlan.description}
-                  onChange={(e) => setNewPlan({ ...newPlan, description: e.target.value })}
+                  onChange={(e) =>
+                    setNewPlan({ ...newPlan, description: e.target.value })
+                  }
                   placeholder="Describe qué incluye este plan..."
                   className="min-h-[80px]"
                 />
@@ -164,7 +262,9 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                     id="price"
                     type="number"
                     value={newPlan.price}
-                    onChange={(e) => setNewPlan({ ...newPlan, price: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setNewPlan({ ...newPlan, price: Number(e.target.value) })
+                    }
                     placeholder="2500"
                   />
                 </div>
@@ -174,13 +274,19 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                     <Input
                       type="number"
                       value={newPlan.duration}
-                      onChange={(e) => setNewPlan({ ...newPlan, duration: Number(e.target.value) })}
+                      onChange={(e) =>
+                        setNewPlan({
+                          ...newPlan,
+                          duration: Number(e.target.value),
+                        })
+                      }
                       className="w-20"
                     />
                     <Select
-                      value={newPlan.durationType}
-                      onValueChange={(value: "days" | "months" | "years") =>
-                        setNewPlan({ ...newPlan, durationType: value })
+                      value={newPlan.duration_type}
+                      onValueChange={
+                        (value: "days" | "months" | "years") =>
+                          setNewPlan({ ...newPlan, duration_type: value }) // ⬅️ este cambio
                       }
                     >
                       <SelectTrigger className="w-24">
@@ -200,36 +306,53 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                 {availableActivities.length > 0 ? (
                   <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
                     {availableActivities.map((activity) => (
-                      <label key={activity} className="flex items-center space-x-2">
+                      <label
+                        key={activity.id}
+                        className="flex items-center space-x-2"
+                      >
                         <input
                           type="checkbox"
-                          checked={newPlan.activities.includes(activity)}
+                          checked={newPlan.activities.includes(activity.name)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setNewPlan({ ...newPlan, activities: [...newPlan.activities, activity] })
+                              setNewPlan({
+                                ...newPlan,
+                                activities: [
+                                  ...newPlan.activities,
+                                  activity.name,
+                                ],
+                              });
                             } else {
                               setNewPlan({
                                 ...newPlan,
-                                activities: newPlan.activities.filter((a) => a !== activity),
-                              })
+                                activities: newPlan.activities.filter(
+                                  (a) => a !== activity.name
+                                ),
+                              });
                             }
                           }}
                           className="rounded"
                         />
-                        <span className="text-sm">{activity}</span>
+                        <span className="text-sm">{activity.name}</span>
                       </label>
                     ))}
                   </div>
                 ) : (
                   <div className="p-4 text-center text-muted-foreground bg-gray-50 rounded-lg">
                     <p>No hay actividades disponibles.</p>
-                    <p className="text-sm">Ve a la sección "Actividades" para crear algunas primero.</p>
+                    <p className="text-sm">
+                      Ve a la sección "Actividades" para crear algunas primero.
+                    </p>
                   </div>
                 )}
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit" onClick={handleAddPlan} disabled={availableActivities.length === 0}>
+              <Button
+                type="submit"
+                onClick={handleAddPlan}
+                disabled={availableActivities.length === 0}
+              >
                 Crear Plan
               </Button>
             </DialogFooter>
@@ -277,13 +400,24 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
               {filteredPlans.map((plan) => (
                 <TableRow key={plan.id}>
                   <TableCell className="font-medium">{plan.name}</TableCell>
-                  <TableCell className="max-w-xs truncate">{plan.description}</TableCell>
-                  <TableCell className="font-bold text-green-600">${plan.price.toLocaleString()}</TableCell>
-                  <TableCell>{getDurationText(plan.duration, plan.durationType)}</TableCell>
+                  <TableCell className="max-w-xs truncate">
+                    {plan.description}
+                  </TableCell>
+                  <TableCell className="font-bold text-green-600">
+                    ${plan.price.toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    {getDurationText(plan.duration, plan.duration_type)} // ✅
+                    nombre correcto
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {plan.activities.slice(0, 2).map((activity) => (
-                        <Badge key={activity} variant="outline" className="text-xs">
+                        <Badge
+                          key={activity}
+                          variant="outline"
+                          className="text-xs"
+                        >
                           {activity}
                         </Badge>
                       ))}
@@ -299,9 +433,11 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                       variant="outline"
                       size="sm"
                       onClick={() => togglePlanStatus(plan.id)}
-                      className={plan.isActive ? "text-green-600" : "text-red-600"}
+                      className={
+                        plan.is_active ? "text-green-600" : "text-red-600"
+                      }
                     >
-                      {plan.isActive ? "Activo" : "Inactivo"}
+                      {plan.is_active ? "Activo" : "Inactivo"}
                     </Button>
                   </TableCell>
                   <TableCell>
@@ -310,13 +446,17 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setEditingPlan(plan)
-                          setIsEditDialogOpen(true)
+                          setEditingPlan(plan);
+                          setIsEditDialogOpen(true);
                         }}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeletePlan(plan.id)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeletePlan(plan.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -342,7 +482,9 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                 <Input
                   id="edit-name"
                   value={editingPlan.name}
-                  onChange={(e) => setEditingPlan({ ...editingPlan, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditingPlan({ ...editingPlan, name: e.target.value })
+                  }
                 />
               </div>
               <div className="grid gap-2">
@@ -350,7 +492,12 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                 <Textarea
                   id="edit-description"
                   value={editingPlan.description}
-                  onChange={(e) => setEditingPlan({ ...editingPlan, description: e.target.value })}
+                  onChange={(e) =>
+                    setEditingPlan({
+                      ...editingPlan,
+                      description: e.target.value,
+                    })
+                  }
                   className="min-h-[80px]"
                 />
               </div>
@@ -361,7 +508,12 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                     id="edit-price"
                     type="number"
                     value={editingPlan.price}
-                    onChange={(e) => setEditingPlan({ ...editingPlan, price: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setEditingPlan({
+                        ...editingPlan,
+                        price: Number(e.target.value),
+                      })
+                    }
                   />
                 </div>
                 <div className="grid gap-2">
@@ -370,13 +522,18 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                     <Input
                       type="number"
                       value={editingPlan.duration}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, duration: Number(e.target.value) })}
+                      onChange={(e) =>
+                        setEditingPlan({
+                          ...editingPlan,
+                          duration: Number(e.target.value),
+                        })
+                      }
                       className="w-20"
                     />
                     <Select
-                      value={editingPlan.durationType}
+                      value={editingPlan.duration_type}
                       onValueChange={(value: "days" | "months" | "years") =>
-                        setEditingPlan({ ...editingPlan, durationType: value })
+                        setEditingPlan({ ...editingPlan, duration_type: value })
                       }
                     >
                       <SelectTrigger className="w-24">
@@ -395,23 +552,34 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
                 <Label>Actividades Incluidas</Label>
                 <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
                   {availableActivities.map((activity) => (
-                    <label key={activity} className="flex items-center space-x-2">
+                    <label
+                      key={activity.id}
+                      className="flex items-center space-x-2"
+                    >
                       <input
                         type="checkbox"
-                        checked={editingPlan.activities.includes(activity)}
+                        checked={editingPlan.activities.includes(activity.name)}
                         onChange={(e) => {
                           if (e.target.checked) {
-                            setEditingPlan({ ...editingPlan, activities: [...editingPlan.activities, activity] })
+                            setEditingPlan({
+                              ...editingPlan,
+                              activities: [
+                                ...editingPlan.activities,
+                                activity.name,
+                              ],
+                            });
                           } else {
                             setEditingPlan({
                               ...editingPlan,
-                              activities: editingPlan.activities.filter((a) => a !== activity),
-                            })
+                              activities: editingPlan.activities.filter(
+                                (a) => a !== activity.name
+                              ),
+                            });
                           }
                         }}
                         className="rounded"
                       />
-                      <span className="text-sm">{activity}</span>
+                      <span className="text-sm">{activity.name}</span>
                     </label>
                   ))}
                 </div>
@@ -426,5 +594,5 @@ export function PlanManagement({ plans, setPlans, activities }: PlanManagementPr
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

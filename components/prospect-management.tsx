@@ -1,13 +1,20 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useState } from "react";
+import { useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -16,21 +23,28 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Edit, Trash2, Search, UserPlus } from "lucide-react"
-import { supabase } from "@/lib/supabase"
-import type { Prospect, Member, Payment, Plan } from "@/lib/supabase"
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Plus, Edit, Trash2, Search, UserPlus } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import type { Prospect, Member, Payment, Plan } from "@/lib/supabase";
 
 interface ProspectManagementProps {
-  prospects: Prospect[]
-  setProspects: (prospects: Prospect[]) => void
-  members: Member[]
-  setMembers: (members: Member[]) => void
-  payments: Payment[]
-  setPayments: (payments: (prevPayments: Payment[]) => Payment[]) => void // Actualizado para aceptar una función
-  plans: Plan[] // Necesario para seleccionar un plan al convertir a miembro
-  gymId: string
+  prospects: Prospect[];
+  setProspects: (updater: (prev: Prospect[]) => Prospect[]) => void;
+  members: Member[];
+  setMembers: (updater: (prev: Member[]) => Member[]) => void;
+  payments: Payment[];
+  setPayments: (updater: (prev: Payment[]) => Payment[]) => void;
+  plans: Plan[];
+  gymId: string;
 }
 
 export function ProspectManagement({
@@ -43,14 +57,16 @@ export function ProspectManagement({
   plans,
   gymId,
 }: ProspectManagementProps) {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false)
-  const [editingProspect, setEditingProspect] = useState<Prospect | null>(null)
-  const [convertingProspect, setConvertingProspect] = useState<Prospect | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [priorityFilter, setPriorityFilter] = useState("all") // Nuevo estado para el filtro de prioridad
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
+  const [editingProspect, setEditingProspect] = useState<Prospect | null>(null);
+  const [convertingProspect, setConvertingProspect] = useState<Prospect | null>(
+    null
+  );
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all"); // Nuevo estado para el filtro de prioridad
   const [newProspect, setNewProspect] = useState({
     name: "",
     email: "",
@@ -60,24 +76,41 @@ export function ProspectManagement({
     status: "new" as Prospect["status"],
     notes: "",
     priority_level: "green" as "green" | "yellow" | "red", // Nuevo campo con valor por defecto
-  })
-  const [conversionPlan, setConversionPlan] = useState<string>("")
-  const [conversionPaymentMethod, setConversionPaymentMethod] = useState("Efectivo")
-  const paymentMethods = ["Efectivo", "Transferencia", "Tarjeta de Débito", "Tarjeta de Crédito"]
+  });
+  const [conversionPlan, setConversionPlan] = useState<string>("");
+  const [conversionPaymentMethod, setConversionPaymentMethod] =
+    useState("Efectivo");
+  const paymentMethods = [
+    "Efectivo",
+    "Transferencia",
+    "Tarjeta de Débito",
+    "Tarjeta de Crédito",
+  ];
+
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const filteredProspects = prospects.filter((prospect) => {
     const matchesSearch =
       prospect.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prospect.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prospect.notes.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || prospect.status === statusFilter
-    const matchesPriority = priorityFilter === "all" || prospect.priority_level === priorityFilter // Nuevo filtro
-    return matchesSearch && matchesStatus && matchesPriority
-  })
+      prospect.notes.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || prospect.status === statusFilter;
+    const matchesPriority =
+      priorityFilter === "all" || prospect.priority_level === priorityFilter; // Nuevo filtro
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
 
   const handleAddProspect = async () => {
     try {
-      const prospectToAdd: Omit<Prospect, "id"> = {
+      const prospectId = `${gymId}_prospect_${Date.now()}`;
+
+      const prospectToAdd: Prospect = {
+        id: prospectId,
         gym_id: gymId,
         name: newProspect.name,
         email: newProspect.email,
@@ -86,16 +119,19 @@ export function ProspectManagement({
         interest: newProspect.interest,
         status: newProspect.status,
         notes: newProspect.notes,
-        priority_level: newProspect.priority_level, // Incluir el nuevo campo
-      }
+        priority_level: newProspect.priority_level,
+      };
 
-      const { data, error } = await supabase.from("prospects").insert([prospectToAdd]).select()
+      const { data, error } = await supabase
+        .from("prospects")
+        .insert([prospectToAdd])
+        .select();
 
-      if (error) throw error
+      if (error) throw error;
 
       if (data && data.length > 0) {
-        const addedProspect = data[0] as Prospect
-        setProspects([...prospects, addedProspect])
+        const addedProspect = data[0] as Prospect;
+        setProspects((prev) => [...prev, addedProspect]);
         setNewProspect({
           name: "",
           email: "",
@@ -105,20 +141,22 @@ export function ProspectManagement({
           status: "new",
           notes: "",
           priority_level: "green", // Resetear a verde por defecto
-        })
-        setIsAddDialogOpen(false)
+        });
+        setIsAddDialogOpen(false);
       }
     } catch (error: any) {
       // Usar 'any' para acceder a 'message'
-      console.error("Error agregando interesado:", error.message || error)
+      console.error("Error agregando interesado:", error.message || error);
       alert(
-        `Error al agregar el interesado: ${error.message || "Error desconocido"}. Revisa la consola para más detalles.`,
-      )
+        `Error al agregar el interesado: ${
+          error.message || "Error desconocido"
+        }. Revisa la consola para más detalles.`
+      );
     }
-  }
+  };
 
   const handleEditProspect = async () => {
-    if (!editingProspect) return
+    if (!editingProspect) return;
     try {
       const { error } = await supabase
         .from("prospects")
@@ -133,55 +171,63 @@ export function ProspectManagement({
           priority_level: editingProspect.priority_level, // Incluir el nuevo campo
         })
         .eq("id", editingProspect.id)
-        .eq("gym_id", gymId)
+        .eq("gym_id", gymId);
 
-      if (error) throw error
+      if (error) throw error;
 
-      setProspects(prospects.map((p) => (p.id === editingProspect.id ? editingProspect : p)))
-      setIsEditDialogOpen(false)
-      setEditingProspect(null)
+      setProspects((prev) =>
+        prev.map((p) => (p.id === editingProspect.id ? editingProspect : p))
+      );
+      setIsEditDialogOpen(false);
+      setEditingProspect(null);
     } catch (error) {
-      console.error("Error editando interesado:", error)
-      alert("Error al editar el interesado. Inténtalo de nuevo.")
+      console.error("Error editando interesado:", error);
+      alert("Error al editar el interesado. Inténtalo de nuevo.");
     }
-  }
+  };
 
   const handleDeleteProspect = async (id: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este interesado?")) return
+    if (!confirm("¿Estás seguro de que quieres eliminar este interesado?"))
+      return;
     try {
-      const { error } = await supabase.from("prospects").delete().eq("id", id).eq("gym_id", gymId)
-      if (error) throw error
+      const { error } = await supabase
+        .from("prospects")
+        .delete()
+        .eq("id", id)
+        .eq("gym_id", gymId);
+      if (error) throw error;
 
-      setProspects(prospects.filter((p) => p.id !== id))
+      setProspects((prev) => prev.filter((p) => p.id !== id));
     } catch (error) {
-      console.error("Error eliminando interesado:", error)
-      alert("Error al eliminar el interesado. Inténtalo de nuevo.")
+      console.error("Error eliminando interesado:", error);
+      alert("Error al eliminar el interesado. Inténtalo de nuevo.");
     }
-  }
+  };
 
   const handleConvertProspectToMember = async () => {
-    if (!convertingProspect || !conversionPlan) return
-
+    if (!convertingProspect || !conversionPlan) return;
     try {
-      const selectedPlan = plans.find((p) => p.id === conversionPlan)
+      const selectedPlan = plans.find((p) => p.id === conversionPlan);
       if (!selectedPlan) {
-        alert("Plan seleccionado no válido.")
-        return
+        alert("Plan seleccionado no válido.");
+        return;
       }
 
       // 1. Crear el nuevo miembro
-      const joinDate = new Date().toISOString().split("T")[0]
-      const nextPayment = new Date(joinDate)
+      const joinDate = new Date().toISOString().split("T")[0];
+      const nextPayment = new Date(joinDate);
 
       if (selectedPlan.duration_type === "days") {
-        nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration)
+        nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration);
       } else if (selectedPlan.duration_type === "months") {
-        nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration)
+        nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration);
       } else if (selectedPlan.duration_type === "years") {
-        nextPayment.setFullYear(nextPayment.getFullYear() + selectedPlan.duration)
+        nextPayment.setFullYear(
+          nextPayment.getFullYear() + selectedPlan.duration
+        );
       }
 
-      const memberId = `${gymId}_member_${Date.now()}`
+      const memberId = `${gymId}_member_${Date.now()}`;
       const newMember: Member = {
         id: memberId,
         gym_id: gymId,
@@ -194,10 +240,12 @@ export function ProspectManagement({
         last_payment: joinDate,
         next_payment: nextPayment.toISOString().split("T")[0],
         status: "active",
-      }
+      };
 
-      const { error: memberError } = await supabase.from("members").insert([newMember])
-      if (memberError) throw memberError
+      const { error: memberError } = await supabase
+        .from("members")
+        .insert([newMember]);
+      if (memberError) throw memberError;
 
       // 2. Crear el pago inicial
       const newPayment: Payment = {
@@ -209,35 +257,39 @@ export function ProspectManagement({
         date: joinDate,
         plan: newMember.plan,
         method: conversionPaymentMethod,
-      }
+      };
 
-      const { error: paymentError } = await supabase.from("payments").insert([newPayment])
-      if (paymentError) throw paymentError
+      const { error: paymentError } = await supabase
+        .from("payments")
+        .insert([newPayment]);
+      if (paymentError) throw paymentError;
 
       // 3. Eliminar el interesado
       const { error: prospectDeleteError } = await supabase
         .from("prospects")
         .delete()
         .eq("id", convertingProspect.id)
-        .eq("gym_id", gymId)
-      if (prospectDeleteError) throw prospectDeleteError
+        .eq("gym_id", gymId);
+      if (prospectDeleteError) throw prospectDeleteError;
 
       // 4. Actualizar estados locales
-      setMembers((prevMembers) => [...prevMembers, newMember])
-      setPayments((prevPayments) => [...prevPayments, newPayment])
-      setProspects((prevProspects) => prevProspects.filter((p) => p.id !== convertingProspect.id))
+      setMembers((prevMembers) => [...prevMembers, newMember]);
+      setPayments((prevPayments) => [...prevPayments, newPayment]);
+      setProspects((prevProspects) =>
+        prevProspects.filter((p) => p.id !== convertingProspect.id)
+      );
 
       // Limpiar y cerrar diálogos
-      setIsConvertDialogOpen(false)
-      setConvertingProspect(null)
-      setConversionPlan("")
-      setConversionPaymentMethod("Efectivo")
-      alert("Interesado convertido a socio exitosamente!")
+      setIsConvertDialogOpen(false);
+      setConvertingProspect(null);
+      setConversionPlan("");
+      setConversionPaymentMethod("Efectivo");
+      alert("Interesado convertido a socio exitosamente!");
     } catch (error) {
-      console.error("Error convirtiendo interesado a miembro:", error)
-      alert("Error al convertir el interesado a socio. Inténtalo de nuevo.")
+      console.error("Error convirtiendo interesado a miembro:", error);
+      alert("Error al convertir el interesado a socio. Inténtalo de nuevo.");
     }
-  }
+  };
 
   const getStatusBadge = (status: Prospect["status"]) => {
     switch (status) {
@@ -246,50 +298,70 @@ export function ProspectManagement({
           <Badge variant="default" className="bg-blue-500 hover:bg-blue-500">
             Nuevo
           </Badge>
-        )
+        );
       case "contacted":
-        return <Badge variant="secondary">Contactado</Badge>
+        return <Badge variant="secondary">Contactado</Badge>;
       case "waiting_response":
         return (
-          <Badge variant="outline" className="border-orange-500 text-orange-500">
+          <Badge
+            variant="outline"
+            className="border-orange-500 text-orange-500"
+          >
             Esperando Respuesta
           </Badge>
-        )
+        );
       case "waiting_info":
         return (
-          <Badge variant="outline" className="border-purple-500 text-purple-500">
+          <Badge
+            variant="outline"
+            className="border-purple-500 text-purple-500"
+          >
             Esperando Info
           </Badge>
-        )
+        );
       case "not_interested":
-        return <Badge variant="destructive">No Interesado</Badge>
+        return <Badge variant="destructive">No Interesado</Badge>;
       case "contact_later":
-        return <Badge variant="outline">Contactar Después</Badge>
+        return <Badge variant="outline">Contactar Después</Badge>;
       default:
-        return <Badge variant="secondary">Desconocido</Badge>
+        return <Badge variant="secondary">Desconocido</Badge>;
     }
-  }
+  };
 
   // Nueva función para obtener el badge de prioridad
   const getPriorityBadge = (priority: Prospect["priority_level"]) => {
     switch (priority) {
       case "red":
-        return <Badge className="bg-red-500 hover:bg-red-500 text-white">Rojo</Badge>
+        return (
+          <Badge className="bg-red-500 hover:bg-red-500 text-white">Rojo</Badge>
+        );
       case "yellow":
-        return <Badge className="bg-yellow-500 hover:bg-yellow-500 text-black">Amarillo</Badge>
+        return (
+          <Badge className="bg-yellow-500 hover:bg-yellow-500 text-black">
+            Amarillo
+          </Badge>
+        );
       case "green":
-        return <Badge className="bg-green-500 hover:bg-green-500 text-white">Verde</Badge>
+        return (
+          <Badge className="bg-green-500 hover:bg-green-500 text-white">
+            Verde
+          </Badge>
+        );
       default:
-        return <Badge variant="secondary">N/A</Badge>
+        return <Badge variant="secondary">N/A</Badge>;
     }
-  }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Gestión de Interesados</h2>
-          <p className="text-muted-foreground">Administra los prospectos y conviértelos en socios.</p>
+          <h2 className="text-3xl font-bold tracking-tight">
+            Gestión de Interesados
+          </h2>
+          <p className="text-muted-foreground">
+            Administra los prospectos y conviértelos en socios.
+          </p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
@@ -301,7 +373,9 @@ export function ProspectManagement({
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Agregar Nuevo Interesado</DialogTitle>
-              <DialogDescription>Registra los datos de un nuevo prospecto.</DialogDescription>
+              <DialogDescription>
+                Registra los datos de un nuevo prospecto.
+              </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
               <div className="grid gap-2">
@@ -309,7 +383,9 @@ export function ProspectManagement({
                 <Input
                   id="name"
                   value={newProspect.name}
-                  onChange={(e) => setNewProspect({ ...newProspect, name: e.target.value })}
+                  onChange={(e) =>
+                    setNewProspect({ ...newProspect, name: e.target.value })
+                  }
                   placeholder="Ana García"
                 />
               </div>
@@ -319,7 +395,9 @@ export function ProspectManagement({
                   id="email"
                   type="email"
                   value={newProspect.email}
-                  onChange={(e) => setNewProspect({ ...newProspect, email: e.target.value })}
+                  onChange={(e) =>
+                    setNewProspect({ ...newProspect, email: e.target.value })
+                  }
                   placeholder="ana@email.com"
                 />
               </div>
@@ -328,7 +406,9 @@ export function ProspectManagement({
                 <Input
                   id="phone"
                   value={newProspect.phone}
-                  onChange={(e) => setNewProspect({ ...newProspect, phone: e.target.value })}
+                  onChange={(e) =>
+                    setNewProspect({ ...newProspect, phone: e.target.value })
+                  }
                   placeholder="098765432"
                 />
               </div>
@@ -338,7 +418,12 @@ export function ProspectManagement({
                   id="contact_date"
                   type="date"
                   value={newProspect.contact_date}
-                  onChange={(e) => setNewProspect({ ...newProspect, contact_date: e.target.value })}
+                  onChange={(e) =>
+                    setNewProspect({
+                      ...newProspect,
+                      contact_date: e.target.value,
+                    })
+                  }
                 />
               </div>
               <div className="grid gap-2">
@@ -346,7 +431,9 @@ export function ProspectManagement({
                 <Input
                   id="interest"
                   value={newProspect.interest}
-                  onChange={(e) => setNewProspect({ ...newProspect, interest: e.target.value })}
+                  onChange={(e) =>
+                    setNewProspect({ ...newProspect, interest: e.target.value })
+                  }
                   placeholder="Clases de spinning, Musculación"
                 />
               </div>
@@ -354,7 +441,9 @@ export function ProspectManagement({
                 <Label htmlFor="status">Estado</Label>
                 <Select
                   value={newProspect.status}
-                  onValueChange={(value: Prospect["status"]) => setNewProspect({ ...newProspect, status: value })}
+                  onValueChange={(value: Prospect["status"]) =>
+                    setNewProspect({ ...newProspect, status: value })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona un estado" />
@@ -362,10 +451,16 @@ export function ProspectManagement({
                   <SelectContent>
                     <SelectItem value="new">Nuevo</SelectItem>
                     <SelectItem value="contacted">Contactado</SelectItem>
-                    <SelectItem value="waiting_response">Esperando Respuesta</SelectItem>
+                    <SelectItem value="waiting_response">
+                      Esperando Respuesta
+                    </SelectItem>
                     <SelectItem value="waiting_info">Esperando Info</SelectItem>
-                    <SelectItem value="not_interested">No Interesado</SelectItem>
-                    <SelectItem value="contact_later">Contactar Después</SelectItem>
+                    <SelectItem value="not_interested">
+                      No Interesado
+                    </SelectItem>
+                    <SelectItem value="contact_later">
+                      Contactar Después
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -393,7 +488,9 @@ export function ProspectManagement({
                 <Textarea
                   id="notes"
                   value={newProspect.notes}
-                  onChange={(e) => setNewProspect({ ...newProspect, notes: e.target.value })}
+                  onChange={(e) =>
+                    setNewProspect({ ...newProspect, notes: e.target.value })
+                  }
                   placeholder="Notas adicionales sobre el interesado..."
                   className="min-h-[80px]"
                 />
@@ -433,7 +530,9 @@ export function ProspectManagement({
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="new">Nuevo</SelectItem>
                 <SelectItem value="contacted">Contactado</SelectItem>
-                <SelectItem value="waiting_response">Esperando Respuesta</SelectItem>
+                <SelectItem value="waiting_response">
+                  Esperando Respuesta
+                </SelectItem>
                 <SelectItem value="waiting_info">Esperando Info</SelectItem>
                 <SelectItem value="not_interested">No Interesado</SelectItem>
                 <SelectItem value="contact_later">Contactar Después</SelectItem>
@@ -457,7 +556,9 @@ export function ProspectManagement({
       {/* Prospects Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Interesados ({filteredProspects.length})</CardTitle>
+          <CardTitle>
+            Lista de Interesados ({filteredProspects.length})
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -469,7 +570,8 @@ export function ProspectManagement({
                 <TableHead>Fecha Contacto</TableHead>
                 <TableHead>Interés</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Prioridad</TableHead> {/* Nueva columna en la tabla */}
+                <TableHead>Prioridad</TableHead>
+                {/* Nueva columna en la tabla */}
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -479,18 +581,25 @@ export function ProspectManagement({
                   <TableCell className="font-medium">{prospect.name}</TableCell>
                   <TableCell>{prospect.email}</TableCell>
                   <TableCell>{prospect.phone}</TableCell>
-                  <TableCell>{new Date(prospect.contact_date).toLocaleDateString()}</TableCell>
-                  <TableCell className="max-w-xs truncate">{prospect.interest}</TableCell>
+                  <TableCell>
+                    {new Date(prospect.contact_date).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="max-w-xs truncate">
+                    {prospect.interest}
+                  </TableCell>
                   <TableCell>{getStatusBadge(prospect.status)}</TableCell>
-                  <TableCell>{getPriorityBadge(prospect.priority_level)}</TableCell> {/* Mostrar prioridad */}
+                  <TableCell>
+                    {getPriorityBadge(prospect.priority_level)}
+                  </TableCell>{" "}
+                  {/* Mostrar prioridad */}
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setEditingProspect(prospect)
-                          setIsEditDialogOpen(true)
+                          setEditingProspect(prospect);
+                          setIsEditDialogOpen(true);
                         }}
                       >
                         <Edit className="h-4 w-4" />
@@ -499,14 +608,18 @@ export function ProspectManagement({
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setConvertingProspect(prospect)
-                          setIsConvertDialogOpen(true)
+                          setConvertingProspect(prospect);
+                          setIsConvertDialogOpen(true);
                         }}
                         title="Convertir a Socio"
                       >
                         <UserPlus className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeleteProspect(prospect.id)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteProspect(prospect.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -522,7 +635,9 @@ export function ProspectManagement({
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Editar Interesado</DialogTitle>
-            <DialogDescription>Modifica los datos del interesado.</DialogDescription>
+            <DialogDescription>
+              Modifica los datos del interesado.
+            </DialogDescription>
           </DialogHeader>
           {editingProspect && (
             <div className="grid gap-4 py-4">
@@ -531,7 +646,12 @@ export function ProspectManagement({
                 <Input
                   id="edit-name"
                   value={editingProspect.name}
-                  onChange={(e) => setEditingProspect({ ...editingProspect, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditingProspect({
+                      ...editingProspect,
+                      name: e.target.value,
+                    })
+                  }
                 />
               </div>
               <div className="grid gap-2">
@@ -540,7 +660,12 @@ export function ProspectManagement({
                   id="edit-email"
                   type="email"
                   value={editingProspect.email || ""}
-                  onChange={(e) => setEditingProspect({ ...editingProspect, email: e.target.value })}
+                  onChange={(e) =>
+                    setEditingProspect({
+                      ...editingProspect,
+                      email: e.target.value,
+                    })
+                  }
                 />
               </div>
               <div className="grid gap-2">
@@ -548,7 +673,12 @@ export function ProspectManagement({
                 <Input
                   id="edit-phone"
                   value={editingProspect.phone || ""}
-                  onChange={(e) => setEditingProspect({ ...editingProspect, phone: e.target.value })}
+                  onChange={(e) =>
+                    setEditingProspect({
+                      ...editingProspect,
+                      phone: e.target.value,
+                    })
+                  }
                 />
               </div>
               <div className="grid gap-2">
@@ -557,7 +687,12 @@ export function ProspectManagement({
                   id="edit-contact_date"
                   type="date"
                   value={editingProspect.contact_date}
-                  onChange={(e) => setEditingProspect({ ...editingProspect, contact_date: e.target.value })}
+                  onChange={(e) =>
+                    setEditingProspect({
+                      ...editingProspect,
+                      contact_date: e.target.value,
+                    })
+                  }
                 />
               </div>
               <div className="grid gap-2">
@@ -565,7 +700,12 @@ export function ProspectManagement({
                 <Input
                   id="edit-interest"
                   value={editingProspect.interest || ""}
-                  onChange={(e) => setEditingProspect({ ...editingProspect, interest: e.target.value })}
+                  onChange={(e) =>
+                    setEditingProspect({
+                      ...editingProspect,
+                      interest: e.target.value,
+                    })
+                  }
                 />
               </div>
               <div className="grid gap-2">
@@ -582,10 +722,16 @@ export function ProspectManagement({
                   <SelectContent>
                     <SelectItem value="new">Nuevo</SelectItem>
                     <SelectItem value="contacted">Contactado</SelectItem>
-                    <SelectItem value="waiting_response">Esperando Respuesta</SelectItem>
+                    <SelectItem value="waiting_response">
+                      Esperando Respuesta
+                    </SelectItem>
                     <SelectItem value="waiting_info">Esperando Info</SelectItem>
-                    <SelectItem value="not_interested">No Interesado</SelectItem>
-                    <SelectItem value="contact_later">Contactar Después</SelectItem>
+                    <SelectItem value="not_interested">
+                      No Interesado
+                    </SelectItem>
+                    <SelectItem value="contact_later">
+                      Contactar Después
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -595,7 +741,10 @@ export function ProspectManagement({
                 <Select
                   value={editingProspect.priority_level}
                   onValueChange={(value: "green" | "yellow" | "red") =>
-                    setEditingProspect({ ...editingProspect, priority_level: value })
+                    setEditingProspect({
+                      ...editingProspect,
+                      priority_level: value,
+                    })
                   }
                 >
                   <SelectTrigger>
@@ -613,7 +762,12 @@ export function ProspectManagement({
                 <Textarea
                   id="edit-notes"
                   value={editingProspect.notes || ""}
-                  onChange={(e) => setEditingProspect({ ...editingProspect, notes: e.target.value })}
+                  onChange={(e) =>
+                    setEditingProspect({
+                      ...editingProspect,
+                      notes: e.target.value,
+                    })
+                  }
                   className="min-h-[80px]"
                 />
               </div>
@@ -627,62 +781,77 @@ export function ProspectManagement({
         </DialogContent>
       </Dialog>
       {/* Convert to Member Dialog */}
-      <Dialog open={isConvertDialogOpen} onOpenChange={setIsConvertDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Convertir a Socio</DialogTitle>
-            <DialogDescription>Convierte a {convertingProspect?.name} en un nuevo socio.</DialogDescription>
-          </DialogHeader>
-          {convertingProspect && (
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="convert-plan">Seleccionar Plan</Label>
-                <Select value={conversionPlan} onValueChange={setConversionPlan}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona un plan para el nuevo socio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plans
-                      .filter((plan) => plan.is_active)
-                      .map((plan) => (
-                        <SelectItem key={plan.id} value={plan.id}>
-                          {plan.name} - ${plan.price.toLocaleString()} ({plan.duration} {plan.duration_type})
+      {isClient && (
+        <Dialog
+          open={isConvertDialogOpen}
+          onOpenChange={setIsConvertDialogOpen}
+        >
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Convertir a Socio</DialogTitle>
+              <DialogDescription>
+                Convierte a {convertingProspect?.name} en un nuevo socio.
+              </DialogDescription>
+            </DialogHeader>
+            {convertingProspect && (
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="convert-plan">Seleccionar Plan</Label>
+                  <Select
+                    value={conversionPlan}
+                    onValueChange={setConversionPlan}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un plan para el nuevo socio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {plans
+                        .filter((plan) => plan.is_active)
+                        .map((plan) => (
+                          <SelectItem key={plan.id} value={plan.id}>
+                            {plan.name} - ${plan.price.toLocaleString()} (
+                            {plan.duration} {plan.duration_type})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="convert-method">Método de Pago Inicial</Label>
+                  <Select
+                    value={conversionPaymentMethod}
+                    onValueChange={setConversionPaymentMethod}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona método de pago" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {paymentMethods.map((method) => (
+                        <SelectItem key={method} value={method}>
+                          {method}
                         </SelectItem>
                       ))}
-                  </SelectContent>
-                </Select>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Se creará un nuevo socio y un pago inicial, y el interesado
+                  será eliminado.
+                </p>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="convert-method">Método de Pago Inicial</Label>
-                <Select value={conversionPaymentMethod} onValueChange={setConversionPaymentMethod}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona método de pago" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {paymentMethods.map((method) => (
-                      <SelectItem key={method} value={method}>
-                        {method}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Se creará un nuevo socio y un pago inicial, y el interesado será eliminado.
-              </p>
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              type="submit"
-              onClick={handleConvertProspectToMember}
-              disabled={!conversionPlan || !conversionPaymentMethod}
-            >
-              Convertir a Socio
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            )}
+            <DialogFooter>
+              <Button
+                type="submit"
+                onClick={handleConvertProspectToMember}
+                disabled={!conversionPlan || !conversionPaymentMethod}
+              >
+                Convertir a Socio
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
-  )
+  );
 }

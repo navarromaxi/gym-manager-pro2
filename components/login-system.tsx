@@ -66,7 +66,7 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
             GymManagerPro 2.0
           </CardTitle>
           <p className="text-muted-foreground">
-            Sistema de Gestión para Gimnasios
+            Gestión para Gimnasios
           </p>
         </CardHeader>
         <CardContent>
@@ -115,20 +115,7 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
             </Button>
           </form>
 
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">
-              Cuentas de Prueba:
-            </h4>
-            <div className="text-sm text-blue-700 space-y-1">
-              <div>
-                <strong>Demo:</strong> usuario: demo, contraseña: demo123
-              </div>
-              <div>
-                <strong>Dinamo:</strong> usuario: dinamo_admin, contraseña:
-                dinamo2024
-              </div>
-            </div>
-          </div>
+          
         </CardContent>
       </Card>
     </div>
