@@ -303,7 +303,7 @@ export function ProspectManagement({
               <DialogTitle>Agregar Nuevo Interesado</DialogTitle>
               <DialogDescription>Registra los datos de un nuevo prospecto.</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
               <div className="grid gap-2">
                 <Label htmlFor="name">Nombre completo</Label>
                 <Input

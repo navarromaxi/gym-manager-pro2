@@ -275,7 +275,7 @@ export function MemberManagement({
               <DialogTitle>Agregar Nuevo Socio</DialogTitle>
               <DialogDescription>Completa los datos del nuevo miembro del gimnasio.</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
               <div className="grid gap-2">
                 <Label htmlFor="name">Nombre completo</Label>
                 <Input
