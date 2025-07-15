@@ -72,7 +72,9 @@ export function ExpenseManagement({
     date: new Date().toISOString().split("T")[0],
     isRecurring: false,
   });
-  const [generatedExpenseDate, setGeneratedExpenseDate] = useState(new Date().toISOString().split("T")[0]);
+  const [generatedExpenseDate, setGeneratedExpenseDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
   const [monthFilter, setMonthFilter] = useState("all");
   const [selectedRecurringExpense, setSelectedRecurringExpense] = useState("");
   const [yearFilter, setYearFilter] = useState("all");
@@ -102,7 +104,12 @@ export function ExpenseManagement({
       }
 
       if (data) {
-        setExpenses(data as Expense[]);
+        const formatted = data.map((e) => ({
+          ...e,
+          isRecurring: Boolean(e.is_recurring), // 👈 transforma correctamente
+          gymId: e.gym_id, // 👈 asegurate también de esto si lo necesitás
+        }));
+        setExpenses(formatted);
       }
     };
 
@@ -240,7 +247,7 @@ export function ExpenseManagement({
           today.getMonth() + 1
         }/${today.getFullYear()})`,
         amount: recurringExpense.amount,
-        date: today.toISOString().split("T")[0],
+        date: generatedExpenseDate,
         category: recurringExpense.category,
         isRecurring: false,
       };
@@ -336,6 +343,15 @@ export function ExpenseManagement({
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="generated-date">Fecha del gasto</Label>
+                  <Input
+                    id="generated-date"
+                    type="date"
+                    value={generatedExpenseDate}
+                    onChange={(e) => setGeneratedExpenseDate(e.target.value)}
+                  />
+                </div>
                 <div className="grid gap-2">
                   <Label htmlFor="recurring-expense">
                     Gasto Fijo a Generar
