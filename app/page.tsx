@@ -18,6 +18,7 @@ import { ProspectManagement } from "@/components/prospect-management";
 import { ExpenseManagement } from "@/components/expense-management";
 import { ReportsSection } from "@/components/reports-section";
 import { LoginSystem } from "@/components/login-system";
+
 import { PlanManagement } from "@/components/plan-management";
 import { ActivityManagement } from "@/components/activity-management";
 import { RoutineManagement } from "@/components/routine-management";
@@ -718,7 +719,9 @@ export default function GymManagementSystem() {
             gymId={gymData?.id || ""}
           />
         )}
-        {activeTab === "routines" && <RoutineManagement />}
+        {activeTab === "routines" && gymData?.id && (
+          <RoutineManagement gymId={gymData.id} />
+        )}
         {activeTab === "inactives" && (
           <InactiveManagement
             members={members}

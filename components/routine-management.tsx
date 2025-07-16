@@ -1,13 +1,22 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useState } from "react";
+
+import { useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -16,76 +25,51 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Trash2, Search, Download, Dumbbell } from "lucide-react"
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Plus, Trash2, Search, Download, Dumbbell } from "lucide-react";
 
 interface Exercise {
-  name: string
-  sets: number
-  reps: string
-  weight: string
-  rest: string
-  notes: string
+  name: string;
+  sets: number;
+  reps: string;
+  weight: string;
+  rest: string;
+  notes: string;
 }
 
 interface Routine {
-  id: string
-  name: string
-  description: string
-  targetAudience: string
-  difficulty: "Principiante" | "Intermedio" | "Avanzado"
-  duration: number // en minutos
-  exercises: Exercise[]
-  createdDate: string
-  createdBy: string
+  id: string;
+  name: string;
+  description: string;
+  targetAudience: string;
+  difficulty: "Principiante" | "Intermedio" | "Avanzado";
+  duration: number; // en minutos
+  exercises: Exercise[];
+  createdDate: string;
+  createdBy: string;
 }
 
-export function RoutineManagement() {
-  const [routines, setRoutines] = useState<Routine[]>([
-    {
-      id: "1",
-      name: "Rutina Principiante - Cuerpo Completo",
-      description: "Rutina básica para personas que recién comienzan en el gimnasio",
-      targetAudience: "Principiantes",
-      difficulty: "Principiante",
-      duration: 45,
-      exercises: [
-        {
-          name: "Sentadillas",
-          sets: 3,
-          reps: "12-15",
-          weight: "Peso corporal",
-          rest: "60 seg",
-          notes: "Mantener la espalda recta",
-        },
-        {
-          name: "Flexiones de brazos",
-          sets: 3,
-          reps: "8-12",
-          weight: "Peso corporal",
-          rest: "60 seg",
-          notes: "Modificar en rodillas si es necesario",
-        },
-        {
-          name: "Plancha",
-          sets: 3,
-          reps: "30 seg",
-          weight: "Peso corporal",
-          rest: "45 seg",
-          notes: "Mantener el core activado",
-        },
-      ],
-      createdDate: "2024-01-01",
-      createdBy: "Instructor Principal",
-    },
-  ])
+interface RoutineManagementProps {
+  gymId: string;
+}
 
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
-  const [viewingRoutine, setViewingRoutine] = useState<Routine | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [difficultyFilter, setDifficultyFilter] = useState("all")
+export function RoutineManagement({ gymId }: RoutineManagementProps) {
+  console.log("Rutina: Gym ID recibido:", gymId); // 👈 esto
+  const [routines, setRoutines] = useState<Routine[]>([]);
+
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [viewingRoutine, setViewingRoutine] = useState<Routine | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [difficultyFilter, setDifficultyFilter] = useState("all");
   const [newRoutine, setNewRoutine] = useState({
     name: "",
     description: "",
@@ -93,25 +77,82 @@ export function RoutineManagement() {
     difficulty: "Principiante" as "Principiante" | "Intermedio" | "Avanzado",
     duration: 45,
     exercises: [] as Exercise[],
-  })
+  });
+
+  useEffect(() => {
+    const fetchRoutines = async () => {
+      const { data, error } = await supabase
+        .from("routines")
+        .select("*")
+        .eq("gym_id", gymId);
+
+      if (error) {
+        console.error("Error al cargar rutinas desde Supabase:", error);
+        return;
+      }
+
+      if (data) {
+        const formatted = data.map((r) => ({
+          id: r.id,
+          name: r.name,
+          description: r.description,
+          targetAudience: r.target_audience,
+          difficulty: r.difficulty,
+          duration: r.duration,
+          exercises: r.exercises,
+          createdDate: r.created_date,
+          createdBy: r.created_by,
+        })) as Routine[];
+
+        setRoutines(formatted);
+      }
+    };
+
+    fetchRoutines();
+  }, [gymId]);
 
   const filteredRoutines = routines.filter((routine) => {
     const matchesSearch =
       routine.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      routine.targetAudience.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesDifficulty = difficultyFilter === "all" || routine.difficulty === difficultyFilter
-    return matchesSearch && matchesDifficulty
-  })
+      routine.targetAudience.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDifficulty =
+      difficultyFilter === "all" || routine.difficulty === difficultyFilter;
+    return matchesSearch && matchesDifficulty;
+  });
 
-  const handleAddRoutine = () => {
+  const handleAddRoutine = async () => {
     const routine: Routine = {
-      id: Date.now().toString(),
+      id: `${Date.now()}`,
       ...newRoutine,
       createdDate: new Date().toISOString().split("T")[0],
-      createdBy: "Usuario Actual", // En un sistema real, esto vendría del usuario logueado
+      createdBy: "Usuario Actual",
+    };
+
+    const { error } = await supabase.from("routines").insert([
+      {
+        id: routine.id,
+        gym_id: gymId,
+        name: routine.name,
+        description: routine.description,
+        target_audience: routine.targetAudience,
+        difficulty: routine.difficulty,
+        duration: routine.duration,
+        exercises: routine.exercises,
+        created_date: routine.createdDate,
+        created_by: routine.createdBy, // ✅ USA snake_case correcto
+      },
+    ]);
+
+    if (error) {
+      console.error("Error al guardar la rutina en Supabase:", error);
+      return;
     }
 
-    setRoutines([...routines, routine])
+
+    console.log("Gym ID al guardar rutina:", gymId);
+    
+    // Si se guarda bien, actualizamos el estado local
+    setRoutines([...routines, routine]);
     setNewRoutine({
       name: "",
       description: "",
@@ -119,13 +160,20 @@ export function RoutineManagement() {
       difficulty: "Principiante",
       duration: 45,
       exercises: [],
-    })
-    setIsAddDialogOpen(false)
-  }
+    });
+    setIsAddDialogOpen(false);
+  };
 
-  const handleDeleteRoutine = (id: string) => {
-    setRoutines(routines.filter((r) => r.id !== id))
-  }
+  const handleDeleteRoutine = async (id: string) => {
+    const { error } = await supabase.from("routines").delete().eq("id", id);
+
+    if (error) {
+      console.error("Error al eliminar rutina en Supabase:", error);
+      return;
+    }
+
+    setRoutines(routines.filter((r) => r.id !== id));
+  };
 
   const addExercise = () => {
     setNewRoutine({
@@ -141,21 +189,21 @@ export function RoutineManagement() {
           notes: "",
         },
       ],
-    })
-  }
+    });
+  };
 
   const removeExercise = (index: number) => {
     setNewRoutine({
       ...newRoutine,
       exercises: newRoutine.exercises.filter((_, i) => i !== index),
-    })
-  }
+    });
+  };
 
   const updateExercise = (index: number, field: keyof Exercise, value: any) => {
-    const updatedExercises = [...newRoutine.exercises]
-    updatedExercises[index] = { ...updatedExercises[index], [field]: value }
-    setNewRoutine({ ...newRoutine, exercises: updatedExercises })
-  }
+    const updatedExercises = [...newRoutine.exercises];
+    updatedExercises[index] = { ...updatedExercises[index], [field]: value };
+    setNewRoutine({ ...newRoutine, exercises: updatedExercises });
+  };
 
   // DESCARGA A EXCEL - Función actualizada
   const downloadRoutineAsExcel = (routine: Routine) => {
@@ -173,7 +221,7 @@ export function RoutineManagement() {
       [""],
       ["EJERCICIOS:"],
       ["#", "Ejercicio", "Series", "Repeticiones", "Peso", "Descanso", "Notas"],
-    ]
+    ];
 
     // Agregar ejercicios
     routine.exercises.forEach((exercise, index) => {
@@ -185,41 +233,49 @@ export function RoutineManagement() {
         exercise.weight,
         exercise.rest,
         exercise.notes,
-      ])
-    })
+      ]);
+    });
 
     // Convertir a CSV (compatible con Excel)
-    const csvContent = excelData.map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n")
+    const csvContent = excelData
+      .map((row) => row.map((cell) => `"${cell}"`).join(","))
+      .join("\n");
 
     // Crear y descargar archivo
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `rutina-${routine.name.toLowerCase().replace(/\s+/g, "-")}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-  }
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `rutina-${routine.name
+      .toLowerCase()
+      .replace(/\s+/g, "-")}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case "Principiante":
-        return "bg-green-500"
+        return "bg-green-500";
       case "Intermedio":
-        return "bg-yellow-500"
+        return "bg-yellow-500";
       case "Avanzado":
-        return "bg-red-500"
+        return "bg-red-500";
       default:
-        return "bg-gray-500"
+        return "bg-gray-500";
     }
-  }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Gestión de Rutinas</h2>
-          <p className="text-muted-foreground">Crea y administra rutinas de ejercicios para los socios</p>
+          <h2 className="text-3xl font-bold tracking-tight">
+            Gestión de Rutinas
+          </h2>
+          <p className="text-muted-foreground">
+            Crea y administra rutinas de ejercicios para los socios
+          </p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
@@ -231,7 +287,9 @@ export function RoutineManagement() {
           <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Crear Nueva Rutina</DialogTitle>
-              <DialogDescription>Define una nueva rutina de ejercicios.</DialogDescription>
+              <DialogDescription>
+                Define una nueva rutina de ejercicios.
+              </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
@@ -239,7 +297,9 @@ export function RoutineManagement() {
                 <Input
                   id="name"
                   value={newRoutine.name}
-                  onChange={(e) => setNewRoutine({ ...newRoutine, name: e.target.value })}
+                  onChange={(e) =>
+                    setNewRoutine({ ...newRoutine, name: e.target.value })
+                  }
                   placeholder="Rutina Principiante - Cuerpo Completo"
                 />
               </div>
@@ -248,7 +308,12 @@ export function RoutineManagement() {
                 <Textarea
                   id="description"
                   value={newRoutine.description}
-                  onChange={(e) => setNewRoutine({ ...newRoutine, description: e.target.value })}
+                  onChange={(e) =>
+                    setNewRoutine({
+                      ...newRoutine,
+                      description: e.target.value,
+                    })
+                  }
                   placeholder="Describe el objetivo y características de la rutina..."
                   className="min-h-[80px]"
                 />
@@ -259,7 +324,12 @@ export function RoutineManagement() {
                   <Input
                     id="targetAudience"
                     value={newRoutine.targetAudience}
-                    onChange={(e) => setNewRoutine({ ...newRoutine, targetAudience: e.target.value })}
+                    onChange={(e) =>
+                      setNewRoutine({
+                        ...newRoutine,
+                        targetAudience: e.target.value,
+                      })
+                    }
                     placeholder="Principiantes, Mujeres, etc."
                   />
                 </div>
@@ -267,9 +337,9 @@ export function RoutineManagement() {
                   <Label htmlFor="difficulty">Dificultad</Label>
                   <Select
                     value={newRoutine.difficulty}
-                    onValueChange={(value: "Principiante" | "Intermedio" | "Avanzado") =>
-                      setNewRoutine({ ...newRoutine, difficulty: value })
-                    }
+                    onValueChange={(
+                      value: "Principiante" | "Intermedio" | "Avanzado"
+                    ) => setNewRoutine({ ...newRoutine, difficulty: value })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -288,14 +358,24 @@ export function RoutineManagement() {
                   id="duration"
                   type="number"
                   value={newRoutine.duration}
-                  onChange={(e) => setNewRoutine({ ...newRoutine, duration: Number(e.target.value) })}
+                  onChange={(e) =>
+                    setNewRoutine({
+                      ...newRoutine,
+                      duration: Number(e.target.value),
+                    })
+                  }
                   placeholder="45"
                 />
               </div>
               <div className="grid gap-2">
                 <div className="flex justify-between items-center">
                   <Label>Ejercicios</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addExercise}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addExercise}
+                  >
                     <Plus className="h-4 w-4 mr-1" />
                     Agregar Ejercicio
                   </Button>
@@ -305,43 +385,66 @@ export function RoutineManagement() {
                     <Card key={index} className="p-4">
                       <div className="grid gap-3">
                         <div className="flex justify-between items-center">
-                          <Label className="font-medium">Ejercicio {index + 1}</Label>
-                          <Button type="button" variant="outline" size="sm" onClick={() => removeExercise(index)}>
+                          <Label className="font-medium">
+                            Ejercicio {index + 1}
+                          </Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeExercise(index)}
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                         <Input
                           placeholder="Nombre del ejercicio"
                           value={exercise.name}
-                          onChange={(e) => updateExercise(index, "name", e.target.value)}
+                          onChange={(e) =>
+                            updateExercise(index, "name", e.target.value)
+                          }
                         />
                         <div className="grid grid-cols-4 gap-2">
                           <Input
                             type="number"
                             placeholder="Series"
                             value={exercise.sets}
-                            onChange={(e) => updateExercise(index, "sets", Number(e.target.value))}
+                            onChange={(e) =>
+                              updateExercise(
+                                index,
+                                "sets",
+                                Number(e.target.value)
+                              )
+                            }
                           />
                           <Input
                             placeholder="Reps"
                             value={exercise.reps}
-                            onChange={(e) => updateExercise(index, "reps", e.target.value)}
+                            onChange={(e) =>
+                              updateExercise(index, "reps", e.target.value)
+                            }
                           />
                           <Input
                             placeholder="Peso"
                             value={exercise.weight}
-                            onChange={(e) => updateExercise(index, "weight", e.target.value)}
+                            onChange={(e) =>
+                              updateExercise(index, "weight", e.target.value)
+                            }
                           />
                           <Input
                             placeholder="Descanso"
                             value={exercise.rest}
-                            onChange={(e) => updateExercise(index, "rest", e.target.value)}
+                            onChange={(e) =>
+                              updateExercise(index, "rest", e.target.value)
+                            }
                           />
                         </div>
                         <Input
                           placeholder="Notas adicionales"
                           value={exercise.notes}
-                          onChange={(e) => updateExercise(index, "notes", e.target.value)}
+                          onChange={(e) =>
+                            updateExercise(index, "notes", e.target.value)
+                          }
                         />
                       </div>
                     </Card>
@@ -376,7 +479,10 @@ export function RoutineManagement() {
                 />
               </div>
             </div>
-            <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+            <Select
+              value={difficultyFilter}
+              onValueChange={setDifficultyFilter}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Dificultad" />
               </SelectTrigger>
@@ -415,12 +521,18 @@ export function RoutineManagement() {
                   <TableCell>
                     <div>
                       <div className="font-medium">{routine.name}</div>
-                      <div className="text-sm text-muted-foreground truncate max-w-xs">{routine.description}</div>
+                      <div className="text-sm text-muted-foreground truncate max-w-xs">
+                        {routine.description}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>{routine.targetAudience}</TableCell>
                   <TableCell>
-                    <Badge className={`${getDifficultyColor(routine.difficulty)} text-white`}>
+                    <Badge
+                      className={`${getDifficultyColor(
+                        routine.difficulty
+                      )} text-white`}
+                    >
                       {routine.difficulty}
                     </Badge>
                   </TableCell>
@@ -431,23 +543,33 @@ export function RoutineManagement() {
                       {routine.exercises.length}
                     </div>
                   </TableCell>
-                  <TableCell>{new Date(routine.createdDate).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    {new Date(routine.createdDate).toLocaleDateString()}
+                  </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setViewingRoutine(routine)
-                          setIsViewDialogOpen(true)
+                          setViewingRoutine(routine);
+                          setIsViewDialogOpen(true);
                         }}
                       >
                         Ver
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => downloadRoutineAsExcel(routine)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadRoutineAsExcel(routine)}
+                      >
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeleteRoutine(routine.id)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteRoutine(routine.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -475,7 +597,11 @@ export function RoutineManagement() {
                 </div>
                 <div>
                   <Label className="font-medium">Dificultad:</Label>
-                  <Badge className={`${getDifficultyColor(viewingRoutine.difficulty)} text-white ml-2`}>
+                  <Badge
+                    className={`${getDifficultyColor(
+                      viewingRoutine.difficulty
+                    )} text-white ml-2`}
+                  >
                     {viewingRoutine.difficulty}
                   </Badge>
                 </div>
@@ -501,7 +627,11 @@ export function RoutineManagement() {
                         {exercise.weight && ` - ${exercise.weight}`}
                         {exercise.rest && ` - Descanso: ${exercise.rest}`}
                       </div>
-                      {exercise.notes && <div className="text-sm text-blue-600 mt-1">💡 {exercise.notes}</div>}
+                      {exercise.notes && (
+                        <div className="text-sm text-blue-600 mt-1">
+                          💡 {exercise.notes}
+                        </div>
+                      )}
                     </Card>
                   ))}
                 </div>
@@ -509,7 +639,11 @@ export function RoutineManagement() {
             </div>
           )}
           <DialogFooter>
-            <Button onClick={() => viewingRoutine && downloadRoutineAsExcel(viewingRoutine)}>
+            <Button
+              onClick={() =>
+                viewingRoutine && downloadRoutineAsExcel(viewingRoutine)
+              }
+            >
               <Download className="mr-2 h-4 w-4" />
               Descargar Excel
             </Button>
@@ -517,5 +651,5 @@ export function RoutineManagement() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
