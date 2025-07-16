@@ -1,12 +1,18 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -15,21 +21,28 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Edit, Trash2, Search } from "lucide-react"
-import { supabase } from "@/lib/supabase"
-import type { Member, Payment, Plan } from "@/lib/supabase"
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Plus, Edit, Trash2, Search } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import type { Member, Payment, Plan } from "@/lib/supabase";
 
 interface MemberManagementProps {
-  members: Member[]
-  setMembers: (members: Member[]) => void
-  payments: Payment[]
-  setPayments: (payments: Payment[]) => void
-  plans: Plan[]
-  gymId: string
-  initialFilter?: string
-  onFilterChange?: (filter: string) => void
+  members: Member[];
+  setMembers: (members: Member[]) => void;
+  payments: Payment[];
+  setPayments: (payments: Payment[]) => void;
+  plans: Plan[];
+  gymId: string;
+  initialFilter?: string;
+  onFilterChange?: (filter: string) => void;
 }
 
 export function MemberManagement({
@@ -42,11 +55,11 @@ export function MemberManagement({
   initialFilter = "all",
   onFilterChange,
 }: MemberManagementProps) {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [editingMember, setEditingMember] = useState<Member | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState(initialFilter)
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState(initialFilter);
   const [newMember, setNewMember] = useState({
     name: "",
     email: "",
@@ -55,76 +68,84 @@ export function MemberManagement({
     planPrice: 0,
     joinDate: new Date().toISOString().split("T")[0],
     paymentMethod: "Efectivo",
-  })
+  });
 
-  const paymentMethods = ["Efectivo", "Transferencia", "Tarjeta de Débito", "Tarjeta de Crédito"]
+  const paymentMethods = [
+    "Efectivo",
+    "Transferencia",
+    "Tarjeta de Débito",
+    "Tarjeta de Crédito",
+  ];
 
   useEffect(() => {
-    setStatusFilter(initialFilter)
-  }, [initialFilter])
+    setStatusFilter(initialFilter);
+  }, [initialFilter]);
 
   useEffect(() => {
     if (onFilterChange) {
-      onFilterChange(statusFilter)
+      onFilterChange(statusFilter);
     }
-  }, [statusFilter, onFilterChange])
+  }, [statusFilter, onFilterChange]);
 
   const filteredMembers = members.filter((member) => {
     const matchesSearch =
       member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchTerm.toLowerCase())
+      member.email.toLowerCase().includes(searchTerm.toLowerCase());
 
-    let matchesStatus = true
+    let matchesStatus = true;
     if (statusFilter === "expiring_soon") {
-      const nextPayment = new Date(member.next_payment)
-      const today = new Date()
-      const diffTime = nextPayment.getTime() - today.getTime()
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      matchesStatus = diffDays <= 10 && diffDays >= 0 && member.status === "active"
+      const nextPayment = new Date(member.next_payment);
+      const today = new Date();
+      const diffTime = nextPayment.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      matchesStatus =
+        diffDays <= 10 && diffDays >= 0 && member.status === "active";
     } else {
-      matchesStatus = statusFilter === "all" || member.status === statusFilter
+      matchesStatus = statusFilter === "all" || member.status === statusFilter;
     }
 
-    return matchesSearch && matchesStatus
-  })
+    return matchesSearch && matchesStatus;
+  });
 
   const handleAddMember = async () => {
     try {
-      const joinDate = new Date(newMember.joinDate)
-      const nextPayment = new Date(joinDate)
-      const selectedPlan = plans.find((p) => p.name === newMember.plan)
+      const joinDate = new Date(newMember.joinDate);
+      const nextPayment = new Date(joinDate);
+      const selectedPlan = plans.find((p) => p.name === newMember.plan);
 
       if (selectedPlan) {
         if (selectedPlan.duration_type === "days") {
-          nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration)
+          nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration);
         } else if (selectedPlan.duration_type === "months") {
-          nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration)
+          nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration);
         } else if (selectedPlan.duration_type === "years") {
-          nextPayment.setFullYear(nextPayment.getFullYear() + selectedPlan.duration)
+          nextPayment.setFullYear(
+            nextPayment.getFullYear() + selectedPlan.duration
+          );
         }
       }
 
-      const today = new Date()
-      const diffTime = today.getTime() - nextPayment.getTime()
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      const today = new Date();
+      const diffTime = today.getTime() - nextPayment.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      let memberStatus: "active" | "expired" | "inactive" = "active"
-      let inactiveLevel: "green" | "yellow" | "red" | undefined = undefined
+      let memberStatus: "active" | "expired" | "inactive" = "active";
+      let inactiveLevel: "green" | "yellow" | "red" | undefined = undefined;
 
       if (nextPayment > today) {
-        memberStatus = "active"
+        memberStatus = "active";
       } else if (diffDays > 0) {
         if (diffDays > 30) {
-          memberStatus = "inactive"
-          inactiveLevel = "yellow"
+          memberStatus = "inactive";
+          inactiveLevel = "yellow";
         } else {
-          memberStatus = "expired"
+          memberStatus = "expired";
         }
       } else {
-        memberStatus = "expired"
+        memberStatus = "expired";
       }
 
-      const memberId = `${gymId}_member_${Date.now()}`
+      const memberId = `${gymId}_member_${Date.now()}`;
 
       const member: Member = {
         id: memberId,
@@ -139,12 +160,14 @@ export function MemberManagement({
         next_payment: nextPayment.toISOString().split("T")[0],
         status: memberStatus,
         inactive_level: inactiveLevel,
-      }
+      };
 
       // Guardar en Supabase
-      const { error: memberError } = await supabase.from("members").insert([member])
+      const { error: memberError } = await supabase
+        .from("members")
+        .insert([member]);
 
-      if (memberError) throw memberError
+      if (memberError) throw memberError;
 
       // Crear pago inicial
       const payment: Payment = {
@@ -156,15 +179,17 @@ export function MemberManagement({
         date: newMember.joinDate,
         plan: member.plan,
         method: newMember.paymentMethod,
-      }
+      };
 
-      const { error: paymentError } = await supabase.from("payments").insert([payment])
+      const { error: paymentError } = await supabase
+        .from("payments")
+        .insert([payment]);
 
-      if (paymentError) throw paymentError
+      if (paymentError) throw paymentError;
 
       // Actualizar estados locales
-      setMembers([...members, member])
-      setPayments([...payments, payment])
+      setMembers([...members, member]);
+      setPayments([...payments, payment]);
 
       setNewMember({
         name: "",
@@ -174,16 +199,29 @@ export function MemberManagement({
         planPrice: 0,
         joinDate: new Date().toISOString().split("T")[0],
         paymentMethod: "Efectivo",
-      })
-      setIsAddDialogOpen(false)
+      });
+      setIsAddDialogOpen(false);
     } catch (error) {
-      console.error("Error agregando miembro:", error)
-      alert("Error al agregar el miembro. Inténtalo de nuevo.")
+      console.error("Error agregando miembro:", error);
+      alert("Error al agregar el miembro. Inténtalo de nuevo.");
     }
-  }
+  };
+
+  const getRealStatus = (
+        member: Member
+      ): "active" | "expired" | "inactive" => {
+        const today = new Date();
+        const next = new Date(member.next_payment);
+        const diffMs = today.getTime() - next.getTime();
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 0) return "active";
+        if (diffDays <= 30) return "expired";
+        return "inactive";
+      };
 
   const handleEditMember = async () => {
-    if (!editingMember) return
+    if (!editingMember) return;
 
     try {
       const { error } = await supabase
@@ -193,75 +231,88 @@ export function MemberManagement({
           email: editingMember.email,
           phone: editingMember.phone,
         })
-        .eq("id", editingMember.id)
+        .eq("id", editingMember.id);
 
-      if (error) throw error
+      if (error) throw error;
 
-      setMembers(members.map((m) => (m.id === editingMember.id ? editingMember : m)))
-      setIsEditDialogOpen(false)
-      setEditingMember(null)
+      setMembers(
+        members.map((m) => (m.id === editingMember.id ? editingMember : m))
+      );
+      setIsEditDialogOpen(false);
+      setEditingMember(null);
     } catch (error) {
-      console.error("Error editando miembro:", error)
-      alert("Error al editar el miembro. Inténtalo de nuevo.")
+      console.error("Error editando miembro:", error);
+      alert("Error al editar el miembro. Inténtalo de nuevo.");
     }
-  }
+  };
 
   const handleDeleteMember = async (id: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este miembro?")) return
+    if (!confirm("¿Estás seguro de que quieres eliminar este miembro?")) return;
 
     try {
       // Eliminar pagos relacionados
-      const { error: paymentsError } = await supabase.from("payments").delete().eq("member_id", id)
+      const { error: paymentsError } = await supabase
+        .from("payments")
+        .delete()
+        .eq("member_id", id);
 
-      if (paymentsError) throw paymentsError
+      if (paymentsError) throw paymentsError;
 
       // Eliminar miembro
-      const { error: memberError } = await supabase.from("members").delete().eq("id", id)
+      const { error: memberError } = await supabase
+        .from("members")
+        .delete()
+        .eq("id", id);
 
-      if (memberError) throw memberError
+      if (memberError) throw memberError;
 
       // Actualizar estados locales
-      setMembers(members.filter((m) => m.id !== id))
-      setPayments(payments.filter((p) => p.member_id !== id))
+      setMembers(members.filter((m) => m.id !== id));
+      setPayments(payments.filter((p) => p.member_id !== id));
     } catch (error) {
-      console.error("Error eliminando miembro:", error)
-      alert("Error al eliminar el miembro. Inténtalo de nuevo.")
+      console.error("Error eliminando miembro:", error);
+      alert("Error al eliminar el miembro. Inténtalo de nuevo.");
     }
-  }
+  };
 
-  const getStatusBadge = (member: Member) => {
-    switch (member.status) {
+  const getStatusBadge = (
+    status: "active" | "expired" | "inactive",
+    level?: "green" | "yellow" | "red"
+  ) => {
+    switch (status) {
       case "active":
-        return <Badge variant="default">Activo</Badge>
+        return <Badge variant="default">Activo</Badge>;
       case "expired":
-        return <Badge variant="destructive">Vencido</Badge>
+        return <Badge variant="destructive">Vencido</Badge>;
       case "inactive":
         const color =
-          member.inactive_level === "green"
+          level === "green"
             ? "bg-green-500"
-            : member.inactive_level === "yellow"
-              ? "bg-yellow-500"
-              : "bg-red-500"
-        return <Badge className={`${color} text-white`}>Inactivo</Badge>
-      default:
-        return <Badge variant="secondary">Desconocido</Badge>
+            : level === "yellow"
+            ? "bg-yellow-500"
+            : "bg-red-500";
+        return <Badge className={`${color} text-white`}>Inactivo</Badge>;
     }
-  }
+  };
 
   const getDaysUntilExpiration = (nextPayment: string) => {
-    const today = new Date()
-    const expiration = new Date(nextPayment)
-    const diffTime = expiration.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
-  }
+    const today = new Date();
+    const expiration = new Date(nextPayment);
+    const diffTime = expiration.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Gestión de Socios</h2>
-          <p className="text-muted-foreground">Administra los miembros del gimnasio</p>
+          <h2 className="text-3xl font-bold tracking-tight">
+            Gestión de Socios
+          </h2>
+          <p className="text-muted-foreground">
+            Administra los miembros del gimnasio
+          </p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
@@ -273,7 +324,9 @@ export function MemberManagement({
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Agregar Nuevo Socio</DialogTitle>
-              <DialogDescription>Completa los datos del nuevo miembro del gimnasio.</DialogDescription>
+              <DialogDescription>
+                Completa los datos del nuevo miembro del gimnasio.
+              </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
               <div className="grid gap-2">
@@ -281,7 +334,9 @@ export function MemberManagement({
                 <Input
                   id="name"
                   value={newMember.name}
-                  onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, name: e.target.value })
+                  }
                   placeholder="Juan Pérez"
                 />
               </div>
@@ -291,7 +346,9 @@ export function MemberManagement({
                   id="email"
                   type="email"
                   value={newMember.email}
-                  onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, email: e.target.value })
+                  }
                   placeholder="juan@email.com"
                 />
               </div>
@@ -300,7 +357,9 @@ export function MemberManagement({
                 <Input
                   id="phone"
                   value={newMember.phone}
-                  onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, phone: e.target.value })
+                  }
                   placeholder="099123456"
                 />
               </div>
@@ -310,10 +369,13 @@ export function MemberManagement({
                   id="joinDate"
                   type="date"
                   value={newMember.joinDate}
-                  onChange={(e) => setNewMember({ ...newMember, joinDate: e.target.value })}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, joinDate: e.target.value })
+                  }
                 />
                 <p className="text-xs text-muted-foreground">
-                  El plan se calculará desde esta fecha (útil si se registra con atraso)
+                  El plan se calculará desde esta fecha (útil si se registra con
+                  atraso)
                 </p>
               </div>
               <div className="grid gap-2">
@@ -321,12 +383,12 @@ export function MemberManagement({
                 <Select
                   value={newMember.plan}
                   onValueChange={(value) => {
-                    const selectedPlan = plans.find((p) => p.name === value)
+                    const selectedPlan = plans.find((p) => p.name === value);
                     setNewMember({
                       ...newMember,
                       plan: value,
                       planPrice: selectedPlan?.price || 0,
-                    })
+                    });
                   }}
                 >
                   <SelectTrigger>
@@ -347,7 +409,9 @@ export function MemberManagement({
                 <Label htmlFor="paymentMethod">Método de Pago</Label>
                 <Select
                   value={newMember.paymentMethod}
-                  onValueChange={(value) => setNewMember({ ...newMember, paymentMethod: value })}
+                  onValueChange={(value) =>
+                    setNewMember({ ...newMember, paymentMethod: value })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona método de pago" />
@@ -396,9 +460,13 @@ export function MemberManagement({
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="active">Activos</SelectItem>
-                <SelectItem value="expired">Vencidos (hasta 30 días)</SelectItem>
+                <SelectItem value="expired">
+                  Vencidos (hasta 30 días)
+                </SelectItem>
                 <SelectItem value="inactive">Inactivos (+30 días)</SelectItem>
-                <SelectItem value="expiring_soon">Próximo a vencerse (10 días)</SelectItem>
+                <SelectItem value="expiring_soon">
+                  Próximo a vencerse (10 días)
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -425,7 +493,9 @@ export function MemberManagement({
             </TableHeader>
             <TableBody>
               {filteredMembers.map((member) => {
-                const daysUntilExpiration = getDaysUntilExpiration(member.next_payment)
+                const daysUntilExpiration = getDaysUntilExpiration(
+                  member.next_payment
+                );
                 return (
                   <TableRow key={member.id}>
                     <TableCell className="font-medium">{member.name}</TableCell>
@@ -433,8 +503,12 @@ export function MemberManagement({
                     <TableCell>
                       {member.plan} - ${member.plan_price}
                     </TableCell>
-                    <TableCell>{getStatusBadge(member)}</TableCell>
-                    <TableCell>{new Date(member.next_payment).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      {getStatusBadge(getRealStatus(member))}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(member.next_payment).toLocaleDateString()}
+                    </TableCell>
                     <TableCell>
                       <span
                         className={`font-medium ${
@@ -443,8 +517,8 @@ export function MemberManagement({
                               ? "text-gray-600"
                               : "text-red-600"
                             : daysUntilExpiration <= 7
-                              ? "text-orange-600"
-                              : "text-green-600"
+                            ? "text-orange-600"
+                            : "text-green-600"
                         }`}
                       >
                         {daysUntilExpiration < 0
@@ -452,8 +526,8 @@ export function MemberManagement({
                             ? `${Math.abs(daysUntilExpiration)} días inactivo`
                             : `${Math.abs(daysUntilExpiration)} días vencido`
                           : daysUntilExpiration === 0
-                            ? "Vence hoy"
-                            : `${daysUntilExpiration} días`}
+                          ? "Vence hoy"
+                          : `${daysUntilExpiration} días`}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -462,19 +536,23 @@ export function MemberManagement({
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            setEditingMember(member)
-                            setIsEditDialogOpen(true)
+                            setEditingMember(member);
+                            setIsEditDialogOpen(true);
                           }}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDeleteMember(member.id)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteMember(member.id)}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                )
+                );
               })}
             </TableBody>
           </Table>
@@ -495,7 +573,9 @@ export function MemberManagement({
                 <Input
                   id="edit-name"
                   value={editingMember.name}
-                  onChange={(e) => setEditingMember({ ...editingMember, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditingMember({ ...editingMember, name: e.target.value })
+                  }
                 />
               </div>
               <div className="grid gap-2">
@@ -504,7 +584,12 @@ export function MemberManagement({
                   id="edit-email"
                   type="email"
                   value={editingMember.email}
-                  onChange={(e) => setEditingMember({ ...editingMember, email: e.target.value })}
+                  onChange={(e) =>
+                    setEditingMember({
+                      ...editingMember,
+                      email: e.target.value,
+                    })
+                  }
                 />
               </div>
               <div className="grid gap-2">
@@ -512,7 +597,12 @@ export function MemberManagement({
                 <Input
                   id="edit-phone"
                   value={editingMember.phone}
-                  onChange={(e) => setEditingMember({ ...editingMember, phone: e.target.value })}
+                  onChange={(e) =>
+                    setEditingMember({
+                      ...editingMember,
+                      phone: e.target.value,
+                    })
+                  }
                 />
               </div>
             </div>
@@ -525,5 +615,5 @@ export function MemberManagement({
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

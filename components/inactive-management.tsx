@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { getRealStatus } from "@/lib/utils";
+import type { Member } from "@/lib/supabase";
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -18,21 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-
-interface Member {
-  id: string
-  name: string
-  email: string
-  phone: string
-  join_date: string
-  plan: string
-  plan_price: number
-  last_payment: string
-  next_payment: string
-  status: "active" | "expired" | "inactive"
-  inactive_level?: "green" | "yellow" | "red"
-  inactive_comment?: string
-}
 
 interface Payment {
   id: string
@@ -59,8 +46,8 @@ export function InactiveManagement({ members, setMembers, payments }: InactiveMa
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false)
   const [editingComment, setEditingComment] = useState<{ memberId: string; comment: string } | null>(null)
 
-  // Filtrar solo socios inactivos
-  const inactiveMembers = members.filter((member) => member.status === "inactive")
+  // Filtrar solo socios inactivos y los guardo en constante
+  const inactiveMembers = members.filter((m) => getRealStatus(m) === "inactive");
 
   const filteredInactiveMembers = inactiveMembers.filter((member) => {
     const matchesSearch =
