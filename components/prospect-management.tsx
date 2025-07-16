@@ -630,6 +630,7 @@ export function ProspectManagement({
           </Table>
         </CardContent>
       </Card>
+
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -639,8 +640,9 @@ export function ProspectManagement({
               Modifica los datos del interesado.
             </DialogDescription>
           </DialogHeader>
+
           {editingProspect && (
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-name">Nombre completo</Label>
                 <Input
@@ -654,6 +656,7 @@ export function ProspectManagement({
                   }
                 />
               </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="edit-email">Email</Label>
                 <Input
@@ -668,6 +671,7 @@ export function ProspectManagement({
                   }
                 />
               </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="edit-phone">Teléfono</Label>
                 <Input
@@ -681,6 +685,7 @@ export function ProspectManagement({
                   }
                 />
               </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="edit-contact_date">Fecha de Contacto</Label>
                 <Input
@@ -695,6 +700,7 @@ export function ProspectManagement({
                   }
                 />
               </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="edit-interest">Interés</Label>
                 <Input
@@ -708,6 +714,7 @@ export function ProspectManagement({
                   }
                 />
               </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="edit-status">Estado</Label>
                 <Select
@@ -735,7 +742,7 @@ export function ProspectManagement({
                   </SelectContent>
                 </Select>
               </div>
-              {/* Campo de edición para la prioridad */}
+
               <div className="grid gap-2">
                 <Label htmlFor="edit-priority_level">Prioridad</Label>
                 <Select
@@ -757,6 +764,7 @@ export function ProspectManagement({
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="edit-notes">Notas</Label>
                 <Textarea
@@ -773,6 +781,7 @@ export function ProspectManagement({
               </div>
             </div>
           )}
+
           <DialogFooter>
             <Button type="submit" onClick={handleEditProspect}>
               Guardar Cambios
