@@ -66,8 +66,11 @@ export function RoutineManagement({ gymId }: RoutineManagementProps) {
   const [routines, setRoutines] = useState<Routine[]>([]);
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false); //Estado estados para editar rutina
+  const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null); //Estado estados para editar rutina
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [viewingRoutine, setViewingRoutine] = useState<Routine | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [difficultyFilter, setDifficultyFilter] = useState("all");
   const [newRoutine, setNewRoutine] = useState({
@@ -148,9 +151,8 @@ export function RoutineManagement({ gymId }: RoutineManagementProps) {
       return;
     }
 
-
     console.log("Gym ID al guardar rutina:", gymId);
-    
+
     // Si se guarda bien, actualizamos el estado local
     setRoutines([...routines, routine]);
     setNewRoutine({
@@ -162,6 +164,74 @@ export function RoutineManagement({ gymId }: RoutineManagementProps) {
       exercises: [],
     });
     setIsAddDialogOpen(false);
+  };
+
+  const handleUpdateRoutine = async () => {
+    if (!editingRoutine) return;
+
+    const { id, ...dataToUpdate } = editingRoutine;
+
+    const { error } = await supabase
+      .from("routines")
+      .update({
+        name: dataToUpdate.name,
+        description: dataToUpdate.description,
+        target_audience: dataToUpdate.targetAudience,
+        difficulty: dataToUpdate.difficulty,
+        duration: dataToUpdate.duration,
+        exercises: dataToUpdate.exercises,
+      })
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error al actualizar rutina:", error);
+      return;
+    }
+
+    // Actualizar en el estado local
+    const updated = routines.map((r) =>
+      r.id === id ? { ...r, ...dataToUpdate } : r
+    );
+    setRoutines(updated);
+    setIsEditDialogOpen(false);
+    setEditingRoutine(null);
+  };
+
+  const addExerciseToEdit = () => {
+    if (!editingRoutine) return;
+    setEditingRoutine({
+      ...editingRoutine,
+      exercises: [
+        ...editingRoutine.exercises,
+        {
+          name: "",
+          sets: 3,
+          reps: "12",
+          weight: "",
+          rest: "60 seg",
+          notes: "",
+        },
+      ],
+    });
+  };
+
+  const removeExerciseFromEdit = (index: number) => {
+    if (!editingRoutine) return;
+    const updatedExercises = editingRoutine.exercises.filter(
+      (_, i) => i !== index
+    );
+    setEditingRoutine({ ...editingRoutine, exercises: updatedExercises });
+  };
+
+  const updateExerciseInEdit = (
+    index: number,
+    field: keyof Exercise,
+    value: any
+  ) => {
+    if (!editingRoutine) return;
+    const updated = [...editingRoutine.exercises];
+    updated[index] = { ...updated[index], [field]: value };
+    setEditingRoutine({ ...editingRoutine, exercises: updated });
   };
 
   const handleDeleteRoutine = async (id: string) => {
@@ -566,7 +636,17 @@ export function RoutineManagement({ gymId }: RoutineManagementProps) {
                         <Download className="h-4 w-4" />
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="outline" // BOTON PARA EDITAR RUTINA
+                        size="sm"
+                        onClick={() => {
+                          setEditingRoutine(routine);
+                          setIsEditDialogOpen(true);
+                        }}
+                      >
+                        ✏️
+                      </Button>
+                      <Button
+                        variant="outline" //BOTON PARA ELIMINAR RUTINA
                         size="sm"
                         onClick={() => handleDeleteRoutine(routine.id)}
                       >
@@ -648,6 +728,142 @@ export function RoutineManagement({ gymId }: RoutineManagementProps) {
               Descargar Excel
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Rutina</DialogTitle>
+            <DialogDescription>
+              Modifica la rutina y sus ejercicios.
+            </DialogDescription>
+          </DialogHeader>
+          {editingRoutine && (
+            <div className="grid gap-4 py-4">
+              {/* Campos principales */}
+              <Input
+                placeholder="Nombre de la rutina"
+                value={editingRoutine.name}
+                onChange={(e) =>
+                  setEditingRoutine({ ...editingRoutine, name: e.target.value })
+                }
+              />
+              <Textarea
+                placeholder="Descripción"
+                value={editingRoutine.description}
+                onChange={(e) =>
+                  setEditingRoutine({
+                    ...editingRoutine,
+                    description: e.target.value,
+                  })
+                }
+              />
+
+              {/* Lista editable de ejercicios */}
+              <div className="grid gap-2">
+                <div className="flex justify-between items-center">
+                  <Label>Ejercicios</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addExerciseToEdit}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Agregar Ejercicio
+                  </Button>
+                </div>
+
+                <div className="space-y-4 max-h-64 overflow-y-auto">
+                  {editingRoutine.exercises.map((exercise, index) => (
+                    <Card key={index} className="p-4">
+                      <div className="grid gap-3">
+                        <div className="flex justify-between items-center">
+                          <Label className="font-medium">
+                            Ejercicio {index + 1}
+                          </Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeExerciseFromEdit(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Input
+                          placeholder="Nombre del ejercicio"
+                          value={exercise.name}
+                          onChange={(e) =>
+                            updateExerciseInEdit(index, "name", e.target.value)
+                          }
+                        />
+                        <div className="grid grid-cols-4 gap-2">
+                          <Input
+                            type="number"
+                            placeholder="Series"
+                            value={exercise.sets}
+                            onChange={(e) =>
+                              updateExerciseInEdit(
+                                index,
+                                "sets",
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                          <Input
+                            placeholder="Reps"
+                            value={exercise.reps}
+                            onChange={(e) =>
+                              updateExerciseInEdit(
+                                index,
+                                "reps",
+                                e.target.value
+                              )
+                            }
+                          />
+                          <Input
+                            placeholder="Peso"
+                            value={exercise.weight}
+                            onChange={(e) =>
+                              updateExerciseInEdit(
+                                index,
+                                "weight",
+                                e.target.value
+                              )
+                            }
+                          />
+                          <Input
+                            placeholder="Descanso"
+                            value={exercise.rest}
+                            onChange={(e) =>
+                              updateExerciseInEdit(
+                                index,
+                                "rest",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </div>
+                        <Input
+                          placeholder="Notas adicionales"
+                          value={exercise.notes}
+                          onChange={(e) =>
+                            updateExerciseInEdit(index, "notes", e.target.value)
+                          }
+                        />
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {/* Botón para guardar cambios */}
+              <DialogFooter>
+                <Button onClick={handleUpdateRoutine}>Guardar Cambios</Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
