@@ -24,20 +24,21 @@ interface Member {
   name: string
   email: string
   phone: string
-  joinDate: string
+  join_date: string
   plan: string
-  planPrice: number
-  lastPayment: string
-  nextPayment: string
+  plan_price: number
+  last_payment: string
+  next_payment: string
   status: "active" | "expired" | "inactive"
-  inactiveLevel?: "green" | "yellow" | "red"
-  inactiveComment?: string // NUEVO CAMPO
+  inactive_level?: "green" | "yellow" | "red"
+  inactive_comment?: string
 }
 
 interface Payment {
   id: string
-  memberId: string
-  memberName: string
+  gym_id: string
+  member_id: string
+  member_name: string
   amount: number
   date: string
   plan: string
@@ -66,11 +67,11 @@ export function InactiveManagement({ members, setMembers, payments }: InactiveMa
       member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.email.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesColor = colorFilter === "all" || member.inactiveLevel === colorFilter
+    const matchesColor = colorFilter === "all" || member.inactive_level === colorFilter
 
     let matchesDate = true
     if (dateFilter !== "all") {
-      const lastPaymentDate = new Date(member.lastPayment)
+      const lastPaymentDate = new Date(member.last_payment)
       const currentDate = new Date()
       const monthsAgo = Number.parseInt(dateFilter)
       const filterDate = new Date()
@@ -103,7 +104,7 @@ export function InactiveManagement({ members, setMembers, payments }: InactiveMa
 
   // Obtener información de pagos del socio
   const getMemberPaymentInfo = (memberId: string) => {
-    const memberPayments = payments.filter((p) => p.memberId === memberId)
+    const memberPayments = payments.filter((p) => p.member_id === memberId)
     const totalPaid = memberPayments.reduce((sum, p) => sum + p.amount, 0)
     const paymentCount = memberPayments.length
 
@@ -127,9 +128,9 @@ export function InactiveManagement({ members, setMembers, payments }: InactiveMa
   }
 
   const getColorStats = () => {
-    const green = inactiveMembers.filter((m) => m.inactiveLevel === "green").length
-    const yellow = inactiveMembers.filter((m) => m.inactiveLevel === "yellow" || !m.inactiveLevel).length
-    const red = inactiveMembers.filter((m) => m.inactiveLevel === "red").length
+    const green = inactiveMembers.filter((m) => m.inactive_level === "green").length
+    const yellow = inactiveMembers.filter((m) => m.inactive_level === "yellow" || !m.inactive_level).length
+    const red = inactiveMembers.filter((m) => m.inactive_level === "red").length
 
     return { green, yellow, red }
   }
@@ -259,9 +260,9 @@ export function InactiveManagement({ members, setMembers, payments }: InactiveMa
             </TableHeader>
             <TableBody>
               {filteredInactiveMembers
-                .sort((a, b) => new Date(b.lastPayment).getTime() - new Date(a.lastPayment).getTime())
+                .sort((a, b) => new Date(b.last_payment).getTime() - new Date(a.last_payment).getTime())
                 .map((member) => {
-                  const daysSinceLastPayment = getDaysSinceLastPayment(member.lastPayment)
+                  const daysSinceLastPayment = getDaysSinceLastPayment(member.last_payment)
                   const paymentInfo = getMemberPaymentInfo(member.id)
 
                   return (
@@ -270,7 +271,7 @@ export function InactiveManagement({ members, setMembers, payments }: InactiveMa
                         <div>
                           <div className="font-medium">{member.name}</div>
                           <div className="text-sm text-muted-foreground">
-                            Socio desde: {new Date(member.joinDate).toLocaleDateString()}
+                            Socio desde: {new Date(member.join_date).toLocaleDateString()}
                           </div>
                         </div>
                       </TableCell>
@@ -289,12 +290,12 @@ export function InactiveManagement({ members, setMembers, payments }: InactiveMa
                       <TableCell>
                         <div>
                           <div className="font-medium">{member.plan}</div>
-                          <div className="text-sm text-muted-foreground">${member.planPrice}</div>
+                          <div className="text-sm text-muted-foreground">${member.plan_price}</div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{new Date(member.lastPayment).toLocaleDateString()}</div>
+                          <div className="font-medium">{new Date(member.last_payment).toLocaleDateString()}</div>
                           <div className="text-sm text-muted-foreground">${paymentInfo.lastPaymentAmount}</div>
                         </div>
                       </TableCell>
@@ -310,11 +311,11 @@ export function InactiveManagement({ members, setMembers, payments }: InactiveMa
                           <div className="text-sm text-muted-foreground">{paymentInfo.paymentCount} pagos</div>
                         </div>
                       </TableCell>
-                      <TableCell>{getColorBadge(member.inactiveLevel)}</TableCell>
+                      <TableCell>{getColorBadge(member.inactive_level)}</TableCell>
                       <TableCell>
                         <div className="max-w-xs">
-                          {member.inactiveComment ? (
-                            <span className="text-sm text-gray-600 truncate block">{member.inactiveComment}</span>
+                          {member.inactive_comment ? (
+                            <span className="text-sm text-gray-600 truncate block">{member.inactive_comment}</span>
                           ) : (
                             <span className="text-xs text-muted-foreground">Sin comentarios</span>
                           )}
@@ -352,7 +353,7 @@ export function InactiveManagement({ members, setMembers, payments }: InactiveMa
                             onClick={() => {
                               setEditingComment({
                                 memberId: member.id,
-                                comment: member.inactiveComment || "",
+                                comment: member.inactive_comment || "",
                               })
                               setIsCommentDialogOpen(true)
                             }}
