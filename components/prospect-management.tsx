@@ -319,6 +319,21 @@ export function ProspectManagement({
             Esperando Info
           </Badge>
         );
+      case "trial_scheduled":
+        return (
+          <Badge variant="outline" className="border-cyan-500 text-cyan-500">
+            Coordinamos Clase
+          </Badge>
+        );
+      case "trial_completed":
+        return (
+          <Badge
+            variant="outline"
+            className="border-emerald-600 text-emerald-600"
+          >
+            Clase Realizada
+          </Badge>
+        );
       case "not_interested":
         return <Badge variant="destructive">No Interesado</Badge>;
       case "contact_later":
@@ -455,6 +470,12 @@ export function ProspectManagement({
                       Esperando Respuesta
                     </SelectItem>
                     <SelectItem value="waiting_info">Esperando Info</SelectItem>
+                    <SelectItem value="trial_scheduled">
+                      Coordinamos clase de prueba
+                    </SelectItem>
+                    <SelectItem value="trial_completed">
+                      Ya hizo clase de prueba
+                    </SelectItem>
                     <SelectItem value="not_interested">
                       No Interesado
                     </SelectItem>
@@ -733,6 +754,12 @@ export function ProspectManagement({
                       Esperando Respuesta
                     </SelectItem>
                     <SelectItem value="waiting_info">Esperando Info</SelectItem>
+                    <SelectItem value="trial_scheduled">
+                      Coordinamos clase de prueba
+                    </SelectItem>
+                    <SelectItem value="trial_completed">
+                      Ya hizo clase de prueba
+                    </SelectItem>
                     <SelectItem value="not_interested">
                       No Interesado
                     </SelectItem>
