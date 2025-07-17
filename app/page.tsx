@@ -477,7 +477,7 @@ export default function GymManagementSystem() {
 
         <Card
           className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => goToMembersWithFilter("expired")}
+          onClick={() => goToMembersWithFilter("expiring_soon")} // ✅ CORRECTO
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -554,7 +554,7 @@ export default function GymManagementSystem() {
             {upcomingExpirations > 0 && (
               <div
                 className="flex items-center space-x-2 text-orange-600 cursor-pointer hover:bg-orange-50 p-2 rounded"
-                onClick={() => goToMembersWithFilter("expired")}
+                onClick={() => goToMembersWithFilter("expiring_soon")}
               >
                 <AlertTriangle className="h-4 w-4" />
                 <span>
