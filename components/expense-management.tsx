@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { Expense as SupabaseExpense } from "@/lib/supabase";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -52,8 +53,13 @@ interface Expense {
 
 interface ExpenseManagementProps {
   expenses: Expense[];
-  setExpenses: (expenses: Expense[]) => void;
+  setExpenses: (updater: (prev: Expense[]) => Expense[]) => void;
   gymId: string;
+}
+
+interface LocalExpense extends SupabaseExpense {
+  gymId: string;
+  isRecurring: boolean;
 }
 
 export function ExpenseManagement({
@@ -109,7 +115,7 @@ export function ExpenseManagement({
           isRecurring: Boolean(e.is_recurring), // 👈 transforma correctamente
           gymId: e.gym_id, // 👈 asegurate también de esto si lo necesitás
         }));
-        setExpenses(formatted);
+        setExpenses(() => formatted);;
       }
     };
 
@@ -189,7 +195,7 @@ export function ExpenseManagement({
       return;
     }
 
-    setExpenses([...expenses, expense]);
+    setExpenses((prev) => [...prev, expense]);
     setNewExpense({
       description: "",
       amount: 0,
@@ -214,7 +220,7 @@ export function ExpenseManagement({
 
     // 3. Si se eliminó bien, actualizamos el estado con un array limpio
     const updatedExpenses = expenses.filter((e) => e.id !== id);
-    setExpenses(updatedExpenses);
+    setExpenses((prev) => updatedExpenses);
   };
 
   const generateSpecificRecurringExpense = async () => {
@@ -275,7 +281,7 @@ export function ExpenseManagement({
         return;
       }
 
-      setExpenses([...expenses, generatedExpense]);
+      setExpenses((prev) => [...prev, generatedExpense]);
       setSelectedRecurringExpense("");
       setIsGenerateDialogOpen(false);
     } else {

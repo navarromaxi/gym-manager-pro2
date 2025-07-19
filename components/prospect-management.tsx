@@ -77,7 +77,9 @@ export function ProspectManagement({
     notes: "",
     priority_level: "green" as "green" | "yellow" | "red", // Nuevo campo con valor por defecto
   });
-  const [conversionPlan, setConversionPlan] = useState<string>("");
+  const [conversionPlan, setConversionPlan] = useState<string | undefined>(
+    undefined
+  );
   const [conversionPaymentMethod, setConversionPaymentMethod] =
     useState("Efectivo");
   const paymentMethods = [
@@ -611,7 +613,7 @@ export function ProspectManagement({
                   <TableCell>{getStatusBadge(prospect.status)}</TableCell>
                   <TableCell>
                     {getPriorityBadge(prospect.priority_level)}
-                  </TableCell>{" "}
+                  </TableCell>
                   {/* Mostrar prioridad */}
                   <TableCell>
                     <div className="flex space-x-2">
@@ -841,7 +843,8 @@ export function ProspectManagement({
                       <SelectValue placeholder="Selecciona un plan para el nuevo socio" />
                     </SelectTrigger>
                     <SelectContent>
-                      {plans
+                      console.log("Planes disponibles", plans);
+                      {(plans ?? [])
                         .filter((plan) => plan.is_active)
                         .map((plan) => (
                           <SelectItem key={plan.id} value={plan.id}>

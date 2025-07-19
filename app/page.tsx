@@ -686,6 +686,7 @@ export default function GymManagementSystem() {
             setMembers={setMembers}
             payments={payments}
             setPayments={setPayments}
+            plans={plans}
             gymId={gymData?.id || ""}
           />
         )}
