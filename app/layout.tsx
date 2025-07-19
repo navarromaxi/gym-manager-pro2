@@ -1,5 +1,6 @@
 import type React from "react"
 import "./globals.css"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
         </ThemeProvider>
+        <SpeedInsights /> {/* 👈 Insertado correctamente para Vercel */}
       </body>
     </html>
   )
 }
+
