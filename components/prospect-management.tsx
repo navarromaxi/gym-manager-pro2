@@ -350,18 +350,20 @@ export function ProspectManagement({
     switch (priority) {
       case "red":
         return (
-          <Badge className="bg-red-500 hover:bg-red-500 text-white">Rojo</Badge>
+          <Badge className="bg-green-500 hover:bg-green-500 text-white">
+            Alta
+          </Badge>
         );
       case "yellow":
         return (
           <Badge className="bg-yellow-500 hover:bg-yellow-500 text-black">
-            Amarillo
+            Media
           </Badge>
         );
       case "green":
         return (
-          <Badge className="bg-green-500 hover:bg-green-500 text-white">
-            Verde
+          <Badge className="bg-gray-400 hover:bg-gray-400 text-white">
+            Baja
           </Badge>
         );
       default:
@@ -500,9 +502,9 @@ export function ProspectManagement({
                     <SelectValue placeholder="Selecciona prioridad" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="red">Rojo (Alta)</SelectItem>
-                    <SelectItem value="yellow">Amarillo (Media)</SelectItem>
-                    <SelectItem value="green">Verde (Baja)</SelectItem>
+                    <SelectItem value="red">Alta</SelectItem>
+                    <SelectItem value="yellow">Media</SelectItem>
+                    <SelectItem value="green">Baja</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -568,9 +570,9 @@ export function ProspectManagement({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas las Prioridades</SelectItem>
-                <SelectItem value="red">Rojo (Alta)</SelectItem>
-                <SelectItem value="yellow">Amarillo (Media)</SelectItem>
-                <SelectItem value="green">Verde (Baja)</SelectItem>
+                <SelectItem value="red">Alta</SelectItem>
+                <SelectItem value="yellow">Media</SelectItem>
+                <SelectItem value="green">Baja</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -787,9 +789,9 @@ export function ProspectManagement({
                     <SelectValue placeholder="Selecciona prioridad" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="red">Rojo (Alta)</SelectItem>
-                    <SelectItem value="yellow">Amarillo (Media)</SelectItem>
-                    <SelectItem value="green">Verde (Baja)</SelectItem>
+                    <SelectItem value="red">Alta</SelectItem>
+                    <SelectItem value="yellow">Media</SelectItem>
+                    <SelectItem value="green">Baja</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

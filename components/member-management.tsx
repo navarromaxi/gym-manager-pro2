@@ -93,13 +93,20 @@ export function MemberManagement({
       member.email.toLowerCase().includes(searchTerm.toLowerCase());
 
     let matchesStatus = true;
+    const today = new Date();
+
     if (statusFilter === "expiring_soon") {
       const nextPayment = new Date(member.next_payment);
-      const today = new Date();
       const diffTime = nextPayment.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       matchesStatus =
         diffDays <= 10 && diffDays >= 0 && member.status === "active";
+    } else if (statusFilter === "follow_up") {
+      const joinDate = new Date(member.join_date);
+      const diffDays = Math.floor(
+        (today.getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      matchesStatus = !member.followed_up && diffDays >= 5 && diffDays <= 10;
     } else {
       matchesStatus = statusFilter === "all" || member.status === statusFilter;
     }
@@ -207,18 +214,16 @@ export function MemberManagement({
     }
   };
 
-  const getRealStatus = (
-        member: Member
-      ): "active" | "expired" | "inactive" => {
-        const today = new Date();
-        const next = new Date(member.next_payment);
-        const diffMs = today.getTime() - next.getTime();
-        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const getRealStatus = (member: Member): "active" | "expired" | "inactive" => {
+    const today = new Date();
+    const next = new Date(member.next_payment);
+    const diffMs = today.getTime() - next.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-        if (diffDays <= 0) return "active";
-        if (diffDays <= 30) return "expired";
-        return "inactive";
-      };
+    if (diffDays <= 0) return "active";
+    if (diffDays <= 30) return "expired";
+    return "inactive";
+  };
 
   const handleEditMember = async () => {
     if (!editingMember) return;
@@ -303,6 +308,36 @@ export function MemberManagement({
     return diffDays;
   };
 
+  //Función para marcar como contactado
+  const handleMarkAsFollowedUp = async (memberId: string) => {
+    try {
+      const { error } = await supabase
+        .from("members")
+        .update({ followed_up: true })
+        .eq("id", memberId);
+
+      if (error) throw error;
+
+      const updatedMembers = members.map((m) =>
+        m.id === memberId ? { ...m, followed_up: true } : m
+      );
+      setMembers(updatedMembers);
+    } catch (error) {
+      console.error("Error al marcar como contactado:", error);
+      alert("No se pudo marcar como contactado.");
+    }
+  };
+  //ACAA PEGO
+  const getMembersToFollowUp = () => {
+    const today = new Date();
+    return members.filter((member) => {
+      const joinDate = new Date(member.join_date);
+      const diffDays = Math.floor(
+        (today.getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      return !member.followed_up && diffDays >= 5 && diffDays <= 10;
+    });
+  };
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -467,6 +502,7 @@ export function MemberManagement({
                 <SelectItem value="expiring_soon">
                   Próximo a vencerse (10 días)
                 </SelectItem>
+                <SelectItem value="follow_up">Seguimiento pendiente</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -477,6 +513,22 @@ export function MemberManagement({
       <Card>
         <CardHeader>
           <CardTitle>Lista de Socios ({filteredMembers.length})</CardTitle>
+          {getMembersToFollowUp().length > 0 && (
+            <div className="mt-2 text-sm text-yellow-700 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded flex items-center justify-between">
+              <span>
+                ⚠️ Tienes {getMembersToFollowUp().length} socios que ingresaron
+                hace entre 5 y 10 días y aún no fueron contactados.
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-4"
+                onClick={() => setStatusFilter("follow_up")}
+              >
+                Ver socios pendientes
+              </Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <Table>
@@ -532,6 +584,15 @@ export function MemberManagement({
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleMarkAsFollowedUp(member.id)}
+                        >
+                          <span role="img" aria-label="check">
+                            ✅
+                          </span>
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"

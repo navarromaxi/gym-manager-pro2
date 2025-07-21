@@ -20,6 +20,7 @@ export interface Member {
   status: "active" | "expired" | "inactive"
   inactive_level?: "green" | "yellow" | "red"
   inactive_comment?: string
+  followed_up?: boolean; // 👈 AÑADIR ESTA LÍNEA
 }
 
 export interface Payment {
