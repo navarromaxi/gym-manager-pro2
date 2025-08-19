@@ -335,7 +335,7 @@ export function MemberManagement({
       const diffDays = Math.floor(
         (today.getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24)
       );
-      return !member.followed_up && diffDays >= 5 && diffDays <= 10;
+      return !member.followed_up && diffDays >= 5 && diffDays <= 12;
     });
   };
   return (
@@ -517,7 +517,7 @@ export function MemberManagement({
             <div className="mt-2 text-sm text-yellow-700 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded flex items-center justify-between">
               <span>
                 ⚠️ Tienes {getMembersToFollowUp().length} socios que ingresaron
-                hace entre 5 y 10 días y aún no fueron contactados.
+                hace entre 5 y 12 días y aún no fueron contactados.
               </span>
               <Button
                 variant="outline"

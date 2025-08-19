@@ -74,7 +74,8 @@ export default function GymManagementSystem() {
       const { data: membersData, error: membersError } = await supabase
         .from("members")
         .select("*")
-        .eq("gym_id", gymId);
+        .eq("gym_id", gymId)
+        .order("last_payment", { ascending: false });
 
       if (membersError) {
         console.error("Error cargando miembros:", membersError);
@@ -84,7 +85,8 @@ export default function GymManagementSystem() {
       const { data: paymentsData, error: paymentsError } = await supabase
         .from("payments")
         .select("*")
-        .eq("gym_id", gymId);
+        .eq("gym_id", gymId)
+        .order("date", { ascending: false });
 
       if (paymentsError) {
         console.error("Error cargando pagos:", paymentsError);
