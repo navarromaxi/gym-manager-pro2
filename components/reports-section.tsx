@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Download, Calendar, Users, DollarSign, TrendingUp, AlertTriangle, Filter, RefreshCw } from "lucide-react"
+//import type { Member, Payment, Expense } from "@/lib/supabase";
+
 
 interface Member {
   id: string
@@ -30,7 +32,7 @@ interface Payment {
   date: string
   plan: string
   method: string
-}
+} 
 
 interface Expense {
   id: string

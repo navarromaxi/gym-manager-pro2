@@ -77,6 +77,8 @@ export function MemberManagement({
     "Tarjeta de Crédito",
   ];
 
+  const [refreshKey, setRefreshKey] = useState(0);
+
   useEffect(() => {
     setStatusFilter(initialFilter);
   }, [initialFilter]);
@@ -335,6 +337,7 @@ export function MemberManagement({
         m.id === memberId ? { ...m, followed_up: true } : m
       );
       setMembers(updatedMembers);
+      setRefreshKey(prev => prev + 1); // Forzar rerender
     } catch (error) {
       console.error("Error al marcar como contactado:", error);
       alert("No se pudo marcar como contactado.");
@@ -523,8 +526,8 @@ export function MemberManagement({
       </Card>
 
       {/* Members Table */}
-      <Card>
-        <CardHeader>
+      <Card key={refreshKey}>
+        <CardHeader >
           <CardTitle>Lista de Socios ({filteredMembers.length})</CardTitle>
           
           {getExpiringMembers().length > 0 && (
