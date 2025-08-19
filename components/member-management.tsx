@@ -308,6 +308,19 @@ export function MemberManagement({
     return diffDays;
   };
 
+  //Funcion para crear alerta de socios proximo a vencerse
+  const getExpiringMembers = () => {
+    const today = new Date();
+
+    return members.filter((member) => {
+      const nextPayment = new Date(member.next_payment);
+      const diffTime = nextPayment.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      return diffDays <= 10 && diffDays >= 0 && member.status === "active";
+    });
+  };
+
   //Función para marcar como contactado
   const handleMarkAsFollowedUp = async (memberId: string) => {
     try {
@@ -513,6 +526,21 @@ export function MemberManagement({
       <Card>
         <CardHeader>
           <CardTitle>Lista de Socios ({filteredMembers.length})</CardTitle>
+          
+          {getExpiringMembers().length > 0 && (
+            <div className="mt-2 text-sm text-orange-700 bg-orange-100 border-l-4 border-orange-500 p-3 rounded flex justify-between items-center">
+              ⚠️ Tienes {getExpiringMembers().length} socios con vencimiento
+              próximo (menos de 10 días).
+              <Button
+                variant="ghost"
+                className="text-orange-700 hover:underline"
+                onClick={() => setStatusFilter("expiring_soon")}
+              >
+                Ver socios por vencer
+              </Button>
+            </div>
+          )}
+
           {getMembersToFollowUp().length > 0 && (
             <div className="mt-2 text-sm text-yellow-700 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded flex items-center justify-between">
               <span>
