@@ -34,6 +34,22 @@ import { Plus, Edit, Trash2, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan } from "@/lib/supabase";
 
+// Normaliza "YYYY-MM-DD" a medianoche local (evita desfase por UTC)
+const toLocalDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
+
+const getRealStatus = (member: Member): "active" | "expired" | "inactive" => {
+    const today = new Date();
+    //const next = new Date(member.next_payment);
+    //const diffMs = today.getTime() - next.getTime();
+    //const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const next = toLocalDate(member.next_payment);
+    const diffDays = Math.ceil((today.getTime() - next.getTime()) / 86400000);
+
+    if (diffDays <= 0) return "active";
+    if (diffDays <= 30) return "expired";
+    return "inactive";
+  };
+
 interface MemberManagementProps {
   members: Member[];
   setMembers: (members: Member[]) => void;
@@ -97,7 +113,7 @@ export function MemberManagement({
     let matchesStatus = true;
     const today = new Date();
 
-    if (statusFilter === "expiring_soon") {
+    /*  if (statusFilter === "expiring_soon") {
       const nextPayment = new Date(member.next_payment);
       const diffTime = nextPayment.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -111,6 +127,21 @@ export function MemberManagement({
       matchesStatus = !member.followed_up && diffDays >= 5 && diffDays <= 10;
     } else {
       matchesStatus = statusFilter === "all" || member.status === statusFilter;
+    } */
+    const realStatus = getRealStatus(member);
+
+    if (statusFilter === "expiring_soon") {
+      const nextPayment = toLocalDate(member.next_payment);
+      const diffTime = nextPayment.getTime() - new Date().getTime();
+      const diffDays = Math.ceil(diffTime / 86400000);
+      matchesStatus =
+        diffDays <= 10 && diffDays >= 0 && realStatus === "active";
+    } else if (statusFilter === "follow_up") {
+      const joinDate = toLocalDate(member.join_date);
+      const diffDays = Math.floor((Date.now() - joinDate.getTime()) / 86400000);
+      matchesStatus = !member.followed_up && diffDays >= 5 && diffDays <= 10;
+    } else {
+      matchesStatus = statusFilter === "all" || realStatus === statusFilter;
     }
 
     return matchesSearch && matchesStatus;
@@ -216,16 +247,7 @@ export function MemberManagement({
     }
   };
 
-  const getRealStatus = (member: Member): "active" | "expired" | "inactive" => {
-    const today = new Date();
-    const next = new Date(member.next_payment);
-    const diffMs = today.getTime() - next.getTime();
-    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffDays <= 0) return "active";
-    if (diffDays <= 30) return "expired";
-    return "inactive";
-  };
+  
 
   const handleEditMember = async () => {
     if (!editingMember) return;
@@ -311,7 +333,7 @@ export function MemberManagement({
   };
 
   //Funcion para crear alerta de socios proximo a vencerse
-  const getExpiringMembers = () => {
+  /* const getExpiringMembers = () => {
     const today = new Date();
 
     return members.filter((member) => {
@@ -320,6 +342,18 @@ export function MemberManagement({
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       return diffDays <= 10 && diffDays >= 0 && member.status === "active";
+    });
+  }; */
+  const getExpiringMembers = () => {
+    const today = new Date();
+    return members.filter((member) => {
+      const nextPayment = toLocalDate(member.next_payment);
+      const diffDays = Math.ceil(
+        (nextPayment.getTime() - today.getTime()) / 86400000
+      );
+      return (
+        diffDays <= 10 && diffDays >= 0 && getRealStatus(member) === "active"
+      );
     });
   };
 
@@ -337,7 +371,7 @@ export function MemberManagement({
         m.id === memberId ? { ...m, followed_up: true } : m
       );
       setMembers(updatedMembers);
-      setRefreshKey(prev => prev + 1); // Forzar rerender
+      setRefreshKey((prev) => prev + 1); // Forzar rerender
     } catch (error) {
       console.error("Error al marcar como contactado:", error);
       alert("No se pudo marcar como contactado.");
@@ -527,9 +561,9 @@ export function MemberManagement({
 
       {/* Members Table */}
       <Card key={refreshKey}>
-        <CardHeader >
+        <CardHeader>
           <CardTitle>Lista de Socios ({filteredMembers.length})</CardTitle>
-          
+
           {getExpiringMembers().length > 0 && (
             <div className="mt-2 text-sm text-orange-700 bg-orange-100 border-l-4 border-orange-500 p-3 rounded flex justify-between items-center">
               ⚠️ Tienes {getExpiringMembers().length} socios con vencimiento
@@ -547,8 +581,8 @@ export function MemberManagement({
           {getMembersToFollowUp().length > 0 && (
             <div className="mt-2 text-sm text-yellow-700 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded flex items-center justify-between">
               <span>
-                ⚠️ Tienes {getMembersToFollowUp().length} socios que ingresaron
-                hace entre 5 y 12 días y aún no fueron contactados.
+                ⚠️ Tienes socios que ingresaron hace entre 5 y 12 días y aún no
+                fueron contactados.
               </span>
               <Button
                 variant="outline"

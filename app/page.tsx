@@ -1,5 +1,5 @@
 "use client";
-
+import { LoginSystem } from "@/components/login-system";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,17 +12,86 @@ import {
   Calendar,
   UserPlus,
 } from "lucide-react";
-import { MemberManagement } from "@/components/member-management";
+
+/* import { MemberManagement } from "@/components/member-management";
 import { PaymentManagement } from "@/components/payment-management";
 import { ProspectManagement } from "@/components/prospect-management";
 import { ExpenseManagement } from "@/components/expense-management";
 import { ReportsSection } from "@/components/reports-section";
 import { LoginSystem } from "@/components/login-system";
-
 import { PlanManagement } from "@/components/plan-management";
 import { ActivityManagement } from "@/components/activity-management";
 import { RoutineManagement } from "@/components/routine-management";
-import { InactiveManagement } from "@/components/inactive-management";
+import { InactiveManagement } from "@/components/inactive-management";  */
+
+import dynamic from "next/dynamic";
+
+// Carga perezosa (client-only) con un fallback liviano
+const MemberManagement = dynamic(
+  () =>
+    import("@/components/member-management").then((m) => m.MemberManagement),
+  {
+    ssr: false,
+    loading: () => <div className="p-4 text-sm">Cargando socios…</div>,
+  }
+);
+
+const PaymentManagement = dynamic(
+  () =>
+    import("@/components/payment-management").then((m) => m.PaymentManagement),
+  {
+    ssr: false,
+    loading: () => <div className="p-4 text-sm">Cargando pagos…</div>,
+  }
+);
+
+const ProspectManagement = dynamic(
+  () =>
+    import("@/components/prospect-management").then(
+      (m) => m.ProspectManagement
+    ),
+  { ssr: false }
+);
+
+const ExpenseManagement = dynamic<any>(
+  () =>
+    import("@/components/expense-management").then((m) => m.ExpenseManagement),
+  { ssr: false }
+);
+
+const ReportsSection = dynamic<any>(
+  () => import("@/components/reports-section").then((m) => m.ReportsSection),
+  { ssr: false }
+);
+
+const PlanManagement = dynamic<any>(
+  () => import("@/components/plan-management").then((m) => m.PlanManagement),
+  { ssr: false }
+);
+
+const ActivityManagement = dynamic(
+  () =>
+    import("@/components/activity-management").then(
+      (m) => m.ActivityManagement
+    ),
+  { ssr: false }
+);
+
+const RoutineManagement = dynamic(
+  () =>
+    import("@/components/routine-management").then((m) => m.RoutineManagement),
+  { ssr: false }
+);
+
+const InactiveManagement = dynamic(
+  () =>
+    import("@/components/inactive-management").then(
+      (m) => m.InactiveManagement
+    ),
+  { ssr: false }
+);
+
+//Sigue aca
 import { supabase } from "@/lib/supabase";
 import type {
   Member,
@@ -32,6 +101,18 @@ import type {
   Plan,
   Activity,
 } from "@/lib/supabase";
+
+// === Helpers de fecha/estado para el dashboard ===
+const toLocalDate = (iso: string) => new Date(`${iso}T00:00:00`);
+
+const getRealStatus = (m: Member): "active" | "expired" | "inactive" => {
+  const today = new Date();
+  const next = toLocalDate(m.next_payment);
+  const diffDays = Math.ceil((today.getTime() - next.getTime()) / 86400000);
+  if (diffDays <= 0) return "active";
+  if (diffDays <= 30) return "expired";
+  return "inactive";
+};
 
 export default function GymManagementSystem() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -358,9 +439,18 @@ export default function GymManagementSystem() {
   }, [gymData]);
 
   // Calculate dashboard metrics
-  const activeMembers = members.filter((m) => m.status === "active").length;
+  /* const activeMembers = members.filter((m) => m.status === "active").length;
   const expiredMembers = members.filter((m) => m.status === "expired").length;
-  const inactiveMembers = members.filter((m) => m.status === "inactive").length;
+  const inactiveMembers = members.filter((m) => m.status === "inactive").length; */
+  const activeMembers = members.filter(
+    (m) => getRealStatus(m) === "active"
+  ).length;
+  const expiredMembers = members.filter(
+    (m) => getRealStatus(m) === "expired"
+  ).length;
+  const inactiveMembers = members.filter(
+    (m) => getRealStatus(m) === "inactive"
+  ).length;
 
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
@@ -388,10 +478,8 @@ export default function GymManagementSystem() {
   const monthlyProfit = monthlyIncome - monthlyExpenses;
 
   const upcomingExpirations = members.filter((m) => {
-    const nextPayment = new Date(m.next_payment);
-    const today = new Date();
-    const diffTime = nextPayment.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const next = toLocalDate(m.next_payment);
+    const diffDays = Math.ceil((next.getTime() - Date.now()) / 86400000);
     return diffDays <= 7 && diffDays >= 0;
   }).length;
 
