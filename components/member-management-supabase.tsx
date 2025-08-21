@@ -34,6 +34,61 @@ import {
 import { Plus, Edit, Trash2, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan } from "@/lib/supabase";
+import { TableVirtuoso } from "react-virtuoso";
+
+
+//Agrego para la paginacion
+//import { fetchMembersPage } from "@/lib/queries";
+
+export type MembersPageParams = {
+  gymId: string;
+  page: number;       // 1-based
+  pageSize: number;   // ej. 50
+  search?: string;    // filtra por nombre/email
+  orderBy?: "last_payment" | "next_payment" | "name";
+  ascending?: boolean;
+};
+
+export async function fetchMembersPage(params: MembersPageParams) {
+  const {
+    gymId,
+    page,
+    pageSize,
+    search = "",
+    orderBy = "last_payment",
+    ascending = false,
+  } = params;
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  // Base query
+  let q = supabase
+    .from("members")
+    .select("*", { count: "exact" }) // count para total
+    .eq("gym_id", gymId)
+    .order(orderBy, { ascending });
+
+  // Búsqueda en nombre o email (case-insensitive)
+  if (search.trim()) {
+    const s = search.trim();
+    q = q.or(`name.ilike.%${s}%,email.ilike.%${s}%`);
+  }
+
+  // Rango (paginación)
+  q = q.range(from, to);
+
+  const { data, error, count } = await q;
+
+  if (error) throw error;
+
+  return {
+    rows: (data || []) as Member[],
+    total: count ?? 0,
+  };
+}
+
+// FIN DE CODIGO PARA LA PAGINACION
 
 interface MemberManagementProps {
   members: Member[];
@@ -44,6 +99,8 @@ interface MemberManagementProps {
   gymId: string;
   initialFilter?: string;
   onFilterChange?: (filter: string) => void;
+
+  serverPaging?: boolean; // si true, ignora "members" y trae por páginas
 }
 
 export function MemberManagement({
@@ -55,6 +112,7 @@ export function MemberManagement({
   gymId,
   initialFilter = "all",
   onFilterChange,
+  serverPaging = false,
 }: MemberManagementProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -95,12 +153,14 @@ export function MemberManagement({
 
     let matchesStatus = true;
     if (statusFilter === "expiring_soon") {
-      const nextPayment = new Date(member.next_payment);
+      const nextPayment = toLocalDate(member.next_payment);
       const today = new Date();
       const diffTime = nextPayment.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const diffDays = Math.ceil(
+        (nextPayment.getTime() - Date.now()) / 86400000
+      );
       matchesStatus =
-        diffDays <= 10 && diffDays >= 0 && member.status === "active";
+        diffDays <= 10 && diffDays >= 0 && getRealStatus(member) === "active";
     } else {
       matchesStatus =
         statusFilter === "all" || getRealStatus(member) === statusFilter;
@@ -264,7 +324,7 @@ export function MemberManagement({
     }
   };
 
-  const getStatusBadge = (member: Member) => {
+  /* const getStatusBadge = (member: Member) => {
     switch (member.status) {
       case "active":
         return <Badge variant="default">Activo</Badge>;
@@ -281,14 +341,92 @@ export function MemberManagement({
       default:
         return <Badge variant="secondary">Desconocido</Badge>;
     }
+  }; */
+
+  const getStatusBadge = (
+    status: "active" | "expired" | "inactive",
+    level?: "green" | "yellow" | "red"
+  ) => {
+    switch (status) {
+      case "active":
+        return <Badge variant="default">Activo</Badge>;
+      case "expired":
+        return <Badge variant="destructive">Vencido</Badge>;
+      case "inactive": {
+        const color =
+          level === "green"
+            ? "bg-green-500"
+            : level === "yellow"
+            ? "bg-yellow-500"
+            : "bg-red-500";
+        return <Badge className={`${color} text-white`}>Inactivo</Badge>;
+      }
+    }
   };
 
   const getDaysUntilExpiration = (nextPayment: string) => {
     const today = new Date();
-    const expiration = new Date(nextPayment);
+    const expiration = toLocalDate(nextPayment);
     const diffTime = expiration.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
+  };
+
+  // 👇 Si no lo tenés ya:
+  const toLocalDate = (iso: string) => new Date(`${iso}T00:00:00`);
+
+  // Estado para forzar rerender en algunos updates (ej. marcar seguido)
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // ⛳ Socios por vencer (10 días)
+  const getExpiringMembers = () => {
+    const today = new Date();
+    return members.filter((member) => {
+      const nextPayment = toLocalDate(member.next_payment);
+      const diffDays = Math.ceil(
+        (nextPayment.getTime() - today.getTime()) / 86400000
+      );
+      // usamos estado real
+      return (
+        diffDays <= 10 && diffDays >= 0 && getRealStatus(member) === "active"
+      );
+    });
+  };
+
+  // ⛳ Socios a contactar (ingresaron hace 5–12 días y no follow-up)
+  const getMembersToFollowUp = () => {
+    const today = new Date();
+    return members.filter((member) => {
+      const joinDate = toLocalDate(member.join_date);
+      const diffDays = Math.floor(
+        (today.getTime() - joinDate.getTime()) / 86400000
+      );
+      // @ts-ignore (si tu tipo Member aún no declara followed_up)
+      return !member.followed_up && diffDays >= 5 && diffDays <= 12;
+    });
+  };
+
+  // ⛳ Marcar como contactado
+  const handleMarkAsFollowedUp = async (memberId: string) => {
+    try {
+      const { error } = await supabase
+        .from("members")
+        .update({ followed_up: true })
+        .eq("id", memberId);
+
+      if (error) throw error;
+
+      // @ts-ignore (si tu tipo Member aún no declara followed_up)
+      setMembers(
+        members.map((m) =>
+          m.id === memberId ? { ...m, followed_up: true } : m
+        )
+      );
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      console.error("Error al marcar como contactado:", err);
+      alert("No se pudo marcar como contactado.");
+    }
   };
 
   return (
@@ -462,7 +600,7 @@ export function MemberManagement({
       </Card>
 
       {/* Members Table */}
-      <Card>
+      {/* <Card>
         <CardHeader>
           <CardTitle>Lista de Socios ({filteredMembers.length})</CardTitle>
         </CardHeader>
@@ -542,6 +680,171 @@ export function MemberManagement({
               })}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card> */}
+
+      {/* Members Table (Virtualizada) */}
+      <Card key={refreshKey}>
+        <CardHeader>
+          <CardTitle>Lista de Socios ({filteredMembers.length})</CardTitle>
+
+          {getExpiringMembers().length > 0 && (
+            <div className="mt-2 text-sm text-orange-700 bg-orange-100 border-l-4 border-orange-500 p-3 rounded flex justify-between items-center">
+              ⚠️ Tienes {getExpiringMembers().length} socios con vencimiento
+              próximo (menos de 10 días).
+              <Button
+                variant="ghost"
+                className="text-orange-700 hover:underline"
+                onClick={() => setStatusFilter("expiring_soon")}
+              >
+                Ver socios por vencer
+              </Button>
+            </div>
+          )}
+
+          {getMembersToFollowUp().length > 0 && (
+            <div className="mt-2 text-sm text-yellow-700 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded flex items-center justify-between">
+              <span>
+                ⚠️ Tienes socios que ingresaron hace entre 5 y 12 días y aún no
+                fueron contactados.
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-4"
+                onClick={() => setStatusFilter("follow_up")}
+              >
+                Ver socios pendientes
+              </Button>
+            </div>
+          )}
+        </CardHeader>
+
+        <CardContent>
+          {/* Alto fijo para que Virtuoso tenga viewport */}
+          <div
+            className="border rounded-md overflow-hidden"
+            style={{ height: "60vh" }}
+          >
+            <TableVirtuoso
+              data={filteredMembers}
+              fixedHeaderContent={() => (
+                <tr className="text-sm">
+                  <th className="h-10 px-2 text-left align-middle font-medium">
+                    Nombre
+                  </th>
+                  <th className="h-10 px-2 text-left align-middle font-medium">
+                    Email
+                  </th>
+                  <th className="h-10 px-2 text-left align-middle font-medium">
+                    Plan
+                  </th>
+                  <th className="h-10 px-2 text-left align-middle font-medium">
+                    Estado
+                  </th>
+                  <th className="h-10 px-2 text-left align-middle font-medium">
+                    Próximo Pago
+                  </th>
+                  <th className="h-10 px-2 text-left align-middle font-medium">
+                    Días Restantes
+                  </th>
+                  <th className="h-10 px-2 text-left align-middle font-medium">
+                    Acciones
+                  </th>
+                </tr>
+              )}
+              itemContent={(_, member) => {
+                const daysUntilExpiration = getDaysUntilExpiration(
+                  member.next_payment
+                );
+                return (
+                  <>
+                    <td className="p-2 align-middle font-medium">
+                      {member.name}
+                    </td>
+                    <td className="p-2 align-middle">{member.email}</td>
+                    <td className="p-2 align-middle">
+                      {member.plan} - ${member.plan_price}
+                    </td>
+                    <td className="p-2 align-middle">
+                      {getStatusBadge(
+                        getRealStatus(member),
+                        member.inactive_level
+                      )}
+                    </td>
+                    <td className="p-2 align-middle">
+                      {new Date(
+                        `${member.next_payment}T00:00:00`
+                      ).toLocaleDateString()}
+                    </td>
+                    <td className="p-2 align-middle">
+                      <span
+                        className={`font-medium ${
+                          daysUntilExpiration < 0
+                            ? Math.abs(daysUntilExpiration) > 30
+                              ? "text-gray-600"
+                              : "text-red-600"
+                            : daysUntilExpiration <= 7
+                            ? "text-orange-600"
+                            : "text-green-600"
+                        }`}
+                      >
+                        {daysUntilExpiration < 0
+                          ? Math.abs(daysUntilExpiration) > 30
+                            ? `${Math.abs(daysUntilExpiration)} días inactivo`
+                            : `${Math.abs(daysUntilExpiration)} días vencido`
+                          : daysUntilExpiration === 0
+                          ? "Vence hoy"
+                          : `${daysUntilExpiration} días`}
+                      </span>
+                    </td>
+                    <td className="p-2 align-middle">
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleMarkAsFollowedUp(member.id)}
+                        >
+                          <span role="img" aria-label="check">
+                            ✅
+                          </span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingMember(member);
+                            setIsEditDialogOpen(true);
+                          }}
+                        >
+                          <span className="sr-only">Editar</span>✏️
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteMember(member.id)}
+                        >
+                          <span className="sr-only">Eliminar</span>🗑️
+                        </Button>
+                      </div>
+                    </td>
+                  </>
+                );
+              }}
+              components={{
+                // Usamos elementos nativos <table>, <thead>, <tbody>, <tr>, <td>
+                Table: (props) => (
+                  <table {...props} className="w-full text-sm" />
+                ),
+                TableHead: (props) => (
+                  <thead {...props} className="bg-muted/50" />
+                ),
+                TableRow: (props) => <tr {...props} className="border-b" />,
+                TableBody: (props) => <tbody {...props} />,
+                // scroller por defecto ya maneja el scroll
+              }}
+            />
+          </div>
         </CardContent>
       </Card>
 
