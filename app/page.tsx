@@ -23,18 +23,15 @@ import { PlanManagement } from "@/components/plan-management";
 import { ActivityManagement } from "@/components/activity-management";
 import { RoutineManagement } from "@/components/routine-management";
 import { InactiveManagement } from "@/components/inactive-management";  */
-
+import type { MemberManagementProps } from "@/components/member-management";
 import dynamic from "next/dynamic";
 
 // Carga perezosa (client-only) con un fallback liviano
 const MemberManagement = dynamic(
-  () =>
-    import("@/components/member-management").then((m) => m.MemberManagement),
-  {
-    ssr: false,
-    loading: () => <div className="p-4 text-sm">Cargando socios…</div>,
-  }
-);
+  () => import("@/components/member-management").then(m => m.MemberManagement),
+  { ssr: false, loading: () => <div className="p-4 text-sm">Cargando socios…</div> }
+) as React.ComponentType<any>;
+
 
 const PaymentManagement = dynamic(
   () =>
@@ -756,6 +753,7 @@ export default function GymManagementSystem() {
             gymId={gymData?.id || ""}
             initialFilter={memberFilter}
             onFilterChange={setMemberFilter}
+            serverPaging={true}   // ← ACTIVAR
           />
         )}
         {activeTab === "payments" && (

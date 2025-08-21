@@ -36,57 +36,8 @@ import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan } from "@/lib/supabase";
 import { TableVirtuoso } from "react-virtuoso";
 
-
 //Agrego para la paginacion
-//import { fetchMembersPage } from "@/lib/queries";
-
-export type MembersPageParams = {
-  gymId: string;
-  page: number;       // 1-based
-  pageSize: number;   // ej. 50
-  search?: string;    // filtra por nombre/email
-  orderBy?: "last_payment" | "next_payment" | "name";
-  ascending?: boolean;
-};
-
-export async function fetchMembersPage(params: MembersPageParams) {
-  const {
-    gymId,
-    page,
-    pageSize,
-    search = "",
-    orderBy = "last_payment",
-    ascending = false,
-  } = params;
-
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
-
-  // Base query
-  let q = supabase
-    .from("members")
-    .select("*", { count: "exact" }) // count para total
-    .eq("gym_id", gymId)
-    .order(orderBy, { ascending });
-
-  // Búsqueda en nombre o email (case-insensitive)
-  if (search.trim()) {
-    const s = search.trim();
-    q = q.or(`name.ilike.%${s}%,email.ilike.%${s}%`);
-  }
-
-  // Rango (paginación)
-  q = q.range(from, to);
-
-  const { data, error, count } = await q;
-
-  if (error) throw error;
-
-  return {
-    rows: (data || []) as Member[],
-    total: count ?? 0,
-  };
-}
+import { fetchMembersPage } from "@/lib/queries";
 
 // FIN DE CODIGO PARA LA PAGINACION
 
@@ -129,6 +80,13 @@ export function MemberManagement({
     paymentMethod: "Efectivo",
   });
 
+  // Estados de paginación (solo se usan si serverPaging=true)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalRows, setTotalRows] = useState(0);
+  const [loadingPage, setLoadingPage] = useState(false);
+  const [pagedMembers, setPagedMembers] = useState<Member[]>([]);
+
   const paymentMethods = [
     "Efectivo",
     "Transferencia",
@@ -140,22 +98,61 @@ export function MemberManagement({
     setStatusFilter(initialFilter);
   }, [initialFilter]);
 
+  // avisa al padre si cambia el filtro elegido
   useEffect(() => {
-    if (onFilterChange) {
-      onFilterChange(statusFilter);
-    }
+    if (onFilterChange) onFilterChange(statusFilter);
   }, [statusFilter, onFilterChange]);
 
-  const filteredMembers = members.filter((member) => {
+  // carga de página desde Supabase cuando está activo server paging
+  useEffect(() => {
+    if (!serverPaging || !gymId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingPage(true);
+        const { rows, total } = await fetchMembersPage({
+          gymId,
+          page,
+          pageSize,
+          search: searchTerm,
+          orderBy: "last_payment",
+          ascending: false,
+        });
+        if (cancelled) return;
+        setPagedMembers(rows);
+        setTotalRows(total);
+        // opcional: reflejar la página en el estado externo
+        setMembers(rows);
+      } catch (e) {
+        console.error("Error trayendo página de miembros:", e);
+      } finally {
+        if (!cancelled) setLoadingPage(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [serverPaging, gymId, page, pageSize, searchTerm, setMembers]);
+
+  // cuando cambia el término de búsqueda, volvemos a la página 1
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, serverPaging]);
+
+  // fuente base: si serverPaging=true uso la página; si no, lo que vino por props
+  const baseMembers = serverPaging ? pagedMembers : members;
+
+  const filteredMembers = baseMembers.filter((member) => {
     const matchesSearch =
       member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.email.toLowerCase().includes(searchTerm.toLowerCase());
 
     let matchesStatus = true;
+
     if (statusFilter === "expiring_soon") {
       const nextPayment = toLocalDate(member.next_payment);
-      const today = new Date();
-      const diffTime = nextPayment.getTime() - today.getTime();
       const diffDays = Math.ceil(
         (nextPayment.getTime() - Date.now()) / 86400000
       );
@@ -845,6 +842,83 @@ export function MemberManagement({
               }}
             />
           </div>
+          {/* Footer de paginación (solo visible con serverPaging) */}
+          {serverPaging && (
+            <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="text-sm text-muted-foreground">
+                {loadingPage ? (
+                  <>Cargando página…</>
+                ) : (
+                  <>
+                    Mostrando{" "}
+                    <strong>
+                      {Math.min((page - 1) * pageSize + 1, totalRows)}–
+                      {Math.min(page * pageSize, totalRows)}
+                    </strong>{" "}
+                    de <strong>{totalRows}</strong>
+                  </>
+                )}
+                {statusFilter !== "all" && (
+                  <>
+                    {" "}
+                    · Coinciden con el filtro:{" "}
+                    <strong>{filteredMembers.length}</strong>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={loadingPage || page === 1}
+                >
+                  ← Anterior
+                </Button>
+                <span className="text-sm">
+                  Página <strong>{page}</strong> /{" "}
+                  <strong>
+                    {Math.max(1, Math.ceil(totalRows / pageSize))}
+                  </strong>
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setPage((p) =>
+                      Math.min(
+                        p + 1,
+                        Math.max(1, Math.ceil(totalRows / pageSize))
+                      )
+                    )
+                  }
+                  disabled={
+                    loadingPage || page >= Math.ceil(totalRows / pageSize)
+                  }
+                >
+                  Siguiente →
+                </Button>
+
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(v) => {
+                    setPageSize(Number(v));
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="Tamaño" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25 / pág.</SelectItem>
+                    <SelectItem value="50">50 / pág.</SelectItem>
+                    <SelectItem value="100">100 / pág.</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

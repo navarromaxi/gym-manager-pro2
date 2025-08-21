@@ -19,3 +19,48 @@ export async function fetchInactiveMembers(gymId: string): Promise<Member[]> {
 
   return data;
 }
+
+// ✅ NUEVO: tipos y función de paginación
+export type MembersPageParams = {
+  gymId: string;
+  page: number;       // 1-based
+  pageSize: number;   // ej. 50
+  search?: string;    // filtra por nombre/email
+  orderBy?: "last_payment" | "next_payment" | "name";
+  ascending?: boolean;
+};
+
+export async function fetchMembersPage(params: MembersPageParams) {
+  const {
+    gymId,
+    page,
+    pageSize,
+    search = "",
+    orderBy = "last_payment",
+    ascending = false,
+  } = params;
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let q = supabase
+    .from("members")
+    .select("*", { count: "exact" })
+    .eq("gym_id", gymId)
+    .order(orderBy, { ascending });
+
+  if (search.trim()) {
+    const s = search.trim();
+    q = q.or(`name.ilike.%${s}%,email.ilike.%${s}%`);
+  }
+
+  q = q.range(from, to);
+
+  const { data, error, count } = await q;
+  if (error) throw error;
+
+  return {
+    rows: (data || []) as Member[],
+    total: count ?? 0,
+  };
+}

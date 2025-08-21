@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,19 +38,19 @@ import type { Member, Payment, Plan } from "@/lib/supabase";
 const toLocalDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
 
 const getRealStatus = (member: Member): "active" | "expired" | "inactive" => {
-    const today = new Date();
-    //const next = new Date(member.next_payment);
-    //const diffMs = today.getTime() - next.getTime();
-    //const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    const next = toLocalDate(member.next_payment);
-    const diffDays = Math.ceil((today.getTime() - next.getTime()) / 86400000);
+  const today = new Date();
+  //const next = new Date(member.next_payment);
+  //const diffMs = today.getTime() - next.getTime();
+  //const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const next = toLocalDate(member.next_payment);
+  const diffDays = Math.ceil((today.getTime() - next.getTime()) / 86400000);
 
-    if (diffDays <= 0) return "active";
-    if (diffDays <= 30) return "expired";
-    return "inactive";
-  };
+  if (diffDays <= 0) return "active";
+  if (diffDays <= 30) return "expired";
+  return "inactive";
+};
 
-interface MemberManagementProps {
+export interface MemberManagementProps {
   members: Member[];
   setMembers: (members: Member[]) => void;
   payments: Payment[];
@@ -75,6 +75,16 @@ export function MemberManagement({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
+
+  useEffect(() => {
+    const id = setTimeout(
+      () => setDebouncedSearch(searchTerm.trim().toLowerCase()),
+      250
+    ); // 250ms
+    return () => clearTimeout(id);
+  }, [searchTerm]);
+
   const [statusFilter, setStatusFilter] = useState(initialFilter);
   const [newMember, setNewMember] = useState({
     name: "",
@@ -105,47 +115,42 @@ export function MemberManagement({
     }
   }, [statusFilter, onFilterChange]);
 
-  const filteredMembers = members.filter((member) => {
-    const matchesSearch =
-      member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchTerm.toLowerCase());
-
-    let matchesStatus = true;
+  const filteredMembers = useMemo(() => {
     const today = new Date();
 
-    /*  if (statusFilter === "expiring_soon") {
-      const nextPayment = new Date(member.next_payment);
-      const diffTime = nextPayment.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      matchesStatus =
-        diffDays <= 10 && diffDays >= 0 && member.status === "active";
-    } else if (statusFilter === "follow_up") {
-      const joinDate = new Date(member.join_date);
-      const diffDays = Math.floor(
-        (today.getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      matchesStatus = !member.followed_up && diffDays >= 5 && diffDays <= 10;
-    } else {
-      matchesStatus = statusFilter === "all" || member.status === statusFilter;
-    } */
-    const realStatus = getRealStatus(member);
+    return members.filter((member) => {
+      // búsqueda (debounced)
+      const name = (member.name ?? "").toLowerCase();
+      const email = (member.email ?? "").toLowerCase();
+      const matchesSearch =
+        !debouncedSearch ||
+        name.includes(debouncedSearch) ||
+        email.includes(debouncedSearch);
 
-    if (statusFilter === "expiring_soon") {
-      const nextPayment = toLocalDate(member.next_payment);
-      const diffTime = nextPayment.getTime() - new Date().getTime();
-      const diffDays = Math.ceil(diffTime / 86400000);
-      matchesStatus =
-        diffDays <= 10 && diffDays >= 0 && realStatus === "active";
-    } else if (statusFilter === "follow_up") {
-      const joinDate = toLocalDate(member.join_date);
-      const diffDays = Math.floor((Date.now() - joinDate.getTime()) / 86400000);
-      matchesStatus = !member.followed_up && diffDays >= 5 && diffDays <= 10;
-    } else {
-      matchesStatus = statusFilter === "all" || realStatus === statusFilter;
-    }
+      if (!matchesSearch) return false;
 
-    return matchesSearch && matchesStatus;
-  });
+      const realStatus = getRealStatus(member);
+
+      if (statusFilter === "expiring_soon") {
+        const nextPayment = toLocalDate(member.next_payment);
+        const diffDays = Math.ceil(
+          (nextPayment.getTime() - today.getTime()) / 86400000
+        );
+        return diffDays <= 10 && diffDays >= 0 && realStatus === "active";
+      }
+
+      if (statusFilter === "follow_up") {
+        const joinDate = toLocalDate(member.join_date);
+        const diffDays = Math.floor(
+          (today.getTime() - joinDate.getTime()) / 86400000
+        );
+        // @ts-ignore posible campo no tipado
+        return !member.followed_up && diffDays >= 5 && diffDays <= 10;
+      }
+
+      return statusFilter === "all" || realStatus === statusFilter;
+    });
+  }, [members, debouncedSearch, statusFilter]);
 
   const handleAddMember = async () => {
     try {
@@ -247,8 +252,6 @@ export function MemberManagement({
     }
   };
 
-  
-
   const handleEditMember = async () => {
     if (!editingMember) return;
 
@@ -326,9 +329,10 @@ export function MemberManagement({
 
   const getDaysUntilExpiration = (nextPayment: string) => {
     const today = new Date();
-    const expiration = new Date(nextPayment);
-    const diffTime = expiration.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const expiration = toLocalDate(nextPayment); // 👈 evita desfase
+    const diffDays = Math.ceil(
+      (expiration.getTime() - today.getTime()) / 86400000
+    );
     return diffDays;
   };
 
@@ -595,6 +599,14 @@ export function MemberManagement({
             </div>
           )}
         </CardHeader>
+        {filteredMembers.length === 0 && (
+          <div className="mt-2 text-sm text-muted-foreground">
+            {debouncedSearch
+              ? "No hay socios que coincidan con la búsqueda/estado."
+              : "Aún no hay socios para mostrar con este filtro."}
+          </div>
+        )}
+
         <CardContent>
           <Table>
             <TableHeader>
@@ -621,7 +633,10 @@ export function MemberManagement({
                       {member.plan} - ${member.plan_price}
                     </TableCell>
                     <TableCell>
-                      {getStatusBadge(getRealStatus(member))}
+                      {getStatusBadge(
+                        getRealStatus(member),
+                        member.inactive_level
+                      )}
                     </TableCell>
                     <TableCell>
                       {new Date(member.next_payment).toLocaleDateString()}
