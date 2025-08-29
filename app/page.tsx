@@ -13,25 +13,18 @@ import {
   UserPlus,
 } from "lucide-react";
 
-/* import { MemberManagement } from "@/components/member-management";
-import { PaymentManagement } from "@/components/payment-management";
-import { ProspectManagement } from "@/components/prospect-management";
-import { ExpenseManagement } from "@/components/expense-management";
-import { ReportsSection } from "@/components/reports-section";
-import { LoginSystem } from "@/components/login-system";
-import { PlanManagement } from "@/components/plan-management";
-import { ActivityManagement } from "@/components/activity-management";
-import { RoutineManagement } from "@/components/routine-management";
-import { InactiveManagement } from "@/components/inactive-management";  */
 import type { MemberManagementProps } from "@/components/member-management";
 import dynamic from "next/dynamic";
 
 // Carga perezosa (client-only) con un fallback liviano
 const MemberManagement = dynamic(
-  () => import("@/components/member-management").then(m => m.MemberManagement),
-  { ssr: false, loading: () => <div className="p-4 text-sm">Cargando socios…</div> }
+  () =>
+    import("@/components/member-management").then((m) => m.MemberManagement),
+  {
+    ssr: false,
+    loading: () => <div className="p-4 text-sm">Cargando socios…</div>,
+  }
 ) as React.ComponentType<any>;
-
 
 const PaymentManagement = dynamic(
   () =>
@@ -480,6 +473,18 @@ export default function GymManagementSystem() {
     return diffDays <= 7 && diffDays >= 0;
   }).length;
 
+  // Socios que ingresaron hace 5–12 días y aún no fueron contactados
+  const followUpCount = (() => {
+    const today = new Date();
+    return members.filter((m) => {
+      const join = new Date(`${m.join_date}T00:00:00`); // normaliza a medianoche local
+      const diffDays = Math.floor(
+        (today.getTime() - join.getTime()) / 86400000
+      );
+      return !m.followed_up && diffDays >= 5 && diffDays <= 12;
+    }).length;
+  })();
+
   const goToMembersWithFilter = (filter: string) => {
     setMemberFilter(filter);
     setActiveTab("members");
@@ -638,6 +643,17 @@ export default function GymManagementSystem() {
             <CardTitle>Alertas Importantes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {followUpCount > 0 && (
+              <div
+                className="flex items-center space-x-2 text-blue-600 cursor-pointer hover:bg-blue-50 p-2 rounded"
+                onClick={() => goToMembersWithFilter("follow_up")}
+              >
+                <span>
+                  📩 {followUpCount} socio{followUpCount > 1 ? "s" : ""} con
+                  seguimiento pendiente (5–12 días)
+                </span>
+              </div>
+            )}
             {upcomingExpirations > 0 && (
               <div
                 className="flex items-center space-x-2 text-orange-600 cursor-pointer hover:bg-orange-50 p-2 rounded"
@@ -753,7 +769,7 @@ export default function GymManagementSystem() {
             gymId={gymData?.id || ""}
             initialFilter={memberFilter}
             onFilterChange={setMemberFilter}
-            serverPaging={true}   // ← ACTIVAR
+            serverPaging={true} // ← ACTIVAR
           />
         )}
         {activeTab === "payments" && (
