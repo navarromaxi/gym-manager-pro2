@@ -170,7 +170,8 @@ export default function GymManagementSystem() {
       const { data: expensesData, error: expensesError } = await supabase
         .from("expenses")
         .select("*")
-        .eq("gym_id", gymId);
+        .eq("gym_id", gymId)
+        .order("date", { ascending: false });
 
       if (expensesError) {
         console.error("Error cargando gastos:", expensesError);

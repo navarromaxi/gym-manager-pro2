@@ -101,7 +101,9 @@ export function PaymentManagement({
       })
     }
 
-    return filtered
+    return filtered.sort(
+      (a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime(),
+    )
   }
 
   const filteredPayments = getFilteredPayments()
@@ -475,19 +477,19 @@ export function PaymentManagement({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPayments
-                .sort((a, b) =>
-                  parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime(),
-                )
-                .map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>{parseLocalDate(payment.date).toLocaleDateString()}</TableCell>
-                    <TableCell className="font-medium">{payment.member_name}</TableCell>
-                    <TableCell>{payment.plan}</TableCell>
-                    <TableCell className="font-medium text-green-600">${payment.amount.toLocaleString()}</TableCell>
-                    <TableCell>{payment.method}</TableCell>
-                  </TableRow>
-                ))}
+              {filteredPayments.map((payment) => (
+                <TableRow key={payment.id}>
+                  <TableCell>
+                    {parseLocalDate(payment.date).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="font-medium">{payment.member_name}</TableCell>
+                  <TableCell>{payment.plan}</TableCell>
+                  <TableCell className="font-medium text-green-600">
+                    ${payment.amount.toLocaleString()}
+                  </TableCell>
+                  <TableCell>{payment.method}</TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </CardContent>

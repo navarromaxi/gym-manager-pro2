@@ -115,54 +115,56 @@ export function ExpenseManagement({
           isRecurring: Boolean(e.is_recurring), // 👈 transforma correctamente
           gymId: e.gym_id, // 👈 asegurate también de esto si lo necesitás
         }));
-        setExpenses(() => formatted);;
+        setExpenses(() => formatted);
       }
     };
 
     fetchExpenses();
   }, [gymId, setExpenses]);
 
-  const filteredExpenses = expenses.filter((expense) => {
-    const matchesSearch = expense.description
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesCategory =
-      categoryFilter === "all" || expense.category === categoryFilter;
-    let matchesMonth = true;
-    let matchesYear = true;
+  const filteredExpenses = expenses
+    .filter((expense) => {
+      const matchesSearch = expense.description
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+      const matchesCategory =
+        categoryFilter === "all" || expense.category === categoryFilter;
+      let matchesMonth = true;
+      let matchesYear = true;
 
-    if (monthFilter === "current") {
-      const currentDate = new Date();
-      const expenseDate = new Date(expense.date);
-      matchesMonth =
-        expenseDate.getMonth() === currentDate.getMonth() &&
-        expenseDate.getFullYear() === currentDate.getFullYear();
-    } else if (monthFilter === "previous") {
-      const currentDate = new Date();
-      const previousMonth =
-        currentDate.getMonth() === 0 ? 11 : currentDate.getMonth() - 1;
-      const previousYear =
-        currentDate.getMonth() === 0
-          ? currentDate.getFullYear() - 1
-          : currentDate.getFullYear();
-      const expenseDate = new Date(expense.date);
-      matchesMonth =
-        expenseDate.getMonth() === previousMonth &&
-        expenseDate.getFullYear() === previousYear;
-    }
+      if (monthFilter === "current") {
+        const currentDate = new Date();
+        const expenseDate = new Date(expense.date);
+        matchesMonth =
+          expenseDate.getMonth() === currentDate.getMonth() &&
+          expenseDate.getFullYear() === currentDate.getFullYear();
+      } else if (monthFilter === "previous") {
+        const currentDate = new Date();
+        const previousMonth =
+          currentDate.getMonth() === 0 ? 11 : currentDate.getMonth() - 1;
+        const previousYear =
+          currentDate.getMonth() === 0
+            ? currentDate.getFullYear() - 1
+            : currentDate.getFullYear();
+        const expenseDate = new Date(expense.date);
+        matchesMonth =
+          expenseDate.getMonth() === previousMonth &&
+          expenseDate.getFullYear() === previousYear;
+      }
 
-    if (yearFilter === "current") {
-      const currentYear = new Date().getFullYear();
-      const expenseDate = new Date(expense.date);
-      matchesYear = expenseDate.getFullYear() === currentYear;
-    } else if (yearFilter === "previous") {
-      const previousYear = new Date().getFullYear() - 1;
-      const expenseDate = new Date(expense.date);
-      matchesYear = expenseDate.getFullYear() === previousYear;
-    }
+      if (yearFilter === "current") {
+        const currentYear = new Date().getFullYear();
+        const expenseDate = new Date(expense.date);
+        matchesYear = expenseDate.getFullYear() === currentYear;
+      } else if (yearFilter === "previous") {
+        const previousYear = new Date().getFullYear() - 1;
+        const expenseDate = new Date(expense.date);
+        matchesYear = expenseDate.getFullYear() === previousYear;
+      }
 
-    return matchesSearch && matchesCategory && matchesMonth && matchesYear;
-  });
+      return matchesSearch && matchesCategory && matchesMonth && matchesYear;
+    })
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   //ACA ES QUE HAY QUE MODIFICAR PARA GUARDAR EL DATO EN SUPABASE:  versión async que lo guarde en Supabase:
   const handleAddExpense = async () => {
@@ -655,46 +657,41 @@ export function ExpenseManagement({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredExpenses
-                .sort(
-                  (a, b) =>
-                    new Date(b.date).getTime() - new Date(a.date).getTime()
-                )
-                .map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell>
-                      {new Date(expense.date).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {expense.description}
-                    </TableCell>
-                    <TableCell>{expense.category}</TableCell>
-                    <TableCell>
-                      {expense.isRecurring ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          <RefreshCw className="w-3 h-3 mr-1" />
-                          Fijo
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
-                          Único
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium text-red-600">
-                      ${expense.amount.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteExpense(expense.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+              {filteredExpenses.map((expense) => (
+                <TableRow key={expense.id}>
+                  <TableCell>
+                    {new Date(expense.date).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {expense.description}
+                  </TableCell>
+                  <TableCell>{expense.category}</TableCell>
+                  <TableCell>
+                    {expense.isRecurring ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                        Fijo
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+                        Único
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-medium text-red-600">
+                    ${expense.amount.toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteExpense(expense.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </CardContent>
