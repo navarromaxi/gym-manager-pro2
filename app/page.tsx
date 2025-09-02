@@ -93,7 +93,10 @@ import type {
 } from "@/lib/supabase";
 
 // === Helpers de fecha/estado para el dashboard ===
-const toLocalDate = (iso: string) => new Date(`${iso}T00:00:00`);
+const toLocalDate = (iso: string) => {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
 
 const getRealStatus = (m: Member): "active" | "expired" | "inactive" => {
   const today = new Date();
@@ -394,7 +397,7 @@ export default function GymManagementSystem() {
   const updateMemberStatuses = (members: Member[]) => {
     const today = new Date();
     return members.map((member) => {
-      const nextPayment = new Date(member.next_payment);
+      const nextPayment = toLocalDate(member.next_payment);
       const diffTime = today.getTime() - nextPayment.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -447,7 +450,7 @@ export default function GymManagementSystem() {
 
   const monthlyIncome = payments
     .filter((p) => {
-      const paymentDate = new Date(p.date);
+      const paymentDate = toLocalDate(p.date);
       return (
         paymentDate.getMonth() === currentMonth &&
         paymentDate.getFullYear() === currentYear
@@ -457,7 +460,7 @@ export default function GymManagementSystem() {
 
   const monthlyExpenses = expenses
     .filter((e) => {
-      const expenseDate = new Date(e.date);
+      const expenseDate = toLocalDate(e.date);
       return (
         expenseDate.getMonth() === currentMonth &&
         expenseDate.getFullYear() === currentYear
@@ -477,7 +480,7 @@ export default function GymManagementSystem() {
   const followUpCount = (() => {
     const today = new Date();
     return members.filter((m) => {
-      const join = new Date(`${m.join_date}T00:00:00`); // normaliza a medianoche local
+      const join = toLocalDate(m.join_date);
       const diffDays = Math.floor(
         (today.getTime() - join.getTime()) / 86400000
       );

@@ -82,7 +82,7 @@ function toLocalMidnight(d: Date) {
   return x;
 }
 function parseDateSafe(s: string) {
-  const d = new Date(s);
+  const d = new Date(`${s}T00:00:00`);
   return isNaN(d.getTime()) ? null : d;
 }
 
@@ -238,14 +238,14 @@ const overdueMembers = membersWithDerived.filter((m) => m.derivedStatus === "exp
     switch (timeFilter) {
       case "current_month":
         filteredPayments = payments.filter((p) => {
-          const paymentDate = new Date(p.date);
+          const paymentDate = toLocalDate(p.date);
           return (
             paymentDate.getMonth() === currentDate.getMonth() &&
             paymentDate.getFullYear() === currentDate.getFullYear()
           );
         });
         filteredExpenses = expenses.filter((e) => {
-          const expenseDate = new Date(e.date);
+          const expenseDate = toLocalDate(e.date);
           return (
             expenseDate.getMonth() === currentDate.getMonth() &&
             expenseDate.getFullYear() === currentDate.getFullYear()
@@ -261,14 +261,14 @@ const overdueMembers = membersWithDerived.filter((m) => m.derivedStatus === "exp
             ? currentDate.getFullYear() - 1
             : currentDate.getFullYear();
         filteredPayments = payments.filter((p) => {
-          const paymentDate = new Date(p.date);
+          const paymentDate = toLocalDate(p.date);
           return (
             paymentDate.getMonth() === previousMonth &&
             paymentDate.getFullYear() === previousYear
           );
         });
         filteredExpenses = expenses.filter((e) => {
-          const expenseDate = new Date(e.date);
+          const expenseDate = toLocalDate(e.date);
           return (
             expenseDate.getMonth() === previousMonth &&
             expenseDate.getFullYear() === previousYear
@@ -281,30 +281,30 @@ const overdueMembers = membersWithDerived.filter((m) => m.derivedStatus === "exp
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
         filteredPayments = payments.filter(
-          (p) => new Date(p.date) >= sixMonthsAgo
+          (p) => toLocalDate(p.date) >= sixMonthsAgo
         );
         filteredExpenses = expenses.filter(
-          (e) => new Date(e.date) >= sixMonthsAgo
+          (e) => toLocalDate(e.date) >= sixMonthsAgo
         );
         break;
       }
 
       case "current_year":
         filteredPayments = payments.filter(
-          (p) => new Date(p.date).getFullYear() === currentDate.getFullYear()
+          (p) => toLocalDate(p.date).getFullYear() === currentDate.getFullYear()
         );
         filteredExpenses = expenses.filter(
-          (e) => new Date(e.date).getFullYear() === currentDate.getFullYear()
+          (e) => toLocalDate(e.date).getFullYear() === currentDate.getFullYear()
         );
         break;
 
       case "last_year": {
         const lastYear = currentDate.getFullYear() - 1;
         filteredPayments = payments.filter(
-          (p) => new Date(p.date).getFullYear() === lastYear
+          (p) => toLocalDate(p.date).getFullYear() === lastYear
         );
         filteredExpenses = expenses.filter(
-          (e) => new Date(e.date).getFullYear() === lastYear
+          (e) => toLocalDate(e.date).getFullYear() === lastYear
         );
         break;
       }
@@ -374,7 +374,7 @@ const getRenewalStats = () => {
     const year = date.getFullYear();
 
     const monthPayments = payments.filter((p) => {
-      const paymentDate = new Date(p.date);
+      const paymentDate = toLocalDate(p.date);
       return (
         paymentDate.getMonth() === month && paymentDate.getFullYear() === year
       );
@@ -406,44 +406,6 @@ const getRenewalStats = () => {
     }
   };
 
-  /* const handleExportReport = () => {
-    const reportData = {
-      gimnasio: gymName,
-      periodo: getTimeFilterLabel(),
-      fecha: new Date().toLocaleDateString(),
-      resumenFinanciero: {
-        ingresos: totalIncome,
-        gastos: totalExpenseAmount,
-        ganancia: totalProfit,
-      },
-      socios: {
-        activos: activeMembers,
-        vencidos: expiredMembers,
-        inactivos: inactiveMembers,
-        total: members.length,
-      },
-      renovaciones: {
-        renovaron: renewalStats.renewedCount,
-        noRenovaron: renewalStats.notRenewedCount,
-        tasaRenovacion: renewalStats.renewalRate,
-      },
-      alertas: {
-        proximosVencimientos: upcomingExpirations.length,
-        morosos: overdueMembers.length,
-      },
-    };
-
-    const dataStr = JSON.stringify(reportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `reporte-${gymName.toLowerCase().replace(/\s+/g, "-")}-${
-      new Date().toISOString().split("T")[0]
-    }.json`;
-    link.click();
-  }; */
-
   // === Construye las "hojas" a exportar a partir de lo ya calculado ===
   function buildSheets() {
     const resumen = [
@@ -471,7 +433,7 @@ const getRenewalStats = () => {
       SocioId: p.memberId,
       Socio: p.memberName,
       Monto: p.amount,
-      Fecha: new Date(p.date).toLocaleDateString(),
+      Fecha: toLocalDate(p.date).toLocaleDateString(),
       Plan: p.plan,
       Metodo: p.method,
     }));
@@ -491,19 +453,19 @@ const getRenewalStats = () => {
       Telefono: m.phone,
       Plan: m.plan,
       PrecioPlan: m.planPrice,
-      Alta: m.joinDate ? new Date(m.joinDate).toLocaleDateString() : "",
+      Alta: m.joinDate ? toLocalDate(m.joinDate).toLocaleDateString() : "",
       UltimoPago: m.lastPayment
-        ? new Date(m.lastPayment).toLocaleDateString()
+        ? toLocalDate(m.lastPayment).toLocaleDateString()
         : "",
       ProximoPago: m.nextPayment
-        ? new Date(m.nextPayment).toLocaleDateString()
+        ? toLocalDate(m.nextPayment).toLocaleDateString()
         : "",
       EstadoDerivado: m.derivedStatus,
     }));
 
     const proximos = upcomingExpirations.map((m) => {
       const baseDate =
-        m._next ?? (m.nextPayment ? new Date(m.nextPayment) : null);
+        m._next ?? (m.nextPayment ? toLocalDate(m.nextPayment) : null);
       const next = baseDate ? new Date(baseDate) : null;
       const days = next
         ? Math.ceil(

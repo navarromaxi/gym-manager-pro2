@@ -45,11 +45,16 @@ export function PaymentManagement({
     memberId: "",
     planId: "",
     method: "",
-    date: new Date().toISOString().split("T")[0],
+    date: new Date().toLocaleDateString("en-CA"),
   })
   const [methodFilter, setMethodFilter] = useState("all")
 
   const paymentMethods = ["Efectivo", "Transferencia", "Tarjeta de Débito", "Tarjeta de Crédito"]
+
+    const parseLocalDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split("-").map(Number)
+    return new Date(year, month - 1, day)
+  }
 
   // Filtrar miembros para el buscador
   const filteredMembersForSearch = members.filter((member) =>
@@ -71,7 +76,7 @@ export function PaymentManagement({
       const currentDate = new Date()
 
       filtered = filtered.filter((payment) => {
-        const paymentDate = new Date(payment.date)
+        const paymentDate = parseLocalDate(payment.date)
 
         switch (periodFilter) {
           case "current_month":
@@ -128,7 +133,7 @@ export function PaymentManagement({
       if (paymentError) throw paymentError
 
       // ACTUALIZAR EL SOCIO CON EL NUEVO PLAN
-      const paymentDate = new Date(newPayment.date)
+      const paymentDate = parseLocalDate(newPayment.date)
       const nextPayment = new Date(paymentDate)
 
       // Calcular próximo vencimiento según el plan
@@ -172,7 +177,7 @@ export function PaymentManagement({
         memberId: "",
         planId: "",
         method: "",
-        date: new Date().toISOString().split("T")[0],
+        date: new Date().toLocaleDateString("en-CA"),
       })
       setMemberSearchTerm("")
       setIsAddDialogOpen(false)
@@ -184,7 +189,7 @@ export function PaymentManagement({
 
   const totalPayments = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0)
   const currentMonthPayments = payments.filter((payment) => {
-    const paymentDate = new Date(payment.date)
+    const paymentDate = parseLocalDate(payment.date)
     const currentDate = new Date()
     return paymentDate.getMonth() === currentDate.getMonth() && paymentDate.getFullYear() === currentDate.getFullYear()
   })
@@ -471,10 +476,12 @@ export function PaymentManagement({
             </TableHeader>
             <TableBody>
               {filteredPayments
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .sort((a, b) =>
+                  parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime(),
+                )
                 .map((payment) => (
                   <TableRow key={payment.id}>
-                    <TableCell>{new Date(payment.date).toLocaleDateString()}</TableCell>
+                    <TableCell>{parseLocalDate(payment.date).toLocaleDateString()}</TableCell>
                     <TableCell className="font-medium">{payment.member_name}</TableCell>
                     <TableCell>{payment.plan}</TableCell>
                     <TableCell className="font-medium text-green-600">${payment.amount.toLocaleString()}</TableCell>
