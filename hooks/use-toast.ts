@@ -182,22 +182,12 @@ function useToast() {
 
   return {
     ...state,
-    toast: ({
-      title,
-      description,
-      variant,
-    }: { title: string; description?: string; variant?: "default" | "destructive" }) => {
-      console.log("Toast:", title, description, variant)
-      // In a real app, this would trigger a visual toast notification.
-      // For now, we'll just use a simple alert or console log.
-      alert(`${title}${description ? "\n" + description : ""}`)
-    },
+    toast,
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
   }
 }
 
-export { useToast }
-export type { ToasterToast }
+export { useToast, toast }
 
 export function useToastDemo() {
   const { toast } = useToast()
