@@ -47,6 +47,7 @@ export interface Payment {
   card_brand?: string
   type: "plan" | "product"
   description?: string
+  plan_id?: string
 }
 
 export interface Expense {

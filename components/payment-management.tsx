@@ -438,10 +438,9 @@ export function PaymentManagement({
                       value={newPayment.amount}
                       onChange={(e) =>
                         setNewPayment({
-                      ...newPayment,
-                      method: value,
-                      cardBrand: "",
-                    })
+                       ...newPayment,
+                          amount: parseFloat(e.target.value),
+                        })
                       }
                     />
                   </div>
