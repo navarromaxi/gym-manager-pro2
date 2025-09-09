@@ -65,6 +65,7 @@ export function CustomPlanManagement({
     end_date: "",
     payment_date: new Date().toLocaleDateString("en-CA"),
     payment_method: "",
+    card_brand: "",
   });
 
   const filteredPlans = customPlans.filter(
@@ -76,6 +77,13 @@ export function CustomPlanManagement({
   const filteredMembers = members.filter((m) =>
     m.name.toLowerCase().includes(memberSearch.toLowerCase())
   );
+
+  const cardBrands = [
+    "Visa",
+    "Mastercard",
+    "American Express",
+    "Otra",
+  ];
 
   const handleAddPlan = async () => {
     const member = members.find((m) => m.id === newPlan.member_id);
@@ -110,6 +118,10 @@ export function CustomPlanManagement({
       date: newPlan.payment_date,
       plan: newPlan.name,
       method: newPlan.payment_method || "Efectivo",
+      card_brand:
+        newPlan.payment_method === "Tarjeta de Crédito"
+          ? newPlan.card_brand
+          : undefined,
       type: "plan",
     };
 
@@ -133,6 +145,7 @@ export function CustomPlanManagement({
       end_date: "",
       payment_date: new Date().toLocaleDateString("en-CA"),
       payment_method: "",
+      card_brand: "",
     });
     setMemberSearch("");
   };
@@ -242,7 +255,11 @@ export function CustomPlanManagement({
                 <Select
                   value={newPlan.payment_method}
                   onValueChange={(v) =>
-                    setNewPlan({ ...newPlan, payment_method: v })
+                    setNewPlan({
+                      ...newPlan,
+                      payment_method: v,
+                      card_brand: "",
+                    })
                   }
                 >
                   <SelectTrigger>
@@ -256,6 +273,29 @@ export function CustomPlanManagement({
                   </SelectContent>
                 </Select>
               </div>
+
+              {newPlan.payment_method === "Tarjeta de Crédito" && (
+                <div className="grid gap-2">
+                  <Label>Tipo de Tarjeta</Label>
+                  <Select
+                    value={newPlan.card_brand}
+                    onValueChange={(v) =>
+                      setNewPlan({ ...newPlan, card_brand: v })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar tarjeta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cardBrands.map((brand) => (
+                        <SelectItem key={brand} value={brand}>
+                          {brand}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label>Fecha de finalización</Label>
                 <Input

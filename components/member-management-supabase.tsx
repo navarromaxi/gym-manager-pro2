@@ -78,6 +78,7 @@ export function MemberManagement({
     planPrice: 0,
     joinDate: new Date().toISOString().split("T")[0],
     paymentMethod: "Efectivo",
+    cardBrand: "",
   });
 
   // Estados de paginación (solo se usan si serverPaging=true)
@@ -92,6 +93,13 @@ export function MemberManagement({
     "Transferencia",
     "Tarjeta de Débito",
     "Tarjeta de Crédito",
+  ];
+
+   const cardBrands = [
+    "Visa",
+    "Mastercard",
+    "American Express",
+    "Otra",
   ];
 
   useEffect(() => {
@@ -238,9 +246,12 @@ export function MemberManagement({
         date: newMember.joinDate,
         plan: member.plan,
         method: newMember.paymentMethod,
+        card_brand:
+          newMember.paymentMethod === "Tarjeta de Crédito"
+            ? newMember.cardBrand
+            : undefined,
         type: "plan",
         description: selectedPlan?.description || member.plan,
-        //plan_id: selectedPlan?.id,
       };
 
       const { error: paymentError } = await supabase
@@ -261,6 +272,7 @@ export function MemberManagement({
         planPrice: 0,
         joinDate: new Date().toISOString().split("T")[0],
         paymentMethod: "Efectivo",
+        cardBrand: "",
       });
       setIsAddDialogOpen(false);
     } catch (error) {
@@ -578,7 +590,11 @@ export function MemberManagement({
                 <Select
                   value={newMember.paymentMethod}
                   onValueChange={(value) =>
-                    setNewMember({ ...newMember, paymentMethod: value })
+                    setNewMember({
+                      ...newMember,
+                      paymentMethod: value,
+                      cardBrand: "",
+                    })
                   }
                 >
                   <SelectTrigger>
@@ -593,9 +609,38 @@ export function MemberManagement({
                   </SelectContent>
                 </Select>
               </div>
+               {newMember.paymentMethod === "Tarjeta de Crédito" && (
+                <div className="grid gap-2">
+                  <Label>Tipo de Tarjeta</Label>
+                  <Select
+                    value={newMember.cardBrand}
+                    onValueChange={(value) =>
+                      setNewMember({ ...newMember, cardBrand: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona tarjeta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cardBrands.map((brand) => (
+                        <SelectItem key={brand} value={brand}>
+                          {brand}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <DialogFooter>
-              <Button type="submit" onClick={handleAddMember}>
+              <Button
+                type="submit"
+                onClick={handleAddMember}
+                disabled={
+                  newMember.paymentMethod === "Tarjeta de Crédito" &&
+                  !newMember.cardBrand
+                }
+              >
                 Agregar Socio
               </Button>
             </DialogFooter>

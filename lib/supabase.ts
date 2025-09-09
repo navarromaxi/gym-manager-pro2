@@ -44,6 +44,7 @@ export interface Payment {
   date: string
   plan?: string
   method: string
+  card_brand?: string
   type: "plan" | "product"
   description?: string
 }

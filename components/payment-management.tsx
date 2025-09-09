@@ -58,6 +58,7 @@ export function PaymentManagement({
     memberId: "",
     planId: "",
     method: "",
+    cardBrand: "",
     date: new Date().toLocaleDateString("en-CA"),
     type: "plan" as "plan" | "product",
     description: "",
@@ -70,6 +71,13 @@ export function PaymentManagement({
     "Transferencia",
     "Tarjeta de Débito",
     "Tarjeta de Crédito",
+  ];
+
+  const cardBrands = [
+    "Visa",
+    "Mastercard",
+    "American Express",
+    "Otra",
   ];
 
   const parseLocalDate = (dateStr: string) => {
@@ -157,6 +165,10 @@ export function PaymentManagement({
           date: newPayment.date,
           plan: selectedPlan.name,
           method: newPayment.method,
+          card_brand:
+            newPayment.method === "Tarjeta de Crédito"
+              ? newPayment.cardBrand
+              : undefined,
           type: "plan",
         }
 
@@ -213,6 +225,10 @@ export function PaymentManagement({
           amount: newPayment.amount,
           date: newPayment.date,
           method: newPayment.method,
+           card_brand:
+            newPayment.method === "Tarjeta de Crédito"
+              ? newPayment.cardBrand
+              : undefined,
           type: "product",
           description: newPayment.description,
           plan: newPayment.description,
@@ -231,6 +247,7 @@ export function PaymentManagement({
         memberId: "",
         planId: "",
         method: "",
+        cardBrand: "",
         date: new Date().toLocaleDateString("en-CA"),
         type: "plan",
         description: "",
@@ -421,9 +438,10 @@ export function PaymentManagement({
                       value={newPayment.amount}
                       onChange={(e) =>
                         setNewPayment({
-                          ...newPayment,
-                          amount: Number(e.target.value),
-                        })
+                      ...newPayment,
+                      method: value,
+                      cardBrand: "",
+                    })
                       }
                     />
                   </div>
@@ -451,6 +469,29 @@ export function PaymentManagement({
                   </SelectContent>
                 </Select>
               </div>
+
+               {newPayment.method === "Tarjeta de Crédito" && (
+                <div className="grid gap-2">
+                  <Label htmlFor="cardBrand">Tipo de Tarjeta</Label>
+                  <Select
+                    value={newPayment.cardBrand}
+                    onValueChange={(value) =>
+                      setNewPayment({ ...newPayment, cardBrand: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona tarjeta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cardBrands.map((brand) => (
+                        <SelectItem key={brand} value={brand}>
+                          {brand}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* FECHA */}
               <div className="grid gap-2">
@@ -532,6 +573,8 @@ export function PaymentManagement({
                 disabled={
                   !newPayment.memberId ||
                   !newPayment.method ||
+                   (newPayment.method === "Tarjeta de Crédito" &&
+                    !newPayment.cardBrand) ||
                   (newPayment.type === "plan"
                     ? !newPayment.planId
                     : !newPayment.description || !newPayment.amount)
@@ -702,7 +745,10 @@ export function PaymentManagement({
                   <TableCell className="font-medium text-green-600">
                     ${payment.amount.toLocaleString()}
                   </TableCell>
-                  <TableCell>{payment.method}</TableCell>
+                  <TableCell>
+                    {payment.method}
+                    {payment.card_brand ? ` - ${payment.card_brand}` : ""}
+                  </TableCell>
                   <TableCell className="capitalize">{payment.type}</TableCell>
                 </TableRow>
               ))}
