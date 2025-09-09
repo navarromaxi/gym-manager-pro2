@@ -273,19 +273,41 @@ export function MemberManagement({
     if (!editingMember) return;
 
     try {
+      const nextPaymentDate = new Date(editingMember.next_payment);
+      const today = new Date();
+      const diffDays = Math.ceil(
+        (today.getTime() - nextPaymentDate.getTime()) / 86400000
+      );
+      let newStatus: "active" | "expired" | "inactive" = "active";
+      let newInactive: "green" | "yellow" | "red" | undefined;
+      if (diffDays > 0) {
+        if (diffDays <= 30) {
+          newStatus = "expired";
+        } else {
+          newStatus = "inactive";
+          newInactive = "yellow";
+        }
+      }
       const { error } = await supabase
         .from("members")
         .update({
           name: editingMember.name,
           email: editingMember.email,
           phone: editingMember.phone,
+           next_payment: editingMember.next_payment,
+          status: newStatus,
+          inactive_level: newInactive,
         })
         .eq("id", editingMember.id);
 
       if (error) throw error;
 
       setMembers(
-        members.map((m) => (m.id === editingMember.id ? editingMember : m))
+        members.map((m) =>
+          m.id === editingMember.id
+            ? { ...editingMember, status: newStatus, inactive_level: newInactive }
+            : m
+        )
       );
       setIsEditDialogOpen(false);
       setEditingMember(null);
@@ -903,6 +925,20 @@ export function MemberManagement({
                     setEditingMember({
                       ...editingMember,
                       phone: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-next-payment">Fin del plan</Label>
+                <Input
+                  id="edit-next-payment"
+                  type="date"
+                  value={editingMember.next_payment}
+                  onChange={(e) =>
+                    setEditingMember({
+                      ...editingMember,
+                      next_payment: e.target.value,
                     })
                   }
                 />
