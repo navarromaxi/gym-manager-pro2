@@ -91,6 +91,18 @@ export interface Plan {
   is_active: boolean
 }
 
+export interface CustomPlan {
+  id: string
+  gym_id: string
+  member_id: string
+  member_name: string
+  name: string
+  description: string
+  price: number
+  end_date: string
+  is_active: boolean
+}
+
 export interface Activity {
   id: string
   gym_id: string

@@ -64,6 +64,14 @@ const PlanManagement = dynamic<any>(
   { ssr: false }
 );
 
+const CustomPlanManagement = dynamic(
+  () =>
+    import("@/components/custom-plan-management").then(
+      (m) => m.CustomPlanManagement
+    ),
+  { ssr: false }
+);
+
 const ActivityManagement = dynamic(
   () =>
     import("@/components/activity-management").then(
@@ -95,6 +103,7 @@ import type {
   Expense,
   Plan,
   Activity,
+  CustomPlan,
 } from "@/lib/supabase";
 
 // === Helpers de fecha/estado para el dashboard ===
@@ -120,6 +129,7 @@ export default function GymManagementSystem() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [customPlans, setCustomPlans] = useState<CustomPlan[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [gymData, setGymData] = useState<{ name: string; id: string } | null>(
     null
@@ -141,6 +151,7 @@ export default function GymManagementSystem() {
     setExpenses([]);
     setPlans([]);
     setActivities([]);
+    setCustomPlans([]);
   };
 
   // CARGAR DATOS DESDE SUPABASE
@@ -212,6 +223,19 @@ export default function GymManagementSystem() {
         console.error("Error cargando actividades:", activitiesError);
       }
 
+      // Cargar planes personalizados
+      const { data: customPlansData, error: customPlansError } = await supabase
+        .from("custom_plans")
+        .select("*")
+        .eq("gym_id", gymId);
+
+      if (customPlansError) {
+        console.error(
+          "Error cargando planes personalizados:",
+          customPlansError
+        );
+      }
+
       // Actualizar estados
       setMembers(membersData || []);
       setPayments(paymentsData || []);
@@ -219,12 +243,14 @@ export default function GymManagementSystem() {
       setProspects(prospectsData || []);
       setPlans(plansData || []);
       setActivities(activitiesData || []);
+      setCustomPlans(customPlansData || []);
 
       console.log("Datos cargados:", {
         members: membersData?.length || 0,
         payments: paymentsData?.length || 0,
         plans: plansData?.length || 0,
         activities: activitiesData?.length || 0,
+        customPlans: customPlansData?.length || 0,
       });
 
       // Si no hay datos, crear datos de ejemplo
@@ -747,6 +773,7 @@ export default function GymManagementSystem() {
               { id: "prospects", label: "Interesados" },
               { id: "inactives", label: "Inactivos" },
               { id: "plans", label: "Planes" },
+               { id: "custom_plans", label: "Personalizados" },
               { id: "activities", label: "Actividades" },
               { id: "routines", label: "Rutinas" },
               { id: "expenses", label: "Gastos" },
@@ -826,6 +853,14 @@ export default function GymManagementSystem() {
             plans={plans}
             setPlans={setPlans}
             activities={activities}
+            gymId={gymData?.id || ""}
+          />
+        )}
+         {activeTab === "custom_plans" && (
+          <CustomPlanManagement
+            customPlans={customPlans}
+            setCustomPlans={setCustomPlans}
+            members={members}
             gymId={gymData?.id || ""}
           />
         )}
