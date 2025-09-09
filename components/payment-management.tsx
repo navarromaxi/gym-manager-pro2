@@ -697,7 +697,7 @@ export function PaymentManagement({
                     {payment.member_name}
                   </TableCell>
                   <TableCell>
-                    {payment.type === "plan"
+                    {payment.type === "plan" || payment.type === "custom"
                       ? payment.plan
                       : payment.description}
                   </TableCell>

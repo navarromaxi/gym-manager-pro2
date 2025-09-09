@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/table";
 import { Plus, Edit, Trash2, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import type { Member, Payment, Plan } from "@/lib/supabase";
+import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
 
 // Normaliza "YYYY-MM-DD" a medianoche local (evita desfase por UTC)
 const toLocalDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
@@ -56,6 +56,7 @@ export interface MemberManagementProps {
   payments: Payment[];
   setPayments: (payments: Payment[]) => void;
   plans: Plan[];
+  customPlans: CustomPlan[];
   gymId: string;
   initialFilter?: string;
   onFilterChange?: (filter: string) => void;
@@ -67,6 +68,7 @@ export function MemberManagement({
   payments,
   setPayments,
   plans,
+  customPlans,
   gymId,
   initialFilter = "all",
   onFilterChange,
@@ -650,12 +652,23 @@ export function MemberManagement({
                 const daysUntilExpiration = getDaysUntilExpiration(
                   member.next_payment
                 );
+                const customPlan = customPlans.find(
+                  (cp) => cp.member_id === member.id && cp.is_active
+                );
                 return (
                   <TableRow key={member.id}>
                     <TableCell className="font-medium">{member.name}</TableCell>
                     <TableCell>{member.email}</TableCell>
                     <TableCell>
-                      {member.plan} - ${member.plan_price}
+                      <div>
+                        {member.plan} - ${member.plan_price}
+                      </div>
+                      {customPlan && (
+                        <div className="ml-4 text-sm text-muted-foreground">
+                          Personalizado -{' '}
+                          {new Date(customPlan.end_date).toLocaleDateString()}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(
@@ -671,11 +684,11 @@ export function MemberManagement({
                         className={`font-medium ${
                           daysUntilExpiration < 0
                             ? Math.abs(daysUntilExpiration) > 30
-                              ? "text-gray-600"
-                              : "text-red-600"
+                              ? 'text-gray-600'
+                              : 'text-red-600'
                             : daysUntilExpiration <= 7
-                            ? "text-orange-600"
-                            : "text-green-600"
+                             ? 'text-orange-600'
+                            : 'text-green-600'
                         }`}
                       >
                         {daysUntilExpiration < 0
@@ -683,7 +696,7 @@ export function MemberManagement({
                             ? `${Math.abs(daysUntilExpiration)} días inactivo`
                             : `${Math.abs(daysUntilExpiration)} días vencido`
                           : daysUntilExpiration === 0
-                          ? "Vence hoy"
+                          ? 'Vence hoy'
                           : `${daysUntilExpiration} días`}
                       </span>
                     </TableCell>

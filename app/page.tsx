@@ -805,6 +805,7 @@ export default function GymManagementSystem() {
             payments={payments}
             setPayments={setPayments}
             plans={plans}
+            customPlans={customPlans}
             gymId={gymData?.id || ""}
             initialFilter={memberFilter}
             onFilterChange={setMemberFilter}
@@ -861,6 +862,8 @@ export default function GymManagementSystem() {
             customPlans={customPlans}
             setCustomPlans={setCustomPlans}
             members={members}
+            payments={payments}
+            setPayments={setPayments}
             gymId={gymData?.id || ""}
           />
         )}

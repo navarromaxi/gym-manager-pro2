@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase, Member, CustomPlan } from "@/lib/supabase";
+import { supabase, Member, CustomPlan, Payment } from "@/lib/supabase";
 import {
   Card,
   CardContent,
@@ -41,6 +41,8 @@ interface CustomPlanManagementProps {
   customPlans: CustomPlan[];
   setCustomPlans: (plans: CustomPlan[]) => void;
   members: Member[];
+   payments: Payment[];
+  setPayments: (payments: Payment[]) => void;
   gymId: string;
 }
 
@@ -48,22 +50,31 @@ export function CustomPlanManagement({
   customPlans,
   setCustomPlans,
   members,
+  payments,
+  setPayments,
   gymId,
 }: CustomPlanManagementProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+   const [memberSearch, setMemberSearch] = useState("");
   const [newPlan, setNewPlan] = useState({
     member_id: "",
     name: "",
     description: "",
     price: 0,
     end_date: "",
+    payment_date: new Date().toLocaleDateString("en-CA"),
+    payment_method: "",
   });
 
   const filteredPlans = customPlans.filter(
     (plan) =>
       plan.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       plan.member_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredMembers = members.filter((m) =>
+    m.name.toLowerCase().includes(memberSearch.toLowerCase())
   );
 
   const handleAddPlan = async () => {
@@ -80,6 +91,7 @@ export function CustomPlanManagement({
       description: newPlan.description,
       price: newPlan.price,
       end_date: newPlan.end_date,
+      payment_date: newPlan.payment_date,
       is_active: true,
     };
 
@@ -89,9 +101,41 @@ export function CustomPlanManagement({
       return;
     }
 
+    const paymentId = `${gymId}_payment_${Date.now()}`;
+    const payment: Payment = {
+      id: paymentId,
+      gym_id: gymId,
+      member_id: member.id,
+      member_name: member.name,
+      amount: newPlan.price,
+      date: newPlan.payment_date,
+      plan: newPlan.name,
+      method: newPlan.payment_method || "Efectivo",
+      type: "custom",
+    };
+
+    const { error: paymentError } = await supabase
+      .from("payments")
+      .insert([payment]);
+    if (paymentError) {
+      console.error("Error al registrar pago de personalizado:", paymentError);
+    } else {
+      setPayments([...payments, payment]);
+    }
+
+
     setCustomPlans([...customPlans, plan]);
     setIsAddDialogOpen(false);
-    setNewPlan({ member_id: "", name: "", description: "", price: 0, end_date: "" });
+     setNewPlan({
+      member_id: "",
+      name: "",
+      description: "",
+      price: 0,
+      end_date: "",
+      payment_date: new Date().toLocaleDateString("en-CA"),
+      payment_method: "",
+    });
+    setMemberSearch("");
   };
 
   const handleDeletePlan = async (id: string) => {
@@ -130,7 +174,16 @@ export function CustomPlanManagement({
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label>Socio</Label>
+                 <Label>Buscar Socio</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar socio..."
+                    className="pl-8"
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                  />
+                </div>
                 <Select
                   value={newPlan.member_id}
                   onValueChange={(v) => setNewPlan({ ...newPlan, member_id: v })}
@@ -139,7 +192,7 @@ export function CustomPlanManagement({
                     <SelectValue placeholder="Seleccionar socio" />
                   </SelectTrigger>
                   <SelectContent>
-                    {members.map((m) => (
+                    {filteredMembers.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
                         {m.name}
                       </SelectItem>
@@ -174,6 +227,35 @@ export function CustomPlanManagement({
                     setNewPlan({ ...newPlan, price: Number(e.target.value) })
                   }
                 />
+              </div>
+              <div className="grid gap-2">
+                <Label>Fecha de pago</Label>
+                <Input
+                  type="date"
+                  value={newPlan.payment_date}
+                  onChange={(e) =>
+                    setNewPlan({ ...newPlan, payment_date: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Método de pago</Label>
+                <Select
+                  value={newPlan.payment_method}
+                  onValueChange={(v) =>
+                    setNewPlan({ ...newPlan, payment_method: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar método" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Efectivo">Efectivo</SelectItem>
+                    <SelectItem value="Transferencia">Transferencia</SelectItem>
+                    <SelectItem value="Tarjeta de Débito">Tarjeta de Débito</SelectItem>
+                    <SelectItem value="Tarjeta de Crédito">Tarjeta de Crédito</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-2">
                 <Label>Fecha de finalización</Label>

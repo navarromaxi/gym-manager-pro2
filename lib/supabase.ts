@@ -44,7 +44,7 @@ export interface Payment {
   date: string
   plan?: string
   method: string
-  type: "plan" | "product"
+  type: "plan" | "product" | "custom"
   description?: string
 }
 
@@ -100,6 +100,7 @@ export interface CustomPlan {
   description: string
   price: number
   end_date: string
+  payment_date: string
   is_active: boolean
 }
 
