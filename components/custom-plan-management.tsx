@@ -91,7 +91,6 @@ export function CustomPlanManagement({
       description: newPlan.description,
       price: newPlan.price,
       end_date: newPlan.end_date,
-      payment_date: newPlan.payment_date,
       is_active: true,
     };
 
@@ -111,7 +110,7 @@ export function CustomPlanManagement({
       date: newPlan.payment_date,
       plan: newPlan.name,
       method: newPlan.payment_method || "Efectivo",
-      type: "custom",
+      type: "plan",
     };
 
     const { error: paymentError } = await supabase

@@ -697,9 +697,7 @@ export function PaymentManagement({
                     {payment.member_name}
                   </TableCell>
                   <TableCell>
-                    {payment.type === "plan" || payment.type === "custom"
-                      ? payment.plan
-                      : payment.description}
+                   {payment.type === "plan" ? payment.plan : payment.description}
                   </TableCell>
                   <TableCell className="font-medium text-green-600">
                     ${payment.amount.toLocaleString()}
