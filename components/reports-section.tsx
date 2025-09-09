@@ -58,7 +58,8 @@ interface Payment {
   date: string;
   plan?: string;
   method: string;
-   type: "plan" | "product";
+   cardBrand?: string;
+  type: "plan" | "product";
   description?: string;
   plan_id?: string;
   product_id?: string;

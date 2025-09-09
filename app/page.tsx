@@ -174,7 +174,9 @@ export default function GymManagementSystem() {
       // Cargar pagos
       const { data: paymentsData, error: paymentsError } = await supabase
         .from("payments")
-        .select("*")
+        .select(
+          "id, gym_id, member_id, member_name, amount, date, plan, method, card_brand, type, description, plan_id"
+        )
         .eq("gym_id", gymId)
         .order("date", { ascending: false });
 
