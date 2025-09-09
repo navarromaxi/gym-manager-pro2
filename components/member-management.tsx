@@ -224,6 +224,9 @@ export function MemberManagement({
         date: newMember.joinDate,
         plan: member.plan,
         method: newMember.paymentMethod,
+         type: "plan",
+        description: selectedPlan?.description || member.plan,
+        plan_id: selectedPlan?.id,
       };
 
       const { error: paymentError } = await supabase

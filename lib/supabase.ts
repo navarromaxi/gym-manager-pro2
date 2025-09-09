@@ -42,8 +42,10 @@ export interface Payment {
   member_name: string
   amount: number
   date: string
-  plan: string
+  plan?: string
   method: string
+  type: "plan" | "product"
+  description?: string
 }
 
 export interface Expense {
@@ -100,4 +102,13 @@ export interface Activity {
   schedule: { day: string; startTime: string; endTime: string }[]
   is_active: boolean
   created_at: string // 👈 AGREGAR ESTO
+}
+
+export interface Product {
+  id: string
+  gym_id: string
+  name: string
+  description: string
+  price: number
+  is_active: boolean
 }

@@ -56,8 +56,13 @@ interface Payment {
   memberName: string;
   amount: number;
   date: string;
-  plan: string;
+  plan?: string;
   method: string;
+   type: "plan" | "product";
+  description?: string;
+  plan_id?: string;
+  product_id?: string;
+
 }
 
 interface Expense {
@@ -434,8 +439,9 @@ const getRenewalStats = () => {
       Socio: p.memberName,
       Monto: p.amount,
       Fecha: toLocalDate(p.date).toLocaleDateString(),
-      Plan: p.plan,
+      Concepto: p.type === "plan" ? p.plan : p.description,
       Metodo: p.method,
+      Tipo: p.type,
     }));
 
     const gastos = filteredExpenses.map((e) => ({

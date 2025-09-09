@@ -238,6 +238,9 @@ export function MemberManagement({
         date: newMember.joinDate,
         plan: member.plan,
         method: newMember.paymentMethod,
+        type: "plan",
+        description: selectedPlan?.description || member.plan,
+        //plan_id: selectedPlan?.id,
       };
 
       const { error: paymentError } = await supabase
@@ -402,6 +405,26 @@ export function MemberManagement({
       return !member.followed_up && diffDays >= 5 && diffDays <= 12;
     });
   };
+
+  const getMonthlyPaymentSummary = (member: Member) => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const memberPayments = payments.filter((p) => p.member_id === member.id);
+    const paymentsThisMonth = memberPayments.filter((p) => {
+      const d = new Date(p.date);
+      return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+    });
+    const totalAmount = paymentsThisMonth.reduce(
+      (sum, p) => sum + p.amount,
+      0
+    );
+    const extras = paymentsThisMonth
+      .map((p) => p.plan)
+      .filter((name) => name && name !== member.plan);
+    return `${member.plan}${extras.length ? " + " + extras.join(" + ") : ""} = $${totalAmount}`;
+  };
+
 
   // ⛳ Marcar como contactado
   const handleMarkAsFollowedUp = async (memberId: string) => {
@@ -596,90 +619,6 @@ export function MemberManagement({
         </CardContent>
       </Card>
 
-      {/* Members Table */}
-      {/* <Card>
-        <CardHeader>
-          <CardTitle>Lista de Socios ({filteredMembers.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Plan</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Próximo Pago</TableHead>
-                <TableHead>Días Restantes</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredMembers.map((member) => {
-                const daysUntilExpiration = getDaysUntilExpiration(
-                  member.next_payment
-                );
-                return (
-                  <TableRow key={member.id}>
-                    <TableCell className="font-medium">{member.name}</TableCell>
-                    <TableCell>{member.email}</TableCell>
-                    <TableCell>
-                      {member.plan} - ${member.plan_price}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(member)}</TableCell>
-                    <TableCell>
-                      {new Date(member.next_payment).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`font-medium ${
-                          daysUntilExpiration < 0
-                            ? Math.abs(daysUntilExpiration) > 30
-                              ? "text-gray-600"
-                              : "text-red-600"
-                            : daysUntilExpiration <= 7
-                            ? "text-orange-600"
-                            : "text-green-600"
-                        }`}
-                      >
-                        {daysUntilExpiration < 0
-                          ? Math.abs(daysUntilExpiration) > 30
-                            ? `${Math.abs(daysUntilExpiration)} días inactivo`
-                            : `${Math.abs(daysUntilExpiration)} días vencido`
-                          : daysUntilExpiration === 0
-                          ? "Vence hoy"
-                          : `${daysUntilExpiration} días`}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingMember(member);
-                            setIsEditDialogOpen(true);
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteMember(member.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card> */}
-
       {/* Members Table (Virtualizada) */}
       <Card key={refreshKey}>
         <CardHeader>
@@ -734,7 +673,7 @@ export function MemberManagement({
                     Email
                   </th>
                   <th className="h-10 px-2 text-left align-middle font-medium">
-                    Plan
+                    Pagos
                   </th>
                   <th className="h-10 px-2 text-left align-middle font-medium">
                     Estado
@@ -761,7 +700,7 @@ export function MemberManagement({
                     </td>
                     <td className="p-2 align-middle">{member.email}</td>
                     <td className="p-2 align-middle">
-                      {member.plan} - ${member.plan_price}
+                      {getMonthlyPaymentSummary(member)}
                     </td>
                     <td className="p-2 align-middle">
                       {getStatusBadge(

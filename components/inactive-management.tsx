@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getRealStatus } from "@/lib/utils";
-import type { Member } from "@/lib/supabase";
+import type { Member, Payment } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,16 +36,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-interface Payment {
-  id: string;
-  gym_id: string;
-  member_id: string;
-  member_name: string;
-  amount: number;
-  date: string;
-  plan: string;
-  method: string;
-}
 
 interface InactiveManagementProps {
   members: Member[];

@@ -1,11 +1,17 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -14,19 +20,26 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Search, DollarSign } from "lucide-react"
-import { supabase } from "@/lib/supabase"
-import type { Member, Payment, Plan } from "@/lib/supabase"
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Plus, Search, DollarSign } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import type { Member, Payment, Plan } from "@/lib/supabase";
 
 interface PaymentManagementProps {
-  payments: Payment[]
-  setPayments: (payments: Payment[]) => void
-  members: Member[]
-  setMembers: (members: Member[]) => void
-  plans: Plan[]
-  gymId: string
+  payments: Payment[];
+  setPayments: (payments: Payment[]) => void;
+  members: Member[];
+  setMembers: (members: Member[]) => void;
+  plans: Plan[];
+  gymId: string;
 }
 
 export function PaymentManagement({
@@ -37,142 +50,178 @@ export function PaymentManagement({
   plans = [],
   gymId,
 }: PaymentManagementProps) {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [periodFilter, setPeriodFilter] = useState("all")
-  const [memberSearchTerm, setMemberSearchTerm] = useState("")
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [periodFilter, setPeriodFilter] = useState("all");
+  const [memberSearchTerm, setMemberSearchTerm] = useState("");
   const [newPayment, setNewPayment] = useState({
     memberId: "",
     planId: "",
     method: "",
     date: new Date().toLocaleDateString("en-CA"),
-  })
-  const [methodFilter, setMethodFilter] = useState("all")
+    type: "plan" as "plan" | "product",
+    description: "",
+    amount: 0,
+  });
+  const [methodFilter, setMethodFilter] = useState("all");
 
-  const paymentMethods = ["Efectivo", "Transferencia", "Tarjeta de Débito", "Tarjeta de Crédito"]
+  const paymentMethods = [
+    "Efectivo",
+    "Transferencia",
+    "Tarjeta de Débito",
+    "Tarjeta de Crédito",
+  ];
 
-    const parseLocalDate = (dateStr: string) => {
-    const [year, month, day] = dateStr.split("-").map(Number)
-    return new Date(year, month - 1, day)
-  }
+  const parseLocalDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  };
 
   // Filtrar miembros para el buscador
   const filteredMembersForSearch = members.filter((member) =>
-    member.name.toLowerCase().includes(memberSearchTerm.toLowerCase()),
-  )
+    member.name.toLowerCase().includes(memberSearchTerm.toLowerCase())
+  );
 
   // Función para obtener pagos filtrados actualizada
   const getFilteredPayments = () => {
     let filtered = (payments || []).filter((payment) =>
-      payment.member_name.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
+      payment.member_name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     // Filtro por método de pago
     if (methodFilter !== "all") {
-      filtered = filtered.filter((payment) => payment.method === methodFilter)
+      filtered = filtered.filter((payment) => payment.method === methodFilter);
     }
 
     if (periodFilter !== "all") {
-      const currentDate = new Date()
+      const currentDate = new Date();
 
       filtered = filtered.filter((payment) => {
-        const paymentDate = parseLocalDate(payment.date)
+        const paymentDate = parseLocalDate(payment.date);
 
         switch (periodFilter) {
           case "current_month":
             return (
               paymentDate.getMonth() === currentDate.getMonth() &&
               paymentDate.getFullYear() === currentDate.getFullYear()
-            )
+            );
           case "previous_month":
-            const previousMonth = currentDate.getMonth() === 0 ? 11 : currentDate.getMonth() - 1
+            const previousMonth =
+              currentDate.getMonth() === 0 ? 11 : currentDate.getMonth() - 1;
             const previousYear =
-              currentDate.getMonth() === 0 ? currentDate.getFullYear() - 1 : currentDate.getFullYear()
-            return paymentDate.getMonth() === previousMonth && paymentDate.getFullYear() === previousYear
+              currentDate.getMonth() === 0
+                ? currentDate.getFullYear() - 1
+                : currentDate.getFullYear();
+            return (
+              paymentDate.getMonth() === previousMonth &&
+              paymentDate.getFullYear() === previousYear
+            );
           case "last_6_months":
-            const sixMonthsAgo = new Date()
-            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-            return paymentDate >= sixMonthsAgo
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+            return paymentDate >= sixMonthsAgo;
           case "current_year":
-            return paymentDate.getFullYear() === currentDate.getFullYear()
+            return paymentDate.getFullYear() === currentDate.getFullYear();
           default:
-            return true
+            return true;
         }
-      })
+      });
     }
 
     return filtered.sort(
-      (a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime(),
-    )
-  }
+      (a, b) =>
+        parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
+    );
+  };
 
-  const filteredPayments = getFilteredPayments()
+  const filteredPayments = getFilteredPayments();
 
   // FUNCIÓN ACTUALIZADA PARA REGISTRAR PAGO Y RENOVAR SOCIO
   const handleAddPayment = async () => {
     try {
-      const selectedMember = members.find((m) => m.id === newPayment.memberId)
-      const selectedPlan = plans.find((p) => p.id === newPayment.planId)
+      const selectedMember = members.find((m) => m.id === newPayment.memberId);
+      if (!selectedMember) return;
 
-      if (!selectedMember || !selectedPlan) return
+      if (newPayment.type === "plan") {
+        const selectedPlan = plans.find((p) => p.id === newPayment.planId)
+        if (!selectedPlan) return
 
-      // Crear el pago
-      const paymentId = `${gymId}_payment_${Date.now()}`
-      const payment: Payment = {
-        id: paymentId,
-        gym_id: gymId,
-        member_id: newPayment.memberId,
-        member_name: selectedMember.name,
-        amount: selectedPlan.price,
-        date: newPayment.date,
-        plan: selectedPlan.name,
-        method: newPayment.method,
-      }
+        const payment: Payment = {
+          id: paymentId,
+          gym_id: gymId,
+          member_id: newPayment.memberId,
+          member_name: selectedMember.name,
+          amount: selectedPlan.price,
+          date: newPayment.date,
+          plan: selectedPlan.name,
+          method: newPayment.method,
+          type: "plan",
+        }
 
-      // Guardar pago en Supabase
-      const { error: paymentError } = await supabase.from("payments").insert([payment])
+        const { error: paymentError } = await supabase
+          .from("payments")
+          .insert([payment]);
+        if (paymentError) throw paymentError;
 
-      if (paymentError) throw paymentError
+        // Actualizar el socio con el nuevo plan
+        const paymentDate = parseLocalDate(newPayment.date);
+        const nextPayment = new Date(paymentDate);
 
-      // ACTUALIZAR EL SOCIO CON EL NUEVO PLAN
-      const paymentDate = parseLocalDate(newPayment.date)
-      const nextPayment = new Date(paymentDate)
+        if (selectedPlan.duration_type === "days") {
+          nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration);
+        } else if (selectedPlan.duration_type === "months") {
+          nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration);
+        } else if (selectedPlan.duration_type === "years") {
+          nextPayment.setFullYear(
+            nextPayment.getFullYear() + selectedPlan.duration
+          );
+        }
 
-      // Calcular próximo vencimiento según el plan
-      if (selectedPlan.duration_type === "days") {
-        nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration)
-      } else if (selectedPlan.duration_type === "months") {
-        nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration)
-      } else if (selectedPlan.duration_type === "years") {
-        nextPayment.setFullYear(nextPayment.getFullYear() + selectedPlan.duration)
-      }
+        const { error: memberError } = await supabase
+          .from("members")
+          .update({
+            plan: selectedPlan.name,
+            plan_price: selectedPlan.price,
+            last_payment: newPayment.date,
+            next_payment: nextPayment.toISOString().split("T")[0],
+            status: "active",
+          })
+          .eq("id", selectedMember.id);
+        if (memberError) throw memberError;
 
-      // Actualizar el socio en Supabase
-      const { error: memberError } = await supabase
-        .from("members")
-        .update({
+        const updatedMember = {
+          ...selectedMember,
           plan: selectedPlan.name,
           plan_price: selectedPlan.price,
           last_payment: newPayment.date,
           next_payment: nextPayment.toISOString().split("T")[0],
-          status: "active", // Al pagar se vuelve activo
-        })
-        .eq("id", selectedMember.id)
+          status: "active" as const,
+        };
 
-      if (memberError) throw memberError
+        setPayments([...payments, payment]);
+        setMembers(
+          members.map((m) => (m.id === selectedMember.id ? updatedMember : m))
+        );
+      } else {
+        const payment: Payment = {
+          id: paymentId,
+          gym_id: gymId,
+          member_id: newPayment.memberId,
+          member_name: selectedMember.name,
+          amount: newPayment.amount,
+          date: newPayment.date,
+          method: newPayment.method,
+          type: "product",
+          description: newPayment.description,
+        };
 
-      // Actualizar estados locales
-      const updatedMember = {
-        ...selectedMember,
-        plan: selectedPlan.name,
-        plan_price: selectedPlan.price,
-        last_payment: newPayment.date,
-        next_payment: nextPayment.toISOString().split("T")[0],
-        status: "active" as const,
+        const { error: paymentError } = await supabase
+          .from("payments")
+          .insert([payment]);
+        if (paymentError) throw paymentError;
+
+        setPayments([...payments, payment]);
       }
-
-      setPayments([...payments, payment])
-      setMembers(members.map((m) => (m.id === selectedMember.id ? updatedMember : m)))
 
       // Limpiar formulario
       setNewPayment({
@@ -180,39 +229,55 @@ export function PaymentManagement({
         planId: "",
         method: "",
         date: new Date().toLocaleDateString("en-CA"),
-      })
-      setMemberSearchTerm("")
-      setIsAddDialogOpen(false)
+        type: "plan",
+        description: "",
+        amount: 0,
+      });
+      setMemberSearchTerm("");
+      setIsAddDialogOpen(false);
     } catch (error) {
-      console.error("Error registrando pago:", error)
-      alert("Error al registrar el pago. Inténtalo de nuevo.")
+      console.error("Error registrando pago:", error);
+      alert("Error al registrar el pago. Inténtalo de nuevo.");
     }
-  }
+  };
 
-  const totalPayments = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0)
+  const totalPayments = filteredPayments.reduce(
+    (sum, payment) => sum + payment.amount,
+    0
+  );
   const currentMonthPayments = payments.filter((payment) => {
-    const paymentDate = parseLocalDate(payment.date)
-    const currentDate = new Date()
-    return paymentDate.getMonth() === currentDate.getMonth() && paymentDate.getFullYear() === currentDate.getFullYear()
-  })
+    const paymentDate = parseLocalDate(payment.date);
+    const currentDate = new Date();
+    return (
+      paymentDate.getMonth() === currentDate.getMonth() &&
+      paymentDate.getFullYear() === currentDate.getFullYear()
+    );
+  });
 
   // Calcular estadísticas por método de pago del mes actual
   const currentMonthPaymentsByMethod = currentMonthPayments.reduce(
     (acc, payment) => {
-      acc[payment.method] = (acc[payment.method] || 0) + 1
-      return acc
+      acc[payment.method] = (acc[payment.method] || 0) + 1;
+      return acc;
     },
-    {} as Record<string, number>,
-  )
+    {} as Record<string, number>
+  );
 
-  const monthlyTotal = currentMonthPayments.reduce((sum, payment) => sum + payment.amount, 0)
+  const monthlyTotal = currentMonthPayments.reduce(
+    (sum, payment) => sum + payment.amount,
+    0
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Gestión de Pagos</h2>
-          <p className="text-muted-foreground">Registra pagos y renueva planes de socios existentes</p>
+          <h2 className="text-3xl font-bold tracking-tight">
+            Gestión de Pagos
+          </h2>
+          <p className="text-muted-foreground">
+            Registra pagos y renueva planes de socios existentes
+          </p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
@@ -224,7 +289,10 @@ export function PaymentManagement({
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Registrar Pago de Socio</DialogTitle>
-              <DialogDescription>Registra el pago de un socio existente y renueva su plan.</DialogDescription>
+              <DialogDescription>
+                Registra el pago de un socio existente. Si es un plan, se
+                renovará automáticamente.
+              </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
               {/* BUSCADOR DE SOCIOS */}
@@ -247,11 +315,16 @@ export function PaymentManagement({
                         <div
                           key={member.id}
                           className={`p-2 cursor-pointer hover:bg-gray-50 border-b last:border-b-0 ${
-                            newPayment.memberId === member.id ? "bg-blue-50" : ""
+                            newPayment.memberId === member.id
+                              ? "bg-blue-50"
+                              : ""
                           }`}
                           onClick={() => {
-                            setNewPayment({ ...newPayment, memberId: member.id })
-                            setMemberSearchTerm(member.name)
+                            setNewPayment({
+                              ...newPayment,
+                              memberId: member.id,
+                            });
+                            setMemberSearchTerm(member.name);
                           }}
                         >
                           <div className="font-medium">{member.name}</div>
@@ -261,40 +334,107 @@ export function PaymentManagement({
                         </div>
                       ))
                     ) : (
-                      <div className="p-2 text-sm text-muted-foreground">No se encontraron socios</div>
+                      <div className="p-2 text-sm text-muted-foreground">
+                        No se encontraron socios
+                      </div>
                     )}
                   </div>
                 )}
               </div>
 
-              {/* SELECCIÓN DE PLAN */}
+              {/* TIPO DE PAGO */}
               <div className="grid gap-2">
                 <Label htmlFor="plan">Nuevo Plan</Label>
+                <Label htmlFor="type">Tipo de Pago</Label>
                 <Select
-                  value={newPayment.planId}
-                  onValueChange={(value) => setNewPayment({ ...newPayment, planId: value })}
+                  value={newPayment.type}
+                  onValueChange={(value) =>
+                    setNewPayment({
+                      ...newPayment,
+                      type: value as "plan" | "product",
+                      planId: "",
+                      description: "",
+                      amount: 0,
+                    })
+                  }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecciona el plan a renovar" />
+                    <SelectValue placeholder="Selecciona tipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    {plans
-                      .filter((plan) => plan.is_active)
-                      .map((plan) => (
-                        <SelectItem key={plan.id} value={plan.id}>
-                          {plan.name} - ${plan.price.toLocaleString()}
-                        </SelectItem>
-                      ))}
+                    <SelectItem value="plan">Plan</SelectItem>
+                    <SelectItem value="product">Producto</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* SELECCIÓN DE PLAN */}
+              {newPayment.type === "plan" && (
+                <div className="grid gap-2">
+                  <Label htmlFor="plan">Nuevo Plan</Label>
+                  <Select
+                    value={newPayment.planId}
+                    onValueChange={(value) =>
+                      setNewPayment({ ...newPayment, planId: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona el plan a renovar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {plans
+                        .filter((plan) => plan.is_active)
+                        .map((plan) => (
+                          <SelectItem key={plan.id} value={plan.id}>
+                            {plan.name} - ${plan.price.toLocaleString()}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* CAMPOS DE PRODUCTO */}
+              {newPayment.type === "product" && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="description">Descripción</Label>
+                    <Input
+                      id="description"
+                      value={newPayment.description}
+                      onChange={(e) =>
+                        setNewPayment({
+                          ...newPayment,
+                          description: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="amount">Monto</Label>
+                    <Input
+                      id="amount"
+                      type="number"
+                      value={newPayment.amount}
+                      onChange={(e) =>
+                        setNewPayment({
+                          ...newPayment,
+                          amount: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                </>
+              )}
 
               {/* MÉTODO DE PAGO */}
               <div className="grid gap-2">
                 <Label htmlFor="method">Método de Pago</Label>
                 <Select
                   value={newPayment.method}
-                  onValueChange={(value) => setNewPayment({ ...newPayment, method: value })}
+                  onValueChange={(value) =>
+                    setNewPayment({ ...newPayment, method: value })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona método" />
@@ -316,36 +456,85 @@ export function PaymentManagement({
                   id="date"
                   type="date"
                   value={newPayment.date}
-                  onChange={(e) => setNewPayment({ ...newPayment, date: e.target.value })}
+                  onChange={(e) =>
+                    setNewPayment({ ...newPayment, date: e.target.value })
+                  }
                 />
               </div>
 
               {/* RESUMEN */}
-              {newPayment.memberId && newPayment.planId && (
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <h4 className="font-medium text-green-800 mb-2">Resumen de Renovación</h4>
-                  <div className="text-sm text-green-700">
-                    <p>
-                      <strong>Socio:</strong> {members.find((m) => m.id === newPayment.memberId)?.name}
-                    </p>
-                    <p>
-                      <strong>Plan:</strong> {plans.find((p) => p.id === newPayment.planId)?.name}
-                    </p>
-                    <p>
-                      <strong>Monto:</strong> ${plans.find((p) => p.id === newPayment.planId)?.price.toLocaleString()}
-                    </p>
-                    <p className="mt-1 text-xs">✅ El socio se activará y se actualizará su próximo vencimiento</p>
+              {newPayment.type === "plan" &&
+                newPayment.memberId &&
+                newPayment.planId && (
+                  <div className="p-3 bg-green-50 rounded-lg">
+                    <h4 className="font-medium text-green-800 mb-2">
+                      Resumen de Renovación
+                    </h4>
+                    <div className="text-sm text-green-700">
+                      <p>
+                        <strong>Socio:</strong>{" "}
+                        {
+                          members.find((m) => m.id === newPayment.memberId)
+                            ?.name
+                        }
+                      </p>
+                      <p>
+                        <strong>Plan:</strong>{" "}
+                        {plans.find((p) => p.id === newPayment.planId)?.name}
+                      </p>
+                      <p>
+                        <strong>Monto:</strong> $
+                        {plans
+                          .find((p) => p.id === newPayment.planId)
+                          ?.price.toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-xs">
+                        ✅ El socio se activará y se actualizará su próximo
+                        vencimiento
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              {newPayment.type === "product" &&
+                newPayment.memberId &&
+                newPayment.description &&
+                newPayment.amount > 0 && (
+                  <div className="p-3 bg-green-50 rounded-lg">
+                    <h4 className="font-medium text-green-800 mb-2">
+                      Resumen de Venta
+                    </h4>
+                    <div className="text-sm text-green-700">
+                      <p>
+                        <strong>Socio:</strong>{" "}
+                        {
+                          members.find((m) => m.id === newPayment.memberId)
+                            ?.name
+                        }
+                      </p>
+                      <p>
+                        <strong>Descripción:</strong> {newPayment.description}
+                      </p>
+                      <p>
+                        <strong>Monto:</strong> $
+                        {newPayment.amount.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                )}
             </div>
             <DialogFooter>
               <Button
                 type="submit"
                 onClick={handleAddPayment}
-                disabled={!newPayment.memberId || !newPayment.planId || !newPayment.method}
+                disabled={
+                  !newPayment.memberId ||
+                  !newPayment.method ||
+                  (newPayment.type === "plan"
+                    ? !newPayment.planId
+                    : !newPayment.description || !newPayment.amount)
+                }
               >
-                Registrar Pago y Renovar
+                Registrar Pago
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -356,12 +545,18 @@ export function PaymentManagement({
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pagos (Filtrado)</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Pagos (Filtrado)
+            </CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalPayments.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">{filteredPayments.length} pagos</p>
+            <div className="text-2xl font-bold">
+              ${totalPayments.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {filteredPayments.length} pagos
+            </p>
           </CardContent>
         </Card>
 
@@ -371,18 +566,26 @@ export function PaymentManagement({
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${monthlyTotal.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">{currentMonthPayments.length} pagos este mes</p>
+            <div className="text-2xl font-bold">
+              ${monthlyTotal.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {currentMonthPayments.length} pagos este mes
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Efectivo (Mes)</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Efectivo (Mes)
+            </CardTitle>
             <div className="w-3 h-3 bg-green-500 rounded-full"></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{currentMonthPaymentsByMethod["Efectivo"] || 0}</div>
+            <div className="text-2xl font-bold text-green-600">
+              {currentMonthPaymentsByMethod["Efectivo"] || 0}
+            </div>
             <p className="text-xs text-muted-foreground">pagos en efectivo</p>
           </CardContent>
         </Card>
@@ -440,8 +643,12 @@ export function PaymentManagement({
                 <SelectItem value="all">Todos los métodos</SelectItem>
                 <SelectItem value="Efectivo">Efectivo</SelectItem>
                 <SelectItem value="Transferencia">Transferencia</SelectItem>
-                <SelectItem value="Tarjeta de Débito">Tarjeta de Débito</SelectItem>
-                <SelectItem value="Tarjeta de Crédito">Tarjeta de Crédito</SelectItem>
+                <SelectItem value="Tarjeta de Débito">
+                  Tarjeta de Débito
+                </SelectItem>
+                <SelectItem value="Tarjeta de Crédito">
+                  Tarjeta de Crédito
+                </SelectItem>
               </SelectContent>
             </Select>
             <Select value={periodFilter} onValueChange={setPeriodFilter}>
@@ -471,9 +678,10 @@ export function PaymentManagement({
               <TableRow>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Socio</TableHead>
-                <TableHead>Plan</TableHead>
+                <TableHead>Detalle</TableHead>
                 <TableHead>Monto</TableHead>
                 <TableHead>Método</TableHead>
+                <TableHead>Tipo</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -482,12 +690,19 @@ export function PaymentManagement({
                   <TableCell>
                     {parseLocalDate(payment.date).toLocaleDateString()}
                   </TableCell>
-                  <TableCell className="font-medium">{payment.member_name}</TableCell>
-                  <TableCell>{payment.plan}</TableCell>
+                  <TableCell className="font-medium">
+                    {payment.member_name}
+                  </TableCell>
+                  <TableCell>
+                    {payment.type === "plan"
+                      ? payment.plan
+                      : payment.description}
+                  </TableCell>
                   <TableCell className="font-medium text-green-600">
                     ${payment.amount.toLocaleString()}
                   </TableCell>
                   <TableCell>{payment.method}</TableCell>
+                  <TableCell className="capitalize">{payment.type}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -495,5 +710,5 @@ export function PaymentManagement({
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

@@ -368,6 +368,9 @@ export default function GymManagementSystem() {
           date: "2024-12-01",
           plan: "Mensual",
           method: "Efectivo",
+          type: "plan",
+          description: "Plan Mensual",
+          plan_id: `${gymId}_plan_1`,
         },
       ];
 

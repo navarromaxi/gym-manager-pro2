@@ -259,6 +259,9 @@ export function ProspectManagement({
         date: joinDate,
         plan: newMember.plan,
         method: conversionPaymentMethod,
+        type: "plan",
+        description: selectedPlan.description,
+        //plan_id: selectedPlan.id,
       };
 
       const { error: paymentError } = await supabase
