@@ -1,5 +1,5 @@
 "use client";
-import { LoginSystem } from "@/components/login-system";
+//import { LoginSystem } from "@/components/login-system";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,11 @@ import {
 
 import type { MemberManagementProps } from "@/components/member-management";
 import dynamic from "next/dynamic";
+
+const LoginSystem = dynamic(
+  () => import("@/components/login-system").then((m) => m.LoginSystem),
+  { ssr: false }
+);
 
 // Carga perezosa (client-only) con un fallback liviano
 const MemberManagement = dynamic(

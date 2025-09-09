@@ -111,8 +111,8 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
               </Alert>
             )}
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
-            </Button>
+                {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
+              </Button>
           </form>
 
           
@@ -237,9 +237,14 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
               </Alert>
             )}
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
-            </Button>
+            <Button
+                type="submit"
+                className="w-full"
+                disabled={isLoading}
+                suppressHydrationWarning
+              >
+                {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
+              </Button>
           </form>
         </CardContent>
       </Card>

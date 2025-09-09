@@ -142,6 +142,8 @@ export function PaymentManagement({
       const selectedMember = members.find((m) => m.id === newPayment.memberId);
       if (!selectedMember) return;
 
+       const paymentId = `${gymId}_payment_${Date.now()}`;
+
       if (newPayment.type === "plan") {
         const selectedPlan = plans.find((p) => p.id === newPayment.planId)
         if (!selectedPlan) return
@@ -213,6 +215,7 @@ export function PaymentManagement({
           method: newPayment.method,
           type: "product",
           description: newPayment.description,
+          plan: newPayment.description,
         };
 
         const { error: paymentError } = await supabase
