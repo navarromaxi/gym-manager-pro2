@@ -42,6 +42,7 @@ export interface Payment {
   member_name: string
   amount: number
   date: string
+  start_date?: string
   plan?: string
   method: string
   card_brand?: string

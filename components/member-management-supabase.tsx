@@ -76,7 +76,7 @@ export function MemberManagement({
     phone: "",
     plan: "",
     planPrice: 0,
-    joinDate: new Date().toISOString().split("T")[0],
+    planStartDate: new Date().toISOString().split("T")[0],
     paymentMethod: "Efectivo",
     cardBrand: "",
   });
@@ -176,8 +176,8 @@ export function MemberManagement({
 
   const handleAddMember = async () => {
     try {
-      const joinDate = new Date(newMember.joinDate);
-      const nextPayment = new Date(joinDate);
+      const startDate = new Date(newMember.planStartDate);
+      const nextPayment = new Date(startDate);
       const selectedPlan = plans.find((p) => p.name === newMember.plan);
 
       if (selectedPlan) {
@@ -222,8 +222,8 @@ export function MemberManagement({
         phone: newMember.phone,
         plan: newMember.plan,
         plan_price: newMember.planPrice,
-        join_date: newMember.joinDate,
-        last_payment: newMember.joinDate,
+         join_date: newMember.planStartDate,
+        last_payment: newMember.planStartDate,
         next_payment: nextPayment.toISOString().split("T")[0],
         status: memberStatus,
         inactive_level: inactiveLevel,
@@ -243,7 +243,8 @@ export function MemberManagement({
         member_id: memberId,
         member_name: member.name,
         amount: member.plan_price,
-        date: newMember.joinDate,
+        date: new Date().toISOString().split("T")[0],
+        start_date: newMember.planStartDate,
         plan: member.plan,
         method: newMember.paymentMethod,
         card_brand:
@@ -270,7 +271,7 @@ export function MemberManagement({
         phone: "",
         plan: "",
         planPrice: 0,
-        joinDate: new Date().toISOString().split("T")[0],
+        planStartDate: new Date().toISOString().split("T")[0],
         paymentMethod: "Efectivo",
         cardBrand: "",
       });
@@ -544,13 +545,13 @@ export function MemberManagement({
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="joinDate">Fecha de Ingreso</Label>
+                 <Label htmlFor="planStartDate">Fecha de inicio del plan</Label>
                 <Input
-                  id="joinDate"
+                   id="planStartDate"
                   type="date"
-                  value={newMember.joinDate}
+                  value={newMember.planStartDate}
                   onChange={(e) =>
-                    setNewMember({ ...newMember, joinDate: e.target.value })
+                     setNewMember({ ...newMember, planStartDate: e.target.value })
                   }
                 />
                 <p className="text-xs text-muted-foreground">

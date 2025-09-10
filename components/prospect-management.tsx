@@ -257,6 +257,7 @@ export function ProspectManagement({
         member_name: newMember.name,
         amount: newMember.plan_price,
         date: joinDate,
+        start_date: joinDate,
         plan: newMember.plan,
         method: conversionPaymentMethod,
         type: "plan",

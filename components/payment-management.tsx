@@ -60,6 +60,7 @@ export function PaymentManagement({
     method: "",
     cardBrand: "",
     date: new Date().toLocaleDateString("en-CA"),
+    startDate: new Date().toLocaleDateString("en-CA"),
     type: "plan" as "plan" | "product",
     description: "",
     amount: 0,
@@ -163,6 +164,7 @@ export function PaymentManagement({
           member_name: selectedMember.name,
           amount: selectedPlan.price,
           date: newPayment.date,
+          start_date: newPayment.startDate,
           plan: selectedPlan.name,
           method: newPayment.method,
           card_brand:
@@ -178,8 +180,8 @@ export function PaymentManagement({
         if (paymentError) throw paymentError;
 
         // Actualizar el socio con el nuevo plan
-        const paymentDate = parseLocalDate(newPayment.date);
-        const nextPayment = new Date(paymentDate);
+        const planStart = parseLocalDate(newPayment.startDate);
+        const nextPayment = new Date(planStart);
 
         if (selectedPlan.duration_type === "days") {
           nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration);
@@ -196,7 +198,7 @@ export function PaymentManagement({
           .update({
             plan: selectedPlan.name,
             plan_price: selectedPlan.price,
-            last_payment: newPayment.date,
+             last_payment: newPayment.startDate,
             next_payment: nextPayment.toISOString().split("T")[0],
             status: "active",
           })
@@ -207,7 +209,7 @@ export function PaymentManagement({
           ...selectedMember,
           plan: selectedPlan.name,
           plan_price: selectedPlan.price,
-          last_payment: newPayment.date,
+          last_payment: newPayment.startDate,
           next_payment: nextPayment.toISOString().split("T")[0],
           status: "active" as const,
         };
@@ -249,6 +251,7 @@ export function PaymentManagement({
         method: "",
         cardBrand: "",
         date: new Date().toLocaleDateString("en-CA"),
+        startDate: new Date().toLocaleDateString("en-CA"),
         type: "plan",
         description: "",
         amount: 0,
@@ -505,6 +508,24 @@ export function PaymentManagement({
                 />
               </div>
 
+               {newPayment.type === "plan" && (
+                <div className="grid gap-2">
+                  <Label htmlFor="startDate">Fecha de inicio del plan</Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={newPayment.startDate}
+                    onChange={(e) =>
+                      setNewPayment({ ...newPayment, startDate: e.target.value })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    El plan se calculará desde esta fecha (útil si se registra con
+                    atraso)
+                  </p>
+                </div>
+              )}
+
               {/* RESUMEN */}
               {newPayment.type === "plan" &&
                 newPayment.memberId &&
@@ -575,7 +596,7 @@ export function PaymentManagement({
                    (newPayment.method === "Tarjeta de Crédito" &&
                     !newPayment.cardBrand) ||
                   (newPayment.type === "plan"
-                    ? !newPayment.planId
+                    ? !newPayment.planId || !newPayment.startDate
                     : !newPayment.description || !newPayment.amount)
                 }
               >
