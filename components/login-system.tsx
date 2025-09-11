@@ -205,7 +205,7 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
         throw new Error("No se pudo actualizar la sesión.");
       }if (refreshData.session) {
         await supabase.auth.setSession(refreshData.session);
-      }
+      };
 
       // 6) Continuar: usar el id de gym (text) para filtrar en toda la app
       onLogin({ name: gym.name, id: gym.id });
