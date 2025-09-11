@@ -229,7 +229,7 @@ export function MemberManagement({
         next_payment: nextPayment.toISOString().split("T")[0],
         status: memberStatus,
         inactive_level: inactiveLevel,
-       balance_due: selectedPlan.price - installmentAmount,
+        balance_due: selectedPlan.price - installmentAmount,
         followed_up: false,
       };
 
@@ -274,7 +274,6 @@ export function MemberManagement({
         type: "plan",
         description: selectedPlan?.description || member.plan,
         plan_id: selectedPlan?.id,
-        contract_id: contractId,
       };
 
       const { error: paymentError } = await supabase
@@ -577,24 +576,27 @@ export function MemberManagement({
                   </SelectContent>
                 </Select>
               </div>
-               {newMember.plan && (
+              {newMember.plan && (
                 <div className="grid gap-2">
                   <Label htmlFor="installments">Cantidad de cuotas</Label>
-                  <Input
-                    id="installments"
-                    type="number"
-                    min={1}
-                    value={newMember.installments}
-                    onChange={(e) =>
+                   <Select
+                    value={newMember.installments.toString()}
+                    onValueChange={(value) =>
                       setNewMember({
                         ...newMember,
-                        installments: Math.max(
-                          1,
-                          parseInt(e.target.value) || 1
-                        ),
+                        installments: parseInt(value)
                       })
                     }
-                  />
+                   >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona cuotas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1</SelectItem>
+                      <SelectItem value="2">2</SelectItem>
+                      <SelectItem value="3">3</SelectItem>
+                    </SelectContent>
+                  </Select>
                   {newMember.installments > 1 && (
                     <p className="text-xs text-muted-foreground">
                       Monto por cuota: $

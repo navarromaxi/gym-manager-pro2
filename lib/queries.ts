@@ -68,28 +68,5 @@ export async function fetchMembersPage(params: MembersPageParams) {
     rows: (data || []) as Member[],
     total: count ?? 0,
   };
-  }
-
-// Suma los pagos asociados a un contract_id y calcula el saldo pendiente
-export async function getContractPaymentSummary(
-  contractId: string,
-  planTotal: number
-) {
-  const { data, error } = await supabase
-    .from("payments")
-    .select("amount")
-    .eq("contract_id", contractId);
-
-  if (error) {
-    console.error("Error fetching contract payments:", error);
-    return { paid: 0, pending: planTotal, status: "pending" as const };
-  }
-
-  const paid = (data || []).reduce((sum, p) => sum + (p.amount || 0), 0);
-  const pending = planTotal - paid;
-  return {
-    paid,
-    pending,
-    status: pending <= 0 ? "paid" : "pending",
-  };
+ 
 }

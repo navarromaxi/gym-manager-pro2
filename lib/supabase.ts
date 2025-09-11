@@ -50,7 +50,6 @@ export interface Payment {
   card_brand?: string
   type: "plan" | "product"
   description?: string
-  contract_id?: string
   plan_id?: string
 }
 

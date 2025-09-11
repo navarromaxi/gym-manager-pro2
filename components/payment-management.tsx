@@ -57,7 +57,6 @@ export function PaymentManagement({
   const [newPayment, setNewPayment] = useState({
     memberId: "",
     planId: "",
-    contractId: "",
     method: "",
     cardBrand: "",
     date: new Date().toLocaleDateString("en-CA"),
@@ -65,6 +64,7 @@ export function PaymentManagement({
     type: "plan" as "plan" | "product",
     description: "",
     amount: 0,
+    installments: 1,
   });
   const [planContract, setPlanContract] = useState<PlanContract | null>(null);
   const [methodFilter, setMethodFilter] = useState("all");
@@ -144,8 +144,6 @@ export function PaymentManagement({
 
   const selectedMember = members.find((m) => m.id === newPayment.memberId);
   const selectedPlan = plans.find((p) => p.id === newPayment.planId);
-  const contractId =
-    newPayment.contractId || `${newPayment.memberId}_contract_${Date.now()}`;
   const balanceDueActual = selectedMember?.balance_due || 0;
   const maxPlanAmount = selectedPlan
     ? Math.max(selectedPlan.price - balanceDueActual, 0)
@@ -171,6 +169,43 @@ export function PaymentManagement({
           return;
         }
 
+        let currentContract = planContract;
+        let contractId =
+          planContract?.id || `${newPayment.memberId}_contract_${Date.now()}`;
+
+        if (!currentContract) {
+          const { data: newContract, error: contractError } = await supabase
+            .from("plan_contracts")
+            .insert([
+              {
+                id: contractId,
+                gym_id: gymId,
+                member_id: newPayment.memberId,
+                plan_id: selectedPlan.id,
+                installments_total: newPayment.installments,
+                installments_paid: 1,
+              },
+            ])
+            .select()
+            .single();
+          if (contractError) throw contractError;
+          currentContract = newContract as PlanContract;
+          setPlanContract(currentContract);
+        } else {
+          const { error: contractError } = await supabase
+            .from("plan_contracts")
+            .update({
+              installments_paid: currentContract.installments_paid + 1,
+            })
+            .eq("id", currentContract.id);
+          if (contractError) throw contractError;
+          currentContract = {
+            ...currentContract,
+            installments_paid: currentContract.installments_paid + 1,
+          };
+          setPlanContract(currentContract);
+        }
+
         const payment: Payment = {
           id: paymentId,
           gym_id: gymId,
@@ -186,7 +221,6 @@ export function PaymentManagement({
               ? newPayment.cardBrand
               : undefined,
           type: "plan",
-          contract_id: contractId,
           plan_id: selectedPlan.id,
         };
 
@@ -194,20 +228,6 @@ export function PaymentManagement({
           .from("payments")
           .insert([payment]);
         if (paymentError) throw paymentError;
-
-        if (planContract) {
-          const { error: contractError } = await supabase
-            .from("plan_contracts")
-            .update({
-              installments_paid: planContract.installments_paid + 1,
-            })
-            .eq("id", planContract.id);
-          if (contractError) throw contractError;
-          setPlanContract({
-            ...planContract,
-            installments_paid: planContract.installments_paid + 1,
-          });
-        }
 
         // Actualizar el socio con el nuevo plan
         const planStart = parseLocalDate(newPayment.startDate);
@@ -280,7 +300,6 @@ export function PaymentManagement({
       setNewPayment({
         memberId: "",
         planId: "",
-        contractId: "",
         method: "",
         cardBrand: "",
         date: new Date().toLocaleDateString("en-CA"),
@@ -288,6 +307,7 @@ export function PaymentManagement({
         type: "plan",
         description: "",
         amount: 0,
+        installments: 1,
       });
       setMemberSearchTerm("");
       setPlanContract(null);
@@ -436,7 +456,11 @@ export function PaymentManagement({
                     <Select
                       value={newPayment.planId}
                       onValueChange={async (value) => {
-                        setNewPayment({ ...newPayment, planId: value });
+                        setNewPayment({
+                          ...newPayment,
+                          planId: value,
+                          installments: 1,
+                        });
                         if (newPayment.memberId) {
                           const { data } = await supabase
                             .from("plan_contracts")
@@ -445,6 +469,12 @@ export function PaymentManagement({
                             .eq("plan_id", value)
                             .single();
                           setPlanContract(data ?? null);
+                          if (data) {
+                            setNewPayment((prev) => ({
+                              ...prev,
+                              installments: data.installments_total,
+                            }));
+                          }
                         } else {
                           setPlanContract(null);
                         }
@@ -463,10 +493,33 @@ export function PaymentManagement({
                           ))}
                       </SelectContent>
                     </Select>
-                    {newPayment.planId && (
+                    {newPayment.planId && !planContract && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="installments">Cantidad de cuotas</Label>
+                        <Select
+                          value={newPayment.installments.toString()}
+                          onValueChange={(value) =>
+                            setNewPayment({
+                              ...newPayment,
+                              installments: parseInt(value),
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona cuotas" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">1</SelectItem>
+                            <SelectItem value="2">2</SelectItem>
+                            <SelectItem value="3">3</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    {newPayment.planId && planContract && (
                       <div className="text-sm text-muted-foreground">
-                        Cuotas pagadas: {planContract?.installments_paid ?? 0} /{" "}
-                        {planContract?.installments_total ?? 0}
+                        Cuotas pagadas: {planContract.installments_paid} /{" "}
+                        {planContract.installments_total}
                       </div>
                     )}
                   </div>

@@ -258,7 +258,6 @@ export function MemberManagement({
         type: "plan",
         description: selectedPlan?.description || member.plan,
         plan_id: selectedPlan?.id,
-        contract_id: contractId
       };
 
       const { error: paymentError } = await supabase
