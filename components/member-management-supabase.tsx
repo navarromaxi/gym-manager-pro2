@@ -227,6 +227,7 @@ export function MemberManagement({
         next_payment: nextPayment.toISOString().split("T")[0],
         status: memberStatus,
         inactive_level: inactiveLevel,
+        followed_up: false,
       };
 
       // Guardar en Supabase
