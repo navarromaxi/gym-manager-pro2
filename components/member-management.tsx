@@ -128,38 +128,50 @@ export function MemberManagement({
   const filteredMembers = useMemo(() => {
     const today = new Date();
 
-    return members.filter((member) => {
-      // búsqueda (debounced)
-      const name = (member.name ?? "").toLowerCase();
-      const email = (member.email ?? "").toLowerCase();
-      const matchesSearch =
-        !debouncedSearch ||
-        name.includes(debouncedSearch) ||
-        email.includes(debouncedSearch);
+    return members
+      .filter((member) => {
+        // búsqueda (debounced)
+        const name = (member.name ?? "").toLowerCase();
+        const email = (member.email ?? "").toLowerCase();
+        const matchesSearch =
+          !debouncedSearch ||
+          name.includes(debouncedSearch) ||
+          email.includes(debouncedSearch);
 
-      if (!matchesSearch) return false;
+        if (!matchesSearch) return false;
 
-      const realStatus = getRealStatus(member);
+        const realStatus = getRealStatus(member);
 
-      if (statusFilter === "expiring_soon") {
-        const nextPayment = toLocalDate(member.next_payment);
-        const diffDays = Math.ceil(
-          (nextPayment.getTime() - today.getTime()) / 86400000
-        );
-        return diffDays <= 10 && diffDays >= 0 && realStatus === "active";
-      }
+        if (statusFilter === "expiring_soon") {
+          const nextPayment = toLocalDate(member.next_payment);
+          const diffDays = Math.ceil(
+            (nextPayment.getTime() - today.getTime()) / 86400000
+          );
+          return diffDays <= 10 && diffDays >= 0 && realStatus === "active";
+        }
 
-      if (statusFilter === "follow_up") {
-        const joinDate = toLocalDate(member.join_date);
-        const diffDays = Math.floor(
-          (today.getTime() - joinDate.getTime()) / 86400000
-        );
-        // @ts-ignore posible campo no tipado
-        return !member.followed_up && diffDays >= 5 && diffDays <= 10;
-      }
+       if (statusFilter === "follow_up") {
+          const joinDate = toLocalDate(member.join_date);
+          const diffDays = Math.floor(
+            (today.getTime() - joinDate.getTime()) / 86400000
+          );
+          // @ts-ignore posible campo no tipado
+          return !member.followed_up && diffDays >= 5 && diffDays <= 10;
+        }
 
-      return statusFilter === "all" || realStatus === statusFilter;
-    });
+      if (statusFilter === "balance_due") {
+          return (member.balance_due || 0) > 0;
+        }
+
+        return statusFilter === "all" || realStatus === statusFilter;
+      })
+      .sort((a, b) => {
+        const balanceDiff = (b.balance_due || 0) - (a.balance_due || 0);
+        if (balanceDiff !== 0) return balanceDiff;
+        const nextA = toLocalDate(a.next_payment).getTime();
+        const nextB = toLocalDate(b.next_payment).getTime();
+        return nextA - nextB;
+      });
   }, [members, debouncedSearch, statusFilter]);
 
   const handleAddMember = async () => {
@@ -215,6 +227,7 @@ export function MemberManagement({
         next_payment: nextPayment.toISOString().split("T")[0],
         status: memberStatus,
         inactive_level: inactiveLevel,
+        balance_due: 0,
       };
 
       // Guardar en Supabase
@@ -225,6 +238,7 @@ export function MemberManagement({
       if (memberError) throw memberError;
 
       // Crear pago inicial
+      const contractId = `${memberId}_contract_${Date.now()}`;
       const payment: Payment = {
         id: `${gymId}_payment_${Date.now()}`,
         gym_id: gymId,
@@ -235,13 +249,14 @@ export function MemberManagement({
         start_date: newMember.planStartDate,
         plan: member.plan,
         method: newMember.paymentMethod,
-         card_brand:
+        card_brand:
           newMember.paymentMethod === "Tarjeta de Crédito"
             ? newMember.cardBrand
             : undefined,
         type: "plan",
         description: selectedPlan?.description || member.plan,
         plan_id: selectedPlan?.id,
+        contract_id: contractId,
       };
 
       const { error: paymentError } = await supabase
@@ -630,6 +645,7 @@ export function MemberManagement({
                 <SelectItem value="expiring_soon">
                   Próximo a vencerse (10 días)
                 </SelectItem>
+                <SelectItem value="balance_due">Saldo pendiente</SelectItem>
                 <SelectItem value="follow_up">Seguimiento pendiente</SelectItem>
               </SelectContent>
             </Select>
@@ -691,6 +707,7 @@ export function MemberManagement({
                 <TableHead>Estado</TableHead>
                 <TableHead>Próximo Pago</TableHead>
                 <TableHead>Días Restantes</TableHead>
+                <TableHead>Saldo Pendiente</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -724,7 +741,9 @@ export function MemberManagement({
                       )}
                     </TableCell>
                     <TableCell>
-                      {new Date(member.next_payment).toLocaleDateString()}
+                      {(member.balance_due ?? 0) > 0
+                        ? new Date(member.next_payment).toLocaleDateString()
+                        : "-"}
                     </TableCell>
                     <TableCell>
                       <span
@@ -746,6 +765,15 @@ export function MemberManagement({
                           ? 'Vence hoy'
                           : `${daysUntilExpiration} días`}
                       </span>
+                    </TableCell>
+                     <TableCell>
+                      {(member.balance_due ?? 0) > 0 ? (
+                        <span className="text-red-600 font-semibold">
+                          {`$${(member.balance_due ?? 0).toFixed(2)}`}
+                        </span>
+                      ) : (
+                        "$0.00"
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">

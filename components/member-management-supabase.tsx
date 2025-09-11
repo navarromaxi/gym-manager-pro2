@@ -225,8 +225,10 @@ export function MemberManagement({
          join_date: newMember.planStartDate,
         last_payment: newMember.planStartDate,
         next_payment: nextPayment.toISOString().split("T")[0],
+        //balance_due: 0,
         status: memberStatus,
         inactive_level: inactiveLevel,
+        balance_due: 0,
       };
 
       // Guardar en Supabase
@@ -237,6 +239,7 @@ export function MemberManagement({
       if (memberError) throw memberError;
 
       // Crear pago inicial
+      const contractId = `${memberId}_contract_${Date.now()}`;
       const payment: Payment = {
         id: `${gymId}_payment_${Date.now()}`,
         gym_id: gymId,
@@ -253,6 +256,8 @@ export function MemberManagement({
             : undefined,
         type: "plan",
         description: selectedPlan?.description || member.plan,
+        plan_id: selectedPlan?.id,
+        contract_id: contractId
       };
 
       const { error: paymentError } = await supabase
