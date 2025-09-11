@@ -32,7 +32,6 @@ import {
 import { Plus, Search, DollarSign } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan, PlanContract } from "@/lib/supabase";
-import { processContractPayment } from "@/lib/utils";
 
 interface PaymentManagementProps {
   payments: Payment[];
@@ -77,12 +76,7 @@ export function PaymentManagement({
     "Tarjeta de Crédito",
   ];
 
-  const cardBrands = [
-    "Visa",
-    "Mastercard",
-    "American Express",
-    "Otra",
-  ];
+  const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
 
   const parseLocalDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split("-").map(Number);
@@ -149,11 +143,9 @@ export function PaymentManagement({
   const filteredPayments = getFilteredPayments();
 
   const selectedMember = members.find((m) => m.id === newPayment.memberId);
-   const selectedPlan = plans.find((p) => p.id === newPayment.planId);
-        if (!selectedPlan) return;
-
-        const contractId =
-          newPayment.contractId || `${newPayment.memberId}_contract_${Date.now()}`;
+  const selectedPlan = plans.find((p) => p.id === newPayment.planId);
+  const contractId =
+    newPayment.contractId || `${newPayment.memberId}_contract_${Date.now()}`;
   const balanceDueActual = selectedMember?.balance_due || 0;
   const maxPlanAmount = selectedPlan
     ? Math.max(selectedPlan.price - balanceDueActual, 0)
@@ -164,7 +156,7 @@ export function PaymentManagement({
     try {
       if (!selectedMember) return;
 
-       const paymentId = `${gymId}_payment_${Date.now()}`;
+      const paymentId = `${gymId}_payment_${Date.now()}`;
 
       if (newPayment.type === "plan") {
         if (!selectedPlan) return;
@@ -199,23 +191,23 @@ export function PaymentManagement({
         };
 
         const { error: paymentError } = await supabase
-            .from("payments")
-            .insert([payment]);
-          if (paymentError) throw paymentError;
+          .from("payments")
+          .insert([payment]);
+        if (paymentError) throw paymentError;
 
-          if (planContract) {
-            const { error: contractError } = await supabase
-              .from("plan_contracts")
-              .update({
-                installments_paid: planContract.installments_paid + 1,
-              })
-              .eq("id", planContract.id);
-            if (contractError) throw contractError;
-            setPlanContract({
-              ...planContract,
+        if (planContract) {
+          const { error: contractError } = await supabase
+            .from("plan_contracts")
+            .update({
               installments_paid: planContract.installments_paid + 1,
-            });
-          }
+            })
+            .eq("id", planContract.id);
+          if (contractError) throw contractError;
+          setPlanContract({
+            ...planContract,
+            installments_paid: planContract.installments_paid + 1,
+          });
+        }
 
         // Actualizar el socio con el nuevo plan
         const planStart = parseLocalDate(newPayment.startDate);
@@ -255,10 +247,10 @@ export function PaymentManagement({
         };
 
         setPayments([...payments, payment]);
-      setMembers(
-        members.map((m) => (m.id === selectedMember.id ? updatedMember : m))
-      );
-    } else {
+        setMembers(
+          members.map((m) => (m.id === selectedMember.id ? updatedMember : m))
+        );
+      } else {
         const payment: Payment = {
           id: paymentId,
           gym_id: gymId,
@@ -267,7 +259,7 @@ export function PaymentManagement({
           amount: newPayment.amount,
           date: newPayment.date,
           method: newPayment.method,
-           card_brand:
+          card_brand:
             newPayment.method === "Tarjeta de Crédito"
               ? newPayment.cardBrand
               : undefined,
@@ -438,25 +430,25 @@ export function PaymentManagement({
 
               {/* SELECCIÓN DE PLAN */}
               {newPayment.type === "plan" && (
-                 <>
+                <>
                   <div className="grid gap-2">
                     <Label htmlFor="plan">Nuevo Plan</Label>
                     <Select
                       value={newPayment.planId}
-                       onValueChange={async (value) => {
-                      setNewPayment({ ...newPayment, planId: value });
-                      if (newPayment.memberId) {
-                        const { data } = await supabase
-                          .from("plan_contracts")
-                          .select("*")
-                          .eq("member_id", newPayment.memberId)
-                          .eq("plan_id", value)
-                          .single();
-                        setPlanContract(data ?? null);
-                      } else {
-                        setPlanContract(null);
-                      }
-                    }}
+                      onValueChange={async (value) => {
+                        setNewPayment({ ...newPayment, planId: value });
+                        if (newPayment.memberId) {
+                          const { data } = await supabase
+                            .from("plan_contracts")
+                            .select("*")
+                            .eq("member_id", newPayment.memberId)
+                            .eq("plan_id", value)
+                            .single();
+                          setPlanContract(data ?? null);
+                        } else {
+                          setPlanContract(null);
+                        }
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona el plan a renovar" />
@@ -472,10 +464,11 @@ export function PaymentManagement({
                       </SelectContent>
                     </Select>
                     {newPayment.planId && (
-                    <div className="text-sm text-muted-foreground">
-                      Cuotas pagadas: {planContract?.installments_paid ?? 0} / {planContract?.installments_total ?? 0}
-                    </div>
-                  )}
+                      <div className="text-sm text-muted-foreground">
+                        Cuotas pagadas: {planContract?.installments_paid ?? 0} /{" "}
+                        {planContract?.installments_total ?? 0}
+                      </div>
+                    )}
                   </div>
                   {newPayment.planId && (
                     <div className="grid gap-2">
@@ -524,7 +517,7 @@ export function PaymentManagement({
                       value={newPayment.amount}
                       onChange={(e) =>
                         setNewPayment({
-                       ...newPayment,
+                          ...newPayment,
                           amount: parseFloat(e.target.value),
                         })
                       }
@@ -555,7 +548,7 @@ export function PaymentManagement({
                 </Select>
               </div>
 
-               {newPayment.method === "Tarjeta de Crédito" && (
+              {newPayment.method === "Tarjeta de Crédito" && (
                 <div className="grid gap-2">
                   <Label htmlFor="cardBrand">Tipo de Tarjeta</Label>
                   <Select
@@ -591,7 +584,7 @@ export function PaymentManagement({
                 />
               </div>
 
-               {newPayment.type === "plan" && (
+              {newPayment.type === "plan" && (
                 <div className="grid gap-2">
                   <Label htmlFor="startDate">Fecha de inicio del plan</Label>
                   <Input
@@ -599,12 +592,15 @@ export function PaymentManagement({
                     type="date"
                     value={newPayment.startDate}
                     onChange={(e) =>
-                      setNewPayment({ ...newPayment, startDate: e.target.value })
+                      setNewPayment({
+                        ...newPayment,
+                        startDate: e.target.value,
+                      })
                     }
                   />
                   <p className="text-xs text-muted-foreground">
-                    El plan se calculará desde esta fecha (útil si se registra con
-                    atraso)
+                    El plan se calculará desde esta fecha (útil si se registra
+                    con atraso)
                   </p>
                 </div>
               )}
@@ -612,7 +608,7 @@ export function PaymentManagement({
               {/* RESUMEN */}
               {newPayment.type === "plan" &&
                 newPayment.memberId &&
-                 newPayment.planId &&
+                newPayment.planId &&
                 newPayment.amount > 0 && (
                   <div className="p-3 bg-green-50 rounded-lg">
                     <h4 className="font-medium text-green-800 mb-2">
@@ -632,7 +628,7 @@ export function PaymentManagement({
                       </p>
                       <p>
                         <strong>Monto:</strong> $
-                         {newPayment.amount.toLocaleString()}
+                        {newPayment.amount.toLocaleString()}
                       </p>
                       <p className="mt-1 text-xs">
                         ✅ El socio se activará y se actualizará su próximo
@@ -675,7 +671,7 @@ export function PaymentManagement({
                 disabled={
                   !newPayment.memberId ||
                   !newPayment.method ||
-                   (newPayment.method === "Tarjeta de Crédito" &&
+                  (newPayment.method === "Tarjeta de Crédito" &&
                     !newPayment.cardBrand) ||
                   (newPayment.type === "plan"
                     ? !newPayment.planId ||
@@ -844,7 +840,9 @@ export function PaymentManagement({
                     {payment.member_name}
                   </TableCell>
                   <TableCell>
-                   {payment.type === "plan" ? payment.plan : payment.description}
+                    {payment.type === "plan"
+                      ? payment.plan
+                      : payment.description}
                   </TableCell>
                   <TableCell className="font-medium text-green-600">
                     ${payment.amount.toLocaleString()}

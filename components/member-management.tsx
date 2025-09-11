@@ -96,6 +96,7 @@ export function MemberManagement({
     planPrice: 0,
     planStartDate: new Date().toISOString().split("T")[0],
     paymentDate: new Date().toISOString().split("T")[0],
+    installments: 1,
     paymentMethod: "Efectivo",
     cardBrand: "",
   });
@@ -107,12 +108,7 @@ export function MemberManagement({
     "Tarjeta de Crédito",
   ];
 
-  const cardBrands = [
-    "Visa",
-    "Mastercard",
-    "American Express",
-    "Otra",
-  ];
+  const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
 
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -151,7 +147,7 @@ export function MemberManagement({
           return diffDays <= 10 && diffDays >= 0 && realStatus === "active";
         }
 
-       if (statusFilter === "follow_up") {
+        if (statusFilter === "follow_up") {
           const joinDate = toLocalDate(member.join_date);
           const diffDays = Math.floor(
             (today.getTime() - joinDate.getTime()) / 86400000
@@ -160,7 +156,7 @@ export function MemberManagement({
           return !member.followed_up && diffDays >= 5 && diffDays <= 10;
         }
 
-      if (statusFilter === "balance_due") {
+        if (statusFilter === "balance_due") {
           return (member.balance_due || 0) > 0;
         }
 
@@ -181,16 +177,21 @@ export function MemberManagement({
       const nextPayment = new Date(startDate);
       const selectedPlan = plans.find((p) => p.name === newMember.plan);
 
-      if (selectedPlan) {
-        if (selectedPlan.duration_type === "days") {
-          nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration);
-        } else if (selectedPlan.duration_type === "months") {
-          nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration);
-        } else if (selectedPlan.duration_type === "years") {
-          nextPayment.setFullYear(
-            nextPayment.getFullYear() + selectedPlan.duration
-          );
-        }
+      if (!selectedPlan) {
+        alert("Debes seleccionar un plan");
+        return;
+      }
+      const installments = newMember.installments || 1;
+      const installmentAmount = selectedPlan.price / installments;
+
+      if (selectedPlan.duration_type === "days") {
+        nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration);
+      } else if (selectedPlan.duration_type === "months") {
+        nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration);
+      } else if (selectedPlan.duration_type === "years") {
+        nextPayment.setFullYear(
+          nextPayment.getFullYear() + selectedPlan.duration
+        );
       }
 
       const today = new Date();
@@ -222,13 +223,13 @@ export function MemberManagement({
         email: newMember.email,
         phone: newMember.phone,
         plan: newMember.plan,
-        plan_price: newMember.planPrice,
+        plan_price: selectedPlan.price,
         join_date: newMember.paymentDate,
         last_payment: newMember.planStartDate,
         next_payment: nextPayment.toISOString().split("T")[0],
         status: memberStatus,
         inactive_level: inactiveLevel,
-        balance_due: 0,
+       balance_due: selectedPlan.price - installmentAmount,
         followed_up: false,
       };
 
@@ -239,14 +240,29 @@ export function MemberManagement({
 
       if (memberError) throw memberError;
 
-      // Crear pago inicial
+      // Crear contrato de plan
       const contractId = `${memberId}_contract_${Date.now()}`;
+      const { error: contractError } = await supabase
+        .from("plan_contracts")
+        .insert([
+          {
+            id: contractId,
+            gym_id: gymId,
+            member_id: memberId,
+            plan_id: selectedPlan?.id || "",
+            installments_total: installments,
+            installments_paid: 1,
+          },
+        ]);
+      if (contractError) throw contractError;
+
+      // Crear pago inicial
       const payment: Payment = {
         id: `${gymId}_payment_${Date.now()}`,
         gym_id: gymId,
         member_id: memberId,
         member_name: member.name,
-        amount: member.plan_price,
+        amount: installmentAmount,
         date: newMember.paymentDate,
         start_date: newMember.planStartDate,
         plan: member.plan,
@@ -279,8 +295,9 @@ export function MemberManagement({
         planPrice: 0,
         planStartDate: new Date().toISOString().split("T")[0],
         paymentDate: new Date().toISOString().split("T")[0],
+        installments: 1,
         paymentMethod: "Efectivo",
-         cardBrand: "",
+        cardBrand: "",
       });
       setIsAddDialogOpen(false);
     } catch (error) {
@@ -325,7 +342,11 @@ export function MemberManagement({
       setMembers(
         members.map((m) =>
           m.id === editingMember.id
-            ? { ...editingMember, status: newStatus, inactive_level: newInactive }
+            ? {
+                ...editingMember,
+                status: newStatus,
+                inactive_level: newInactive,
+              }
             : m
         )
       );
@@ -504,9 +525,12 @@ export function MemberManagement({
                 <Input
                   id="planStartDate"
                   type="date"
-                   value={newMember.planStartDate}
+                  value={newMember.planStartDate}
                   onChange={(e) =>
-                    setNewMember({ ...newMember, planStartDate: e.target.value })
+                    setNewMember({
+                      ...newMember,
+                      planStartDate: e.target.value,
+                    })
                   }
                 />
                 <p className="text-xs text-muted-foreground">
@@ -535,6 +559,7 @@ export function MemberManagement({
                       ...newMember,
                       plan: value,
                       planPrice: selectedPlan?.price || 0,
+                      installments: 1,
                     });
                   }}
                 >
@@ -552,6 +577,34 @@ export function MemberManagement({
                   </SelectContent>
                 </Select>
               </div>
+               {newMember.plan && (
+                <div className="grid gap-2">
+                  <Label htmlFor="installments">Cantidad de cuotas</Label>
+                  <Input
+                    id="installments"
+                    type="number"
+                    min={1}
+                    value={newMember.installments}
+                    onChange={(e) =>
+                      setNewMember({
+                        ...newMember,
+                        installments: Math.max(
+                          1,
+                          parseInt(e.target.value) || 1
+                        ),
+                      })
+                    }
+                  />
+                  {newMember.installments > 1 && (
+                    <p className="text-xs text-muted-foreground">
+                      Monto por cuota: $
+                      {(newMember.planPrice / newMember.installments).toFixed(
+                        2
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="paymentMethod">Método de Pago</Label>
                 <Select
@@ -731,7 +784,7 @@ export function MemberManagement({
                       </div>
                       {customPlan && (
                         <div className="ml-4 text-sm text-muted-foreground">
-                          Personalizado -{' '}
+                          Personalizado -{" "}
                           {new Date(customPlan.end_date).toLocaleDateString()}
                         </div>
                       )}
@@ -752,11 +805,11 @@ export function MemberManagement({
                         className={`font-medium ${
                           daysUntilExpiration < 0
                             ? Math.abs(daysUntilExpiration) > 30
-                              ? 'text-gray-600'
-                              : 'text-red-600'
+                              ? "text-gray-600"
+                              : "text-red-600"
                             : daysUntilExpiration <= 7
-                             ? 'text-orange-600'
-                            : 'text-green-600'
+                            ? "text-orange-600"
+                            : "text-green-600"
                         }`}
                       >
                         {daysUntilExpiration < 0
@@ -764,11 +817,11 @@ export function MemberManagement({
                             ? `${Math.abs(daysUntilExpiration)} días inactivo`
                             : `${Math.abs(daysUntilExpiration)} días vencido`
                           : daysUntilExpiration === 0
-                          ? 'Vence hoy'
+                          ? "Vence hoy"
                           : `${daysUntilExpiration} días`}
                       </span>
                     </TableCell>
-                     <TableCell>
+                    <TableCell>
                       {(member.balance_due ?? 0) > 0 ? (
                         <span className="text-red-600 font-semibold">
                           {`$${(member.balance_due ?? 0).toFixed(2)}`}
