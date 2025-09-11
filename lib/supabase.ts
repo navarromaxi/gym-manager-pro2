@@ -27,12 +27,14 @@ export interface Member {
   join_date: string
   plan: string
   plan_price: number
+  balance_due?: number
   last_payment: string
   next_payment: string
   status: "active" | "expired" | "inactive"
   inactive_level?: "green" | "yellow" | "red"
   inactive_comment?: string
-  followed_up?: boolean; // 👈 AÑADIR ESTA LÍNEA
+  //balance_due: number
+  followed_up?: boolean;
 }
 
 export interface Payment {
@@ -48,6 +50,7 @@ export interface Payment {
   card_brand?: string
   type: "plan" | "product"
   description?: string
+  contract_id?: string
   plan_id?: string
 }
 
@@ -92,6 +95,15 @@ export interface Plan {
   duration_type: "days" | "months" | "years"
   activities: string[]
   is_active: boolean
+}
+
+export interface PlanContract {
+  id: string
+  gym_id: string
+  member_id: string
+  plan_id: string
+  installments_total: number
+  installments_paid: number
 }
 
 export interface CustomPlan {

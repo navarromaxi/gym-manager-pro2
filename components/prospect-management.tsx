@@ -242,6 +242,7 @@ export function ProspectManagement({
         last_payment: joinDate,
         next_payment: nextPayment.toISOString().split("T")[0],
         status: "active",
+        balance_due: 0,
       };
 
       const { error: memberError } = await supabase

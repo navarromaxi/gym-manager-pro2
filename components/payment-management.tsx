@@ -31,7 +31,8 @@ import {
 } from "@/components/ui/table";
 import { Plus, Search, DollarSign } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import type { Member, Payment, Plan } from "@/lib/supabase";
+import type { Member, Payment, Plan, PlanContract } from "@/lib/supabase";
+import { processContractPayment } from "@/lib/utils";
 
 interface PaymentManagementProps {
   payments: Payment[];
@@ -57,6 +58,7 @@ export function PaymentManagement({
   const [newPayment, setNewPayment] = useState({
     memberId: "",
     planId: "",
+    contractId: "",
     method: "",
     cardBrand: "",
     date: new Date().toLocaleDateString("en-CA"),
@@ -65,6 +67,7 @@ export function PaymentManagement({
     description: "",
     amount: 0,
   });
+  const [planContract, setPlanContract] = useState<PlanContract | null>(null);
   const [methodFilter, setMethodFilter] = useState("all");
 
   const paymentMethods = [
@@ -145,24 +148,43 @@ export function PaymentManagement({
 
   const filteredPayments = getFilteredPayments();
 
+  const selectedMember = members.find((m) => m.id === newPayment.memberId);
+   const selectedPlan = plans.find((p) => p.id === newPayment.planId);
+        if (!selectedPlan) return;
+
+        const contractId =
+          newPayment.contractId || `${newPayment.memberId}_contract_${Date.now()}`;
+  const balanceDueActual = selectedMember?.balance_due || 0;
+  const maxPlanAmount = selectedPlan
+    ? Math.max(selectedPlan.price - balanceDueActual, 0)
+    : 0;
+
   // FUNCIÓN ACTUALIZADA PARA REGISTRAR PAGO Y RENOVAR SOCIO
   const handleAddPayment = async () => {
     try {
-      const selectedMember = members.find((m) => m.id === newPayment.memberId);
       if (!selectedMember) return;
 
        const paymentId = `${gymId}_payment_${Date.now()}`;
 
       if (newPayment.type === "plan") {
-        const selectedPlan = plans.find((p) => p.id === newPayment.planId)
-        if (!selectedPlan) return
+        if (!selectedPlan) return;
+        if (newPayment.amount <= 0) {
+          alert("El monto debe ser mayor a 0");
+          return;
+        }
+        if (newPayment.amount > maxPlanAmount) {
+          alert(
+            `El monto no puede ser mayor a ${maxPlanAmount.toLocaleString()}`
+          );
+          return;
+        }
 
         const payment: Payment = {
           id: paymentId,
           gym_id: gymId,
           member_id: newPayment.memberId,
           member_name: selectedMember.name,
-          amount: selectedPlan.price,
+          amount: newPayment.amount,
           date: newPayment.date,
           start_date: newPayment.startDate,
           plan: selectedPlan.name,
@@ -172,12 +194,28 @@ export function PaymentManagement({
               ? newPayment.cardBrand
               : undefined,
           type: "plan",
-        }
+          contract_id: contractId,
+          plan_id: selectedPlan.id,
+        };
 
         const { error: paymentError } = await supabase
-          .from("payments")
-          .insert([payment]);
-        if (paymentError) throw paymentError;
+            .from("payments")
+            .insert([payment]);
+          if (paymentError) throw paymentError;
+
+          if (planContract) {
+            const { error: contractError } = await supabase
+              .from("plan_contracts")
+              .update({
+                installments_paid: planContract.installments_paid + 1,
+              })
+              .eq("id", planContract.id);
+            if (contractError) throw contractError;
+            setPlanContract({
+              ...planContract,
+              installments_paid: planContract.installments_paid + 1,
+            });
+          }
 
         // Actualizar el socio con el nuevo plan
         const planStart = parseLocalDate(newPayment.startDate);
@@ -198,7 +236,8 @@ export function PaymentManagement({
           .update({
             plan: selectedPlan.name,
             plan_price: selectedPlan.price,
-             last_payment: newPayment.startDate,
+            balance_due: balanceDueActual - newPayment.amount,
+            last_payment: newPayment.startDate,
             next_payment: nextPayment.toISOString().split("T")[0],
             status: "active",
           })
@@ -209,16 +248,17 @@ export function PaymentManagement({
           ...selectedMember,
           plan: selectedPlan.name,
           plan_price: selectedPlan.price,
+          balance_due: balanceDueActual - newPayment.amount,
           last_payment: newPayment.startDate,
           next_payment: nextPayment.toISOString().split("T")[0],
           status: "active" as const,
         };
 
         setPayments([...payments, payment]);
-        setMembers(
-          members.map((m) => (m.id === selectedMember.id ? updatedMember : m))
-        );
-      } else {
+      setMembers(
+        members.map((m) => (m.id === selectedMember.id ? updatedMember : m))
+      );
+    } else {
         const payment: Payment = {
           id: paymentId,
           gym_id: gymId,
@@ -248,6 +288,7 @@ export function PaymentManagement({
       setNewPayment({
         memberId: "",
         planId: "",
+        contractId: "",
         method: "",
         cardBrand: "",
         date: new Date().toLocaleDateString("en-CA"),
@@ -257,6 +298,7 @@ export function PaymentManagement({
         amount: 0,
       });
       setMemberSearchTerm("");
+      setPlanContract(null);
       setIsAddDialogOpen(false);
     } catch (error) {
       console.error("Error registrando pago:", error);
@@ -346,8 +388,10 @@ export function PaymentManagement({
                             setNewPayment({
                               ...newPayment,
                               memberId: member.id,
+                              planId: "",
                             });
                             setMemberSearchTerm(member.name);
+                            setPlanContract(null);
                           }}
                         >
                           <div className="font-medium">{member.name}</div>
@@ -371,15 +415,16 @@ export function PaymentManagement({
                 <Label htmlFor="type">Tipo de Pago</Label>
                 <Select
                   value={newPayment.type}
-                  onValueChange={(value) =>
+                  onValueChange={(value) => {
                     setNewPayment({
                       ...newPayment,
                       type: value as "plan" | "product",
                       planId: "",
                       description: "",
                       amount: 0,
-                    })
-                  }
+                    });
+                    setPlanContract(null);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona tipo" />
@@ -393,28 +438,66 @@ export function PaymentManagement({
 
               {/* SELECCIÓN DE PLAN */}
               {newPayment.type === "plan" && (
-                <div className="grid gap-2">
-                  <Label htmlFor="plan">Nuevo Plan</Label>
-                  <Select
-                    value={newPayment.planId}
-                    onValueChange={(value) =>
-                      setNewPayment({ ...newPayment, planId: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona el plan a renovar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {plans
-                        .filter((plan) => plan.is_active)
-                        .map((plan) => (
-                          <SelectItem key={plan.id} value={plan.id}>
-                            {plan.name} - ${plan.price.toLocaleString()}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                 <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="plan">Nuevo Plan</Label>
+                    <Select
+                      value={newPayment.planId}
+                       onValueChange={async (value) => {
+                      setNewPayment({ ...newPayment, planId: value });
+                      if (newPayment.memberId) {
+                        const { data } = await supabase
+                          .from("plan_contracts")
+                          .select("*")
+                          .eq("member_id", newPayment.memberId)
+                          .eq("plan_id", value)
+                          .single();
+                        setPlanContract(data ?? null);
+                      } else {
+                        setPlanContract(null);
+                      }
+                    }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona el plan a renovar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {plans
+                          .filter((plan) => plan.is_active)
+                          .map((plan) => (
+                            <SelectItem key={plan.id} value={plan.id}>
+                              {plan.name} - ${plan.price.toLocaleString()}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    {newPayment.planId && (
+                    <div className="text-sm text-muted-foreground">
+                      Cuotas pagadas: {planContract?.installments_paid ?? 0} / {planContract?.installments_total ?? 0}
+                    </div>
+                  )}
+                  </div>
+                  {newPayment.planId && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="amount">Monto</Label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        value={newPayment.amount}
+                        max={maxPlanAmount}
+                        onChange={(e) =>
+                          setNewPayment({
+                            ...newPayment,
+                            amount: Number(e.target.value),
+                          })
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Monto máximo: ${maxPlanAmount.toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* CAMPOS DE PRODUCTO */}
@@ -529,7 +612,8 @@ export function PaymentManagement({
               {/* RESUMEN */}
               {newPayment.type === "plan" &&
                 newPayment.memberId &&
-                newPayment.planId && (
+                 newPayment.planId &&
+                newPayment.amount > 0 && (
                   <div className="p-3 bg-green-50 rounded-lg">
                     <h4 className="font-medium text-green-800 mb-2">
                       Resumen de Renovación
@@ -548,9 +632,7 @@ export function PaymentManagement({
                       </p>
                       <p>
                         <strong>Monto:</strong> $
-                        {plans
-                          .find((p) => p.id === newPayment.planId)
-                          ?.price.toLocaleString()}
+                         {newPayment.amount.toLocaleString()}
                       </p>
                       <p className="mt-1 text-xs">
                         ✅ El socio se activará y se actualizará su próximo
@@ -596,7 +678,9 @@ export function PaymentManagement({
                    (newPayment.method === "Tarjeta de Crédito" &&
                     !newPayment.cardBrand) ||
                   (newPayment.type === "plan"
-                    ? !newPayment.planId || !newPayment.startDate
+                    ? !newPayment.planId ||
+                      !newPayment.startDate ||
+                      !newPayment.amount
                     : !newPayment.description || !newPayment.amount)
                 }
               >

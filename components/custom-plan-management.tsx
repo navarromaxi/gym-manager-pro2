@@ -123,6 +123,8 @@ export function CustomPlanManagement({
           ? newPlan.card_brand
           : undefined,
       type: "plan",
+      plan_id: id,
+      contract_id: id,
     };
 
     const { error: paymentError } = await supabase
