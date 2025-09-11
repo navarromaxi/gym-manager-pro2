@@ -95,6 +95,7 @@ export function MemberManagement({
     plan: "",
     planPrice: 0,
     planStartDate: new Date().toISOString().split("T")[0],
+    paymentDate: new Date().toISOString().split("T")[0],
     paymentMethod: "Efectivo",
     cardBrand: "",
   });
@@ -210,7 +211,7 @@ export function MemberManagement({
         phone: newMember.phone,
         plan: newMember.plan,
         plan_price: newMember.planPrice,
-        join_date: newMember.planStartDate,
+        join_date: newMember.paymentDate,
         last_payment: newMember.planStartDate,
         next_payment: nextPayment.toISOString().split("T")[0],
         status: memberStatus,
@@ -232,11 +233,11 @@ export function MemberManagement({
         member_id: memberId,
         member_name: member.name,
         amount: member.plan_price,
-        date: new Date().toISOString().split("T")[0],
+        date: newMember.paymentDate,
         start_date: newMember.planStartDate,
         plan: member.plan,
         method: newMember.paymentMethod,
-         card_brand:
+        card_brand:
           newMember.paymentMethod === "Tarjeta de Crédito"
             ? newMember.cardBrand
             : undefined,
@@ -262,6 +263,7 @@ export function MemberManagement({
         plan: "",
         planPrice: 0,
         planStartDate: new Date().toISOString().split("T")[0],
+        paymentDate: new Date().toISOString().split("T")[0],
         paymentMethod: "Efectivo",
          cardBrand: "",
       });
@@ -378,18 +380,6 @@ export function MemberManagement({
     return diffDays;
   };
 
-  //Funcion para crear alerta de socios proximo a vencerse
-  /* const getExpiringMembers = () => {
-    const today = new Date();
-
-    return members.filter((member) => {
-      const nextPayment = new Date(member.next_payment);
-      const diffTime = nextPayment.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      return diffDays <= 10 && diffDays >= 0 && member.status === "active";
-    });
-  }; */
   const getExpiringMembers = () => {
     const today = new Date();
     return members.filter((member) => {
@@ -508,6 +498,17 @@ export function MemberManagement({
                   El plan se calculará desde esta fecha (útil si se registra con
                   atraso)
                 </p>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="paymentDate">Fecha de pago</Label>
+                <Input
+                  id="paymentDate"
+                  type="date"
+                  value={newMember.paymentDate}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, paymentDate: e.target.value })
+                  }
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="plan">Plan</Label>

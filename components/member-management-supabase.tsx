@@ -77,6 +77,7 @@ export function MemberManagement({
     plan: "",
     planPrice: 0,
     planStartDate: new Date().toISOString().split("T")[0],
+    paymentDate: new Date().toISOString().split("T")[0],
     paymentMethod: "Efectivo",
     cardBrand: "",
   });
@@ -222,7 +223,7 @@ export function MemberManagement({
         phone: newMember.phone,
         plan: newMember.plan,
         plan_price: newMember.planPrice,
-         join_date: newMember.planStartDate,
+        join_date: newMember.paymentDate,
         last_payment: newMember.planStartDate,
         next_payment: nextPayment.toISOString().split("T")[0],
         status: memberStatus,
@@ -244,7 +245,7 @@ export function MemberManagement({
         member_id: memberId,
         member_name: member.name,
         amount: member.plan_price,
-        date: new Date().toISOString().split("T")[0],
+        date: newMember.paymentDate,
         start_date: newMember.planStartDate,
         plan: member.plan,
         method: newMember.paymentMethod,
@@ -273,6 +274,7 @@ export function MemberManagement({
         plan: "",
         planPrice: 0,
         planStartDate: new Date().toISOString().split("T")[0],
+        paymentDate: new Date().toISOString().split("T")[0],
         paymentMethod: "Efectivo",
         cardBrand: "",
       });
@@ -559,6 +561,17 @@ export function MemberManagement({
                   El plan se calculará desde esta fecha (útil si se registra con
                   atraso)
                 </p>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="paymentDate">Fecha de pago</Label>
+                <Input
+                  id="paymentDate"
+                  type="date"
+                  value={newMember.paymentDate}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, paymentDate: e.target.value })
+                  }
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="plan">Plan</Label>
