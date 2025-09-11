@@ -199,9 +199,12 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
       }
 
       // 5) Refrescar sesión para obtener un JWT con gym_id
-      const { error: refreshError } = await supabase.auth.refreshSession();
+      const { data: refreshData, error: refreshError } =
+        await supabase.auth.refreshSession();
       if (refreshError) {
         throw new Error("No se pudo actualizar la sesión.");
+      }if (refreshData.session) {
+        await supabase.auth.setSession(refreshData.session);
       }
 
       // 6) Continuar: usar el id de gym (text) para filtrar en toda la app
