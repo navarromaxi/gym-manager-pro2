@@ -228,6 +228,7 @@ export function MemberManagement({
         status: memberStatus,
         inactive_level: inactiveLevel,
         balance_due: 0,
+        followed_up: false,
       };
 
       // Guardar en Supabase

@@ -178,7 +178,36 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
         throw new Error("Tu suscripción ha expirado.");
       }
 
-      // 4) Continuar: usar el id de gym (text) para filtrar en toda la app
+      // 4) Guardar el id del gimnasio en los metadatos del usuario
+      let { error: updateError } = await supabase.auth.updateUser({
+        data: { gym_id: gym.id },
+      });
+
+      if (updateError) {
+        const { error: sessionError } = await supabase.auth.refreshSession();
+        if (sessionError) {
+          throw new Error("No se pudo refrescar la sesión.");
+        }
+        ({ error: updateError } = await supabase.auth.updateUser({
+          data: { gym_id: gym.id },
+        }));
+        if (updateError) {
+          throw new Error(
+            "No se pudo asociar el gimnasio al usuario."
+          );
+        }
+      }
+
+      // 5) Refrescar sesión para obtener un JWT con gym_id
+      const { data: refreshData, error: refreshError } =
+        await supabase.auth.refreshSession();
+      if (refreshError) {
+        throw new Error("No se pudo actualizar la sesión.");
+      }if (refreshData.session) {
+        await supabase.auth.setSession(refreshData.session);
+      }
+
+      // 6) Continuar: usar el id de gym (text) para filtrar en toda la app
       onLogin({ name: gym.name, id: gym.id });
     } catch (err: any) {
       setError(err.message ?? "Error al iniciar sesión.");
