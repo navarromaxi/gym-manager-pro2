@@ -243,7 +243,7 @@ export function MemberManagement({
       // Crear contrato de plan
       const contractId = `${memberId}_contract_${Date.now()}`;
       const { error: contractError } = await supabase
-        .from("plan_contracts")
+        .from("plan_contract")
         .insert([
           {
             id: contractId,

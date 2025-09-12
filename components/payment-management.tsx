@@ -85,13 +85,13 @@ export function PaymentManagement({
 
   // Filtrar miembros para el buscador
   const filteredMembersForSearch = members.filter((member) =>
-    member.name.toLowerCase().includes(memberSearchTerm.toLowerCase())
+    member.name.toLowerCase().includes(memberSearchTerm.toLowerCase()),
   );
 
   // Función para obtener pagos filtrados actualizada
   const getFilteredPayments = () => {
     let filtered = (payments || []).filter((payment) =>
-      payment.member_name.toLowerCase().includes(searchTerm.toLowerCase())
+      payment.member_name.toLowerCase().includes(searchTerm.toLowerCase()),
     );
 
     // Filtro por método de pago
@@ -136,7 +136,7 @@ export function PaymentManagement({
 
     return filtered.sort(
       (a, b) =>
-        parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
+        parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime(),
     );
   };
 
@@ -164,7 +164,7 @@ export function PaymentManagement({
         }
         if (newPayment.amount > maxPlanAmount) {
           alert(
-            `El monto no puede ser mayor a ${maxPlanAmount.toLocaleString()}`
+            `El monto no puede ser mayor a ${maxPlanAmount.toLocaleString()}`,
           );
           return;
         }
@@ -174,22 +174,19 @@ export function PaymentManagement({
           planContract?.id || `${newPayment.memberId}_contract_${Date.now()}`;
 
         if (!currentContract) {
-          const { data: newContract, error: contractError } = await supabase
+          const newContract: PlanContract = {
+            id: contractId,
+            gym_id: gymId,
+            member_id: newPayment.memberId,
+            plan_id: selectedPlan.id,
+            installments_total: newPayment.installments,
+            installments_paid: 1,
+          };
+          const { error: contractError } = await supabase
             .from("plan_contracts")
-            .insert([
-              {
-                id: contractId,
-                gym_id: gymId,
-                member_id: newPayment.memberId,
-                plan_id: selectedPlan.id,
-                installments_total: newPayment.installments,
-                installments_paid: 1,
-              },
-            ])
-            .select()
-            .single();
+            .insert([newContract]);
           if (contractError) throw contractError;
-          currentContract = newContract as PlanContract;
+          currentContract = newContract;
           setPlanContract(currentContract);
         } else {
           const { error: contractError } = await supabase
@@ -239,7 +236,7 @@ export function PaymentManagement({
           nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration);
         } else if (selectedPlan.duration_type === "years") {
           nextPayment.setFullYear(
-            nextPayment.getFullYear() + selectedPlan.duration
+            nextPayment.getFullYear() + selectedPlan.duration,
           );
         }
 
@@ -268,7 +265,7 @@ export function PaymentManagement({
 
         setPayments([...payments, payment]);
         setMembers(
-          members.map((m) => (m.id === selectedMember.id ? updatedMember : m))
+          members.map((m) => (m.id === selectedMember.id ? updatedMember : m)),
         );
       } else {
         const payment: Payment = {
@@ -320,7 +317,7 @@ export function PaymentManagement({
 
   const totalPayments = filteredPayments.reduce(
     (sum, payment) => sum + payment.amount,
-    0
+    0,
   );
   const currentMonthPayments = payments.filter((payment) => {
     const paymentDate = parseLocalDate(payment.date);
@@ -337,12 +334,12 @@ export function PaymentManagement({
       acc[payment.method] = (acc[payment.method] || 0) + 1;
       return acc;
     },
-    {} as Record<string, number>
+    {} as Record<string, number>,
   );
 
   const monthlyTotal = currentMonthPayments.reduce(
     (sum, payment) => sum + payment.amount,
-    0
+    0,
   );
 
   return (
