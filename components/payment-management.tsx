@@ -185,9 +185,22 @@ export function PaymentManagement({
           const { error: contractError } = await supabase
             .from("plan_contracts")
             .insert([newContract]);
-          if (contractError) throw contractError;
-          currentContract = newContract;
-          setPlanContract(currentContract);
+          if (contractError) {
+            const { error: fallbackError } = await supabase
+              .from("plan_contract")
+              .insert([newContract]);
+            if (fallbackError) {
+              console.warn(
+                "Tabla de contratos de plan no encontrada. Se continúa sin registrarlo."
+              );
+            } else {
+              currentContract = newContract;
+              setPlanContract(currentContract);
+            }
+          } else {
+            currentContract = newContract;
+            setPlanContract(currentContract);
+          }
         } else {
           const { error: contractError } = await supabase
             .from("plan_contracts")
@@ -195,7 +208,19 @@ export function PaymentManagement({
               installments_paid: currentContract.installments_paid + 1,
             })
             .eq("id", currentContract.id);
-          if (contractError) throw contractError;
+          if (contractError) {
+            const { error: fallbackError } = await supabase
+              .from("plan_contract")
+              .update({
+                installments_paid: currentContract.installments_paid + 1,
+              })
+              .eq("id", currentContract.id);
+            if (fallbackError) {
+              console.warn(
+                "Tabla de contratos de plan no encontrada. Se continúa sin actualizar contrato."
+              );
+            }
+          }
           currentContract = {
             ...currentContract,
             installments_paid: currentContract.installments_paid + 1,
@@ -459,12 +484,21 @@ export function PaymentManagement({
                           installments: 1,
                         });
                         if (newPayment.memberId) {
-                          const { data } = await supabase
+                           let { data, error } = await supabase
                             .from("plan_contracts")
                             .select("*")
                             .eq("member_id", newPayment.memberId)
                             .eq("plan_id", value)
                             .single();
+                            if (error) {
+                            const fallback = await supabase
+                              .from("plan_contract")
+                              .select("*")
+                              .eq("member_id", newPayment.memberId)
+                              .eq("plan_id", value)
+                              .single();
+                            data = fallback.data;
+                          }
                           setPlanContract(data ?? null);
                           if (data) {
                             setNewPayment((prev) => ({

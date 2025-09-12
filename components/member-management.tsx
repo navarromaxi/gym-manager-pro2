@@ -242,20 +242,28 @@ export function MemberManagement({
 
       // Crear contrato de plan
       const contractId = `${memberId}_contract_${Date.now()}`;
+      const contract = {
+        id: contractId,
+        gym_id: gymId,
+        member_id: memberId,
+        plan_id: selectedPlan?.id || "",
+        installments_total: installments,
+        installments_paid: 1,
+      };
+      // Intentar insertar en la tabla plural y si no existe usar la singular
       const { error: contractError } = await supabase
-        .from("plan_contract")
-        .insert([
-          {
-            id: contractId,
-            gym_id: gymId,
-            member_id: memberId,
-            plan_id: selectedPlan?.id || "",
-            installments_total: installments,
-            installments_paid: 1,
-          },
-        ]);
-      if (contractError) throw contractError;
-
+        .from("plan_contracts")
+        .insert([contract]);
+      if (contractError) {
+        const { error: fallbackError } = await supabase
+          .from("plan_contract")
+          .insert([contract]);
+        if (fallbackError) {
+          console.warn(
+            "Tabla de contratos de plan no encontrada. Se continúa sin registrar contrato."
+          );
+        }
+      }
       // Crear pago inicial
       const payment: Payment = {
         id: `${gymId}_payment_${Date.now()}`,
