@@ -61,7 +61,7 @@ export function PaymentManagement({
     cardBrand: "",
     date: new Date().toLocaleDateString("en-CA"),
     startDate: new Date().toLocaleDateString("en-CA"),
-     type: "new_plan" as "new_plan" | "existing_plan" | "product",
+    type: "new_plan" as "new_plan" | "existing_plan" | "product",
     description: "",
     amount: 0,
     installments: 1,
@@ -391,19 +391,6 @@ export function PaymentManagement({
           .insert([payment]);
         if (paymentError) throw paymentError;
 
-        const planStart = parseLocalDate(selectedMember.next_payment);
-        const nextPayment = new Date(planStart);
-
-        if (selectedPlan.duration_type === "days") {
-          nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration);
-        } else if (selectedPlan.duration_type === "months") {
-          nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration);
-        } else if (selectedPlan.duration_type === "years") {
-          nextPayment.setFullYear(
-            nextPayment.getFullYear() + selectedPlan.duration,
-          );
-        }
-
         const newBalance = balanceDueActual - newPayment.amount;
 
         const { error: memberError } = await supabase
@@ -411,7 +398,6 @@ export function PaymentManagement({
           .update({
             balance_due: Math.max(newBalance, 0),
             last_payment: newPayment.date,
-            next_payment: nextPayment.toISOString().split("T")[0],
             status: "active",
           })
           .eq("id", selectedMember.id);
@@ -421,7 +407,6 @@ export function PaymentManagement({
           ...selectedMember,
           balance_due: Math.max(newBalance, 0),
           last_payment: newPayment.date,
-          next_payment: nextPayment.toISOString().split("T")[0],
           status: "active" as const,
         };
 
