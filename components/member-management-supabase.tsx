@@ -96,12 +96,7 @@ export function MemberManagement({
     "Tarjeta de Crédito",
   ];
 
-   const cardBrands = [
-    "Visa",
-    "Mastercard",
-    "American Express",
-    "Otra",
-  ];
+  const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
 
   useEffect(() => {
     setStatusFilter(initialFilter);
@@ -167,6 +162,8 @@ export function MemberManagement({
       );
       matchesStatus =
         diffDays <= 10 && diffDays >= 0 && getRealStatus(member) === "active";
+    } else if (statusFilter === "balance_due") {
+      matchesStatus = (member.balance_due || 0) > 0;
     } else {
       matchesStatus =
         statusFilter === "all" || getRealStatus(member) === statusFilter;
@@ -226,7 +223,7 @@ export function MemberManagement({
         join_date: newMember.paymentDate,
         last_payment: newMember.planStartDate,
         next_payment: nextPayment.toISOString().split("T")[0],
-        //balance_due: 0,
+        balance_due: 0,
         status: memberStatus,
         inactive_level: inactiveLevel,
         followed_up: false,
@@ -313,7 +310,7 @@ export function MemberManagement({
           name: editingMember.name,
           email: editingMember.email,
           phone: editingMember.phone,
-           next_payment: editingMember.next_payment,
+          next_payment: editingMember.next_payment,
           status: newStatus,
           inactive_level: newInactive,
         })
@@ -324,7 +321,11 @@ export function MemberManagement({
       setMembers(
         members.map((m) =>
           m.id === editingMember.id
-            ? { ...editingMember, status: newStatus, inactive_level: newInactive }
+            ? {
+                ...editingMember,
+                status: newStatus,
+                inactive_level: newInactive,
+              }
             : m
         )
       );
@@ -365,24 +366,6 @@ export function MemberManagement({
     }
   };
 
-  /* const getStatusBadge = (member: Member) => {
-    switch (member.status) {
-      case "active":
-        return <Badge variant="default">Activo</Badge>;
-      case "expired":
-        return <Badge variant="destructive">Vencido</Badge>;
-      case "inactive":
-        const color =
-          member.inactive_level === "green"
-            ? "bg-green-500"
-            : member.inactive_level === "yellow"
-            ? "bg-yellow-500"
-            : "bg-red-500";
-        return <Badge className={`${color} text-white`}>Inactivo</Badge>;
-      default:
-        return <Badge variant="secondary">Desconocido</Badge>;
-    }
-  }; */
 
   const getStatusBadge = (
     status: "active" | "expired" | "inactive",
@@ -447,6 +430,11 @@ export function MemberManagement({
     });
   };
 
+  // ⛳ Socios con saldo pendiente
+  const getMembersWithBalanceDue = () => {
+    return members.filter((member) => (member.balance_due || 0) > 0);
+  };
+
   const getMonthlyPaymentSummary = (member: Member) => {
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -456,16 +444,14 @@ export function MemberManagement({
       const d = new Date(p.date);
       return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
     });
-    const totalAmount = paymentsThisMonth.reduce(
-      (sum, p) => sum + p.amount,
-      0
-    );
+    const totalAmount = paymentsThisMonth.reduce((sum, p) => sum + p.amount, 0);
     const extras = paymentsThisMonth
       .map((p) => p.plan)
       .filter((name) => name && name !== member.plan);
-    return `${member.plan}${extras.length ? " + " + extras.join(" + ") : ""} = $${totalAmount}`;
+    return `${member.plan}${
+      extras.length ? " + " + extras.join(" + ") : ""
+    } = $${totalAmount}`;
   };
-
 
   // ⛳ Marcar como contactado
   const handleMarkAsFollowedUp = async (memberId: string) => {
@@ -551,13 +537,16 @@ export function MemberManagement({
                 />
               </div>
               <div className="grid gap-2">
-                 <Label htmlFor="planStartDate">Fecha de inicio del plan</Label>
+                <Label htmlFor="planStartDate">Fecha de inicio del plan</Label>
                 <Input
-                   id="planStartDate"
+                  id="planStartDate"
                   type="date"
                   value={newMember.planStartDate}
                   onChange={(e) =>
-                     setNewMember({ ...newMember, planStartDate: e.target.value })
+                    setNewMember({
+                      ...newMember,
+                      planStartDate: e.target.value,
+                    })
                   }
                 />
                 <p className="text-xs text-muted-foreground">
@@ -627,7 +616,7 @@ export function MemberManagement({
                   </SelectContent>
                 </Select>
               </div>
-               {newMember.paymentMethod === "Tarjeta de Crédito" && (
+              {newMember.paymentMethod === "Tarjeta de Crédito" && (
                 <div className="grid gap-2">
                   <Label>Tipo de Tarjeta</Label>
                   <Select
@@ -698,6 +687,7 @@ export function MemberManagement({
                 <SelectItem value="expiring_soon">
                   Próximo a vencerse (10 días)
                 </SelectItem>
+                <SelectItem value="balance_due">Saldo pendiente</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -739,6 +729,21 @@ export function MemberManagement({
               </Button>
             </div>
           )}
+
+          {getMembersWithBalanceDue().length > 0 && (
+            <div className="mt-2 text-sm text-red-700 bg-red-100 border-l-4 border-red-500 p-3 rounded flex items-center justify-between">
+              <span>
+                ⚠️ Tienes {getMembersWithBalanceDue().length} socios con saldo pendiente.
+              </span>
+              <Button
+                variant="ghost"
+                className="text-red-700 hover:underline"
+                onClick={() => setStatusFilter("balance_due")}
+              >
+                Ver socios con saldo
+              </Button>
+            </div>
+          )}
         </CardHeader>
 
         <CardContent>
@@ -768,6 +773,9 @@ export function MemberManagement({
                   </th>
                   <th className="h-10 px-2 text-left align-middle font-medium">
                     Días Restantes
+                  </th>
+                  <th className="h-10 px-2 text-left align-middle font-medium">
+                    Saldo Pendiente
                   </th>
                   <th className="h-10 px-2 text-left align-middle font-medium">
                     Acciones
@@ -818,6 +826,15 @@ export function MemberManagement({
                           ? "Vence hoy"
                           : `${daysUntilExpiration} días`}
                       </span>
+                    </td>
+                     <td className="p-2 align-middle">
+                      {(member.balance_due ?? 0) > 0 ? (
+                        <span className="text-red-600 font-semibold">
+                          {`$${(member.balance_due ?? 0).toFixed(2)}`}
+                        </span>
+                      ) : (
+                        "$0.00"
+                      )}
                     </td>
                     <td className="p-2 align-middle">
                       <div className="flex space-x-2">

@@ -492,6 +492,9 @@ export function MemberManagement({
       return !member.followed_up && diffDays >= 5 && diffDays <= 12;
     });
   };
+  const getMembersWithBalanceDue = () => {
+    return members.filter((member) => (member.balance_due || 0) > 0);
+  };
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -817,6 +820,7 @@ export function MemberManagement({
               </Button>
             </div>
           )}
+          
         </CardHeader>
         {filteredMembers.length === 0 && (
           <div className="mt-2 text-sm text-muted-foreground">
@@ -825,6 +829,20 @@ export function MemberManagement({
               : "Aún no hay socios para mostrar con este filtro."}
           </div>
         )}
+         {getMembersWithBalanceDue().length > 0 && (
+            <div className="mt-2 text-sm text-red-700 bg-red-100 border-l-4 border-red-500 p-3 rounded flex items-center justify-between">
+              <span>
+                ⚠️ Tienes {getMembersWithBalanceDue().length} socios con saldo pendiente.
+              </span>
+              <Button
+                variant="ghost"
+                className="text-red-700 hover:underline"
+                onClick={() => setStatusFilter("balance_due")}
+              >
+                Ver socios con saldo
+              </Button>
+            </div>
+          )}
 
         <CardContent>
           <Table>
@@ -870,8 +888,8 @@ export function MemberManagement({
                       )}
                     </TableCell>
                     <TableCell>
-                      {(member.balance_due ?? 0) > 0
-                        ? new Date(member.next_payment).toLocaleDateString()
+                      {member.next_payment
+                        ? toLocalDate(member.next_payment).toLocaleDateString()
                         : "-"}
                     </TableCell>
                     <TableCell>
