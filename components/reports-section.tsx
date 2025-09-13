@@ -35,7 +35,14 @@ import {
   Filter,
   RefreshCw,
 } from "lucide-react";
-
+import { PieChart, Pie } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
 interface Member {
   id: string;
   name: string;
@@ -362,6 +369,25 @@ const getRenewalStats = () => {
 
   const renewalStats = getRenewalStats();
 
+
+  const renewalChartData = [
+    {
+      status: "renovaron",
+      value: renewalStats.renewedCount,
+      fill: "var(--color-renovaron)",
+    },
+    {
+      status: "noRenovaron",
+      value: renewalStats.notRenewedCount,
+      fill: "var(--color-noRenovaron)",
+    },
+  ];
+
+  const renewalChartConfig = {
+    renovaron: { label: "Renovaron", color: "hsl(var(--chart-1))" },
+    noRenovaron: { label: "No Renovaron", color: "hsl(var(--chart-2))" },
+  };
+
   /** =================== Distribuciones y series =================== */
   const planDistribution = members.reduce((acc, member) => {
     acc[member.plan] = (acc[member.plan] || 0) + 1;
@@ -372,6 +398,37 @@ const getRenewalStats = () => {
     acc[payment.method] = (acc[payment.method] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
+
+  const creditCardPayments = filteredPayments.filter(
+    (p) => p.method === "Tarjeta de Crédito"
+  );
+
+  const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
+
+  const creditCardStats = creditCardPayments.reduce(
+    (acc, payment) => {
+      const brand = payment.cardBrand || "Otra";
+      if (!acc[brand]) acc[brand] = { count: 0, amount: 0 };
+      acc[brand].count += 1;
+      acc[brand].amount += payment.amount;
+      return acc;
+    },
+    {} as Record<string, { count: number; amount: number }>
+  );
+
+  const creditCardDistribution = cardBrands.map((brand) => ({
+    brand,
+    count: creditCardStats[brand]?.count || 0,
+    amount: creditCardStats[brand]?.amount || 0,
+    percentage:
+      creditCardPayments.length > 0
+        ? Math.round(
+            ((creditCardStats[brand]?.count || 0) /
+              creditCardPayments.length) *
+              100
+          )
+        : 0,
+  }));
 
   const last6MonthsIncome = Array.from({ length: 6 }, (_, i) => {
     const date = new Date();
@@ -687,48 +744,26 @@ const getRenewalStats = () => {
           {/* Comparativo Visual */}
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
             <h4 className="font-medium mb-3">Comparativo de Renovaciones</h4>
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Renovaron</span>
-                  <span>{renewalStats.renewedCount}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-green-500 h-2 rounded-full"
-                    style={{
-                      width: `${
-                        renewalStats.totalEligible > 0
-                          ? (renewalStats.renewedCount /
-                              renewalStats.totalEligible) *
-                            100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between text-sm mb-1">
-                  <span>No Renovaron</span>
-                  <span>{renewalStats.notRenewedCount}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-red-500 h-2 rounded-full"
-                    style={{
-                      width: `${
-                        renewalStats.totalEligible > 0
-                          ? (renewalStats.notRenewedCount /
-                              renewalStats.totalEligible) *
-                            100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
+             <ChartContainer
+              config={renewalChartConfig}
+              className="mx-auto aspect-square h-[200px]"
+            >
+              <PieChart>
+                <Pie
+                  data={renewalChartData}
+                  dataKey="value"
+                  nameKey="status"
+                  innerRadius={40}
+                  strokeWidth={5}
+                />
+                <ChartTooltip
+                  content={<ChartTooltipContent nameKey="status" />}
+                />
+                <ChartLegend
+                  content={<ChartLegendContent nameKey="status" />}
+                />
+              </PieChart>
+            </ChartContainer>
           </div>
         </CardContent>
       </Card>
@@ -855,7 +890,7 @@ const getRenewalStats = () => {
       </Card>
 
       {/* Plan Distribution */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Distribución por Planes</CardTitle>
@@ -909,6 +944,32 @@ const getRenewalStats = () => {
                   </div>
                 )
               )}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Pagos con Crédito - {getTimeFilterLabel()}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {creditCardDistribution.map((item) => (
+                <div
+                  key={item.brand}
+                  className="flex items-center justify-between"
+                >
+                  <span className="font-medium">{item.brand}</span>
+                  <div className="flex items-center space-x-4">
+                    <span className="text-sm text-muted-foreground">
+                      {item.count} pagos
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      ${item.amount.toLocaleString()}
+                    </span>
+                    <Badge variant="outline">{item.percentage}%</Badge>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
