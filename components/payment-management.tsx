@@ -74,11 +74,27 @@ export function PaymentManagement({
 
   useEffect(() => {
     const checkTable = async () => {
-      const { data } = await supabase
-        .from("pg_tables")
-        .select("tablename")
-        .in("tablename", ["plan_contracts", "plan_contract"]);
-      setContractTable((data && data[0]?.tablename) || null);
+      const { error: errorContracts } = await supabase
+        .from("plan_contracts")
+        .select("id", { head: true })
+        .limit(1);
+
+      if (!errorContracts) {
+        setContractTable("plan_contracts");
+        return;
+      }
+
+      const { error: errorContract } = await supabase
+        .from("plan_contract")
+        .select("id", { head: true })
+        .limit(1);
+
+      if (!errorContract) {
+        setContractTable("plan_contract");
+        return;
+      }
+
+      setContractTable(null);
     };
     checkTable();
   }, []);
@@ -159,7 +175,9 @@ export function PaymentManagement({
   const selectedPlan = plans.find((p) => p.id === newPayment.planId);
   const balanceDueActual = selectedMember?.balance_due || 0;
   const maxPlanAmount = selectedPlan
-    ? Math.max(selectedPlan.price - balanceDueActual, 0)
+    ? planContract
+      ? balanceDueActual
+      : Math.max(selectedPlan.price + balanceDueActual, 0)
     : 0;
 
   // FUNCIÓN ACTUALIZADA PARA REGISTRAR PAGO Y RENOVAR SOCIO
@@ -183,42 +201,44 @@ export function PaymentManagement({
         }
 
         let currentContract = planContract;
-        let contractId =
+        const contractId =
           planContract?.id || `${newPayment.memberId}_contract_${Date.now()}`;
 
-        if (!currentContract && contractTable) {
-            const newContract: PlanContract = {
-              id: contractId,
-              gym_id: gymId,
-              member_id: newPayment.memberId,
-              plan_id: selectedPlan.id,
-              installments_total: newPayment.installments,
-              installments_paid: 1,
-            };
-            const { error: contractError } = await supabase
-              .from(contractTable)
-              .insert([newContract]);
-            if (contractError) {
-              console.warn("Error registrando contrato de plan:", contractError);
-            } else {
-              currentContract = newContract;
-              setPlanContract(currentContract);
-            }
-          } else if (currentContract && contractTable) {
-            const { error: contractError } = await supabase
-              .from(contractTable)
-              .update({
-                installments_paid: currentContract.installments_paid + 1,
-              })
-              .eq("id", currentContract.id);
-            if (contractError) {
-              console.warn("Error actualizando contrato de plan:", contractError);
-            }
-            currentContract = {
-              ...currentContract,
-             };
+        const isFirstInstallment = !currentContract;
+
+        if (isFirstInstallment && contractTable) {
+          const newContract: PlanContract = {
+            id: contractId,
+            gym_id: gymId,
+            member_id: newPayment.memberId,
+            plan_id: selectedPlan.id,
+            installments_total: newPayment.installments,
+            installments_paid: 1,
+          };
+          const { error: contractError } = await supabase
+            .from(contractTable)
+            .insert([newContract]);
+          if (contractError) {
+            console.warn("Error registrando contrato de plan:", contractError);
+          } else {
+            currentContract = newContract;
             setPlanContract(currentContract);
+          } } else if (currentContract && contractTable) {
+          const { error: contractError } = await supabase
+            .from(contractTable)
+            .update({
+              installments_paid: currentContract.installments_paid + 1,
+            })
+            .eq("id", currentContract.id);
+          if (contractError) {
+            console.warn("Error actualizando contrato de plan:", contractError);
           }
+          currentContract = {
+            ...currentContract,
+            installments_paid: currentContract.installments_paid + 1,
+          };
+          setPlanContract(currentContract);
+        }
 
         const payment: Payment = {
           id: paymentId,
@@ -257,12 +277,16 @@ export function PaymentManagement({
           );
         }
 
+         const newBalance = isFirstInstallment
+          ? balanceDueActual + selectedPlan.price - newPayment.amount
+          : balanceDueActual - newPayment.amount;
+
         const { error: memberError } = await supabase
           .from("members")
           .update({
             plan: selectedPlan.name,
             plan_price: selectedPlan.price,
-            balance_due: balanceDueActual - newPayment.amount,
+            balance_due: Math.max(newBalance, 0),
             last_payment: newPayment.startDate,
             next_payment: nextPayment.toISOString().split("T")[0],
             status: "active",
@@ -274,7 +298,7 @@ export function PaymentManagement({
           ...selectedMember,
           plan: selectedPlan.name,
           plan_price: selectedPlan.price,
-          balance_due: balanceDueActual - newPayment.amount,
+          balance_due: Math.max(newBalance, 0),
           last_payment: newPayment.startDate,
           next_payment: nextPayment.toISOString().split("T")[0],
           status: "active" as const,
