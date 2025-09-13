@@ -109,9 +109,21 @@ export function MemberManagement({
   ];
 
   const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
-
+  const [contractTable, setContractTable] = useState<
+    "plan_contracts" | "plan_contract" | null
+  >(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  useEffect(() => {
+    const checkTable = async () => {
+      const { data } = await supabase
+        .from("pg_tables")
+        .select("tablename")
+        .in("tablename", ["plan_contracts", "plan_contract"]);
+      setContractTable((data && data[0]?.tablename) || null);
+    };
+    checkTable();
+  }, []);
   useEffect(() => {
     setStatusFilter(initialFilter);
   }, [initialFilter]);
@@ -181,8 +193,12 @@ export function MemberManagement({
         alert("Debes seleccionar un plan");
         return;
       }
+       if (newMember.planPrice <= 0) {
+        alert("Debes ingresar un precio válido");
+        return;
+      }
       const installments = newMember.installments || 1;
-      const installmentAmount = selectedPlan.price / installments;
+      const installmentAmount = newMember.planPrice / installments;
 
       if (selectedPlan.duration_type === "days") {
         nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration);
@@ -223,13 +239,13 @@ export function MemberManagement({
         email: newMember.email,
         phone: newMember.phone,
         plan: newMember.plan,
-        plan_price: selectedPlan.price,
+        plan_price: newMember.planPrice,
         join_date: newMember.paymentDate,
         last_payment: newMember.planStartDate,
         next_payment: nextPayment.toISOString().split("T")[0],
         status: memberStatus,
         inactive_level: inactiveLevel,
-        balance_due: selectedPlan.price - installmentAmount,
+        balance_due: newMember.planPrice - installmentAmount,
         followed_up: false,
       };
 
@@ -242,6 +258,8 @@ export function MemberManagement({
 
       // Crear contrato de plan
       const contractId = `${memberId}_contract_${Date.now()}`;
+
+      // Intentar insertar en la tabla plural y si no existe usar la singular
       const contract = {
         id: contractId,
         gym_id: gymId,
@@ -250,18 +268,12 @@ export function MemberManagement({
         installments_total: installments,
         installments_paid: 1,
       };
-      // Intentar insertar en la tabla plural y si no existe usar la singular
-      const { error: contractError } = await supabase
-        .from("plan_contracts")
-        .insert([contract]);
-      if (contractError) {
-        const { error: fallbackError } = await supabase
-          .from("plan_contract")
+      if (contractTable) {
+        const { error: contractError } = await supabase
+          .from(contractTable)
           .insert([contract]);
-        if (fallbackError) {
-          console.warn(
-            "Tabla de contratos de plan no encontrada. Se continúa sin registrar contrato."
-          );
+        if (contractError) {
+          console.warn("Error registrando contrato de plan:", contractError);
         }
       }
       // Crear pago inicial
@@ -584,37 +596,53 @@ export function MemberManagement({
                   </SelectContent>
                 </Select>
               </div>
-              {newMember.plan && (
-                <div className="grid gap-2">
-                  <Label htmlFor="installments">Cantidad de cuotas</Label>
-                   <Select
-                    value={newMember.installments.toString()}
-                    onValueChange={(value) =>
-                      setNewMember({
-                        ...newMember,
-                        installments: parseInt(value)
-                      })
-                    }
-                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona cuotas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1</SelectItem>
-                      <SelectItem value="2">2</SelectItem>
-                      <SelectItem value="3">3</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {newMember.installments > 1 && (
-                    <p className="text-xs text-muted-foreground">
-                      Monto por cuota: $
-                      {(newMember.planPrice / newMember.installments).toFixed(
-                        2
+               {newMember.plan && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label htmlFor="planPrice">Precio total del plan</Label>
+                      <Input
+                        id="planPrice"
+                        type="number"
+                        value={newMember.planPrice}
+                        onChange={(e) =>
+                          setNewMember({
+                            ...newMember,
+                            planPrice: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="installments">Cantidad de cuotas</Label>
+                      <Select
+                        value={newMember.installments.toString()}
+                        onValueChange={(value) =>
+                          setNewMember({
+                            ...newMember,
+                            installments: parseInt(value),
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona cuotas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1</SelectItem>
+                          <SelectItem value="2">2</SelectItem>
+                          <SelectItem value="3">3</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {newMember.installments > 1 && (
+                        <p className="text-xs text-muted-foreground">
+                          Monto por cuota: $
+                          {(newMember.planPrice / newMember.installments).toFixed(
+                            2,
+                          )}
+                        </p>
                       )}
-                    </p>
-                  )}
-                </div>
-              )}
+                    </div>
+                  </>
+                )}
               <div className="grid gap-2">
                 <Label htmlFor="paymentMethod">Método de Pago</Label>
                 <Select

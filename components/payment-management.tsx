@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,7 +68,20 @@ export function PaymentManagement({
   });
   const [planContract, setPlanContract] = useState<PlanContract | null>(null);
   const [methodFilter, setMethodFilter] = useState("all");
+   const [contractTable, setContractTable] = useState<
+    "plan_contracts" | "plan_contract" | null
+  >(null);
 
+  useEffect(() => {
+    const checkTable = async () => {
+      const { data } = await supabase
+        .from("pg_tables")
+        .select("tablename")
+        .in("tablename", ["plan_contracts", "plan_contract"]);
+      setContractTable((data && data[0]?.tablename) || null);
+    };
+    checkTable();
+  }, []);
   const paymentMethods = [
     "Efectivo",
     "Transferencia",
@@ -173,60 +186,39 @@ export function PaymentManagement({
         let contractId =
           planContract?.id || `${newPayment.memberId}_contract_${Date.now()}`;
 
-        if (!currentContract) {
-          const newContract: PlanContract = {
-            id: contractId,
-            gym_id: gymId,
-            member_id: newPayment.memberId,
-            plan_id: selectedPlan.id,
-            installments_total: newPayment.installments,
-            installments_paid: 1,
-          };
-          const { error: contractError } = await supabase
-            .from("plan_contracts")
-            .insert([newContract]);
-          if (contractError) {
-            const { error: fallbackError } = await supabase
-              .from("plan_contract")
+        if (!currentContract && contractTable) {
+            const newContract: PlanContract = {
+              id: contractId,
+              gym_id: gymId,
+              member_id: newPayment.memberId,
+              plan_id: selectedPlan.id,
+              installments_total: newPayment.installments,
+              installments_paid: 1,
+            };
+            const { error: contractError } = await supabase
+              .from(contractTable)
               .insert([newContract]);
-            if (fallbackError) {
-              console.warn(
-                "Tabla de contratos de plan no encontrada. Se continúa sin registrarlo."
-              );
+            if (contractError) {
+              console.warn("Error registrando contrato de plan:", contractError);
             } else {
               currentContract = newContract;
               setPlanContract(currentContract);
             }
-          } else {
-            currentContract = newContract;
-            setPlanContract(currentContract);
-          }
-        } else {
-          const { error: contractError } = await supabase
-            .from("plan_contracts")
-            .update({
-              installments_paid: currentContract.installments_paid + 1,
-            })
-            .eq("id", currentContract.id);
-          if (contractError) {
-            const { error: fallbackError } = await supabase
-              .from("plan_contract")
+          } else if (currentContract && contractTable) {
+            const { error: contractError } = await supabase
+              .from(contractTable)
               .update({
                 installments_paid: currentContract.installments_paid + 1,
               })
               .eq("id", currentContract.id);
-            if (fallbackError) {
-              console.warn(
-                "Tabla de contratos de plan no encontrada. Se continúa sin actualizar contrato."
-              );
+            if (contractError) {
+              console.warn("Error actualizando contrato de plan:", contractError);
             }
+            currentContract = {
+              ...currentContract,
+             };
+            setPlanContract(currentContract);
           }
-          currentContract = {
-            ...currentContract,
-            installments_paid: currentContract.installments_paid + 1,
-          };
-          setPlanContract(currentContract);
-        }
 
         const payment: Payment = {
           id: paymentId,
@@ -483,9 +475,9 @@ export function PaymentManagement({
                           planId: value,
                           installments: 1,
                         });
-                        if (newPayment.memberId) {
+                        if (newPayment.memberId && contractTable) {
                            let { data, error } = await supabase
-                            .from("plan_contracts")
+                            .from(contractTable)
                             .select("*")
                             .eq("member_id", newPayment.memberId)
                             .eq("plan_id", value)
