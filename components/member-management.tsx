@@ -97,6 +97,7 @@ export function MemberManagement({
     planStartDate: new Date().toISOString().split("T")[0],
     paymentDate: new Date().toISOString().split("T")[0],
     installments: 1,
+    paymentAmount: 0,
     paymentMethod: "Efectivo",
     cardBrand: "",
   });
@@ -193,12 +194,23 @@ export function MemberManagement({
         alert("Debes seleccionar un plan");
         return;
       }
-       if (newMember.planPrice <= 0) {
+      if (newMember.planPrice <= 0) {
         alert("Debes ingresar un precio válido");
         return;
       }
       const installments = newMember.installments || 1;
-      const installmentAmount = newMember.planPrice / installments;
+      const paymentAmount =
+        installments === 1
+          ? newMember.planPrice
+          : newMember.paymentAmount;
+      if (paymentAmount <= 0) {
+        alert("Debes ingresar un monto válido");
+        return;
+      }
+      if (paymentAmount > newMember.planPrice) {
+        alert("El monto no puede ser mayor al precio del plan");
+        return;
+      }
 
       if (selectedPlan.duration_type === "days") {
         nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration);
@@ -245,7 +257,7 @@ export function MemberManagement({
         next_payment: nextPayment.toISOString().split("T")[0],
         status: memberStatus,
         inactive_level: inactiveLevel,
-        balance_due: newMember.planPrice - installmentAmount,
+        balance_due: newMember.planPrice - paymentAmount,
         followed_up: false,
       };
 
@@ -282,7 +294,7 @@ export function MemberManagement({
         gym_id: gymId,
         member_id: memberId,
         member_name: member.name,
-        amount: installmentAmount,
+        amount: paymentAmount,
         date: newMember.paymentDate,
         start_date: newMember.planStartDate,
         plan: member.plan,
@@ -315,6 +327,7 @@ export function MemberManagement({
         planStartDate: new Date().toISOString().split("T")[0],
         paymentDate: new Date().toISOString().split("T")[0],
         installments: 1,
+        paymentAmount: 0,
         paymentMethod: "Efectivo",
         cardBrand: "",
       });
@@ -579,6 +592,7 @@ export function MemberManagement({
                       plan: value,
                       planPrice: selectedPlan?.price || 0,
                       installments: 1,
+                      paymentAmount: selectedPlan?.price || 0,
                     });
                   }}
                 >
@@ -599,50 +613,72 @@ export function MemberManagement({
                {newMember.plan && (
                   <>
                     <div className="grid gap-2">
-                      <Label htmlFor="planPrice">Precio total del plan</Label>
-                      <Input
-                        id="planPrice"
-                        type="number"
-                        value={newMember.planPrice}
-                        onChange={(e) =>
-                          setNewMember({
-                            ...newMember,
-                            planPrice: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="installments">Cantidad de cuotas</Label>
-                      <Select
-                        value={newMember.installments.toString()}
-                        onValueChange={(value) =>
-                          setNewMember({
-                            ...newMember,
-                            installments: parseInt(value),
-                          })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona cuotas" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">1</SelectItem>
-                          <SelectItem value="2">2</SelectItem>
-                          <SelectItem value="3">3</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {newMember.installments > 1 && (
-                        <p className="text-xs text-muted-foreground">
-                          Monto por cuota: $
-                          {(newMember.planPrice / newMember.installments).toFixed(
-                            2,
-                          )}
-                        </p>
-                      )}
-                    </div>
-                  </>
-                )}
+                       <Label htmlFor="planPrice">Precio total del plan</Label>
+                <Input
+                  id="planPrice"
+                  type="number"
+                  value={newMember.planPrice}
+                  onChange={(e) => {
+                    const price = parseFloat(e.target.value) || 0;
+                    setNewMember({
+                      ...newMember,
+                      planPrice: price,
+                      paymentAmount:
+                        newMember.installments === 1
+                          ? price
+                          : newMember.paymentAmount,
+                    });
+                  }}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="installments">Cantidad de cuotas</Label>
+                <Select
+                  value={newMember.installments.toString()}
+                  onValueChange={(value) => {
+                    const installments = parseInt(value);
+                    setNewMember({
+                      ...newMember,
+                      installments,
+                      paymentAmount:
+                        installments === 1
+                          ? newMember.planPrice
+                          : 0,
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona cuotas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1</SelectItem>
+                    <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="3">3</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {newMember.installments > 1 && (
+                <div className="grid gap-2">
+                  <Label htmlFor="paymentAmount">Monto a abonar</Label>
+                  <Input
+                    id="paymentAmount"
+                    type="number"
+                    value={newMember.paymentAmount}
+                    onChange={(e) =>
+                      setNewMember({
+                        ...newMember,
+                        paymentAmount: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Saldo pendiente: $
+                    {(newMember.planPrice - newMember.paymentAmount).toFixed(2)}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
               <div className="grid gap-2">
                 <Label htmlFor="paymentMethod">Método de Pago</Label>
                 <Select

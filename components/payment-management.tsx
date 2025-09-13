@@ -461,8 +461,7 @@ export function PaymentManagement({
 
               {/* TIPO DE PAGO */}
               <div className="grid gap-2">
-                <Label htmlFor="plan">Nuevo Plan</Label>
-                <Label htmlFor="type">Tipo de Pago</Label>
+                <Label htmlFor="plan">Pago de:</Label>
                 <Select
                   value={newPayment.type}
                   onValueChange={(value) => {
