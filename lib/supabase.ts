@@ -48,6 +48,7 @@ export interface Payment {
   plan?: string
   method: string
   card_brand?: string
+  card_installments?: number
   type: "plan" | "product"
   description?: string
   plan_id?: string

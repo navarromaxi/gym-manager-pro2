@@ -100,6 +100,8 @@ export function MemberManagement({
     paymentAmount: 0,
     paymentMethod: "Efectivo",
     cardBrand: "",
+    cardInstallments: 1,
+    description: "",
   });
 
   const paymentMethods = [
@@ -303,8 +305,12 @@ export function MemberManagement({
           newMember.paymentMethod === "Tarjeta de Crédito"
             ? newMember.cardBrand
             : undefined,
+         card_installments:
+          newMember.paymentMethod === "Tarjeta de Crédito"
+            ? newMember.cardInstallments
+            : undefined,
         type: "plan",
-        description: selectedPlan?.description || member.plan,
+        description: newMember.description || undefined,
         plan_id: selectedPlan?.id,
       };
 
@@ -330,6 +336,8 @@ export function MemberManagement({
         paymentAmount: 0,
         paymentMethod: "Efectivo",
         cardBrand: "",
+        cardInstallments: 1,
+        description: "",
       });
       setIsAddDialogOpen(false);
     } catch (error) {
@@ -707,27 +715,59 @@ export function MemberManagement({
                 </Select>
               </div>
               {newMember.paymentMethod === "Tarjeta de Crédito" && (
-                <div className="grid gap-2">
-                  <Label>Tipo de Tarjeta</Label>
-                  <Select
-                    value={newMember.cardBrand}
-                    onValueChange={(value) =>
-                      setNewMember({ ...newMember, cardBrand: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona tarjeta" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cardBrands.map((brand) => (
-                        <SelectItem key={brand} value={brand}>
-                          {brand}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                 <>
+                  <div className="grid gap-2">
+                    <Label>Tipo de Tarjeta</Label>
+                    <Select
+                      value={newMember.cardBrand}
+                      onValueChange={(value) =>
+                        setNewMember({ ...newMember, cardBrand: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona tarjeta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cardBrands.map((brand) => (
+                          <SelectItem key={brand} value={brand}>
+                            {brand}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="cardInstallments">
+                      Número de cuotas en la tarjeta
+                    </Label>
+                    <Input
+                      id="cardInstallments"
+                      type="number"
+                      min={1}
+                      value={newMember.cardInstallments}
+                      onChange={(e) =>
+                        setNewMember({
+                          ...newMember,
+                          cardInstallments: parseInt(e.target.value) || 1,
+                        })
+                      }
+                    />
+                  </div>
+                </>
               )}
+              <div className="grid gap-2">
+                <Label htmlFor="description">Descripción</Label>
+                <Input
+                  id="description"
+                  value={newMember.description}
+                  onChange={(e) =>
+                    setNewMember({
+                      ...newMember,
+                      description: e.target.value,
+                    })
+                  }
+                />
+              </div>
             </div>
             <DialogFooter>
               <Button

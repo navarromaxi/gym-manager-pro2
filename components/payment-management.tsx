@@ -59,6 +59,7 @@ export function PaymentManagement({
     planId: "",
     method: "",
     cardBrand: "",
+    cardInstallments: 1,
     date: new Date().toLocaleDateString("en-CA"),
     startDate: new Date().toLocaleDateString("en-CA"),
     type: "new_plan" as "new_plan" | "existing_plan" | "product",
@@ -68,7 +69,7 @@ export function PaymentManagement({
   });
   const [planContract, setPlanContract] = useState<PlanContract | null>(null);
   const [methodFilter, setMethodFilter] = useState("all");
-   const [contractTable, setContractTable] = useState<
+  const [contractTable, setContractTable] = useState<
     "plan_contracts" | "plan_contract" | null
   >(null);
 
@@ -112,7 +113,7 @@ export function PaymentManagement({
     return new Date(year, month - 1, day);
   };
 
-   useEffect(() => {
+  useEffect(() => {
     const fetchExistingContract = async () => {
       if (
         newPayment.type === "existing_plan" &&
@@ -120,7 +121,7 @@ export function PaymentManagement({
         contractTable
       ) {
         const memberPlan = members.find(
-          (m) => m.id === newPayment.memberId,
+          (m) => m.id === newPayment.memberId
         )?.plan;
         const plan = plans.find((p) => p.name === memberPlan);
         if (plan) {
@@ -138,16 +139,16 @@ export function PaymentManagement({
     };
     fetchExistingContract();
   }, [newPayment.type, newPayment.memberId, contractTable, members, plans]);
-  
+
   // Filtrar miembros para el buscador
   const filteredMembersForSearch = members.filter((member) =>
-    member.name.toLowerCase().includes(memberSearchTerm.toLowerCase()),
+    member.name.toLowerCase().includes(memberSearchTerm.toLowerCase())
   );
 
   // Función para obtener pagos filtrados actualizada
   const getFilteredPayments = () => {
     let filtered = (payments || []).filter((payment) =>
-      payment.member_name.toLowerCase().includes(searchTerm.toLowerCase()),
+      payment.member_name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // Filtro por método de pago
@@ -192,7 +193,7 @@ export function PaymentManagement({
 
     return filtered.sort(
       (a, b) =>
-        parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime(),
+        parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
     );
   };
 
@@ -218,7 +219,7 @@ export function PaymentManagement({
 
       const paymentId = `${gymId}_payment_${Date.now()}`;
 
-       if (newPayment.type === "new_plan") {
+      if (newPayment.type === "new_plan") {
         if (!selectedPlan) return;
         if (newPayment.amount <= 0) {
           alert("El monto debe ser mayor a 0");
@@ -226,7 +227,7 @@ export function PaymentManagement({
         }
         if (newPayment.amount > maxPlanAmount) {
           alert(
-            `El monto no puede ser mayor a ${maxPlanAmount.toLocaleString()}`,
+            `El monto no puede ser mayor a ${maxPlanAmount.toLocaleString()}`
           );
           return;
         }
@@ -254,7 +255,8 @@ export function PaymentManagement({
           } else {
             currentContract = newContract;
             setPlanContract(currentContract);
-          } } else if (currentContract && contractTable) {
+          }
+        } else if (currentContract && contractTable) {
           const { error: contractError } = await supabase
             .from(contractTable)
             .update({
@@ -285,7 +287,12 @@ export function PaymentManagement({
             newPayment.method === "Tarjeta de Crédito"
               ? newPayment.cardBrand
               : undefined,
+          card_installments:
+            newPayment.method === "Tarjeta de Crédito"
+              ? newPayment.cardInstallments
+              : undefined,
           type: "plan",
+          description: newPayment.description || undefined,
           plan_id: selectedPlan.id,
         };
 
@@ -304,11 +311,11 @@ export function PaymentManagement({
           nextPayment.setMonth(nextPayment.getMonth() + selectedPlan.duration);
         } else if (selectedPlan.duration_type === "years") {
           nextPayment.setFullYear(
-            nextPayment.getFullYear() + selectedPlan.duration,
+            nextPayment.getFullYear() + selectedPlan.duration
           );
         }
 
-         const newBalance = isFirstInstallment
+        const newBalance = isFirstInstallment
           ? balanceDueActual + selectedPlan.price - newPayment.amount
           : balanceDueActual - newPayment.amount;
 
@@ -337,7 +344,7 @@ export function PaymentManagement({
 
         setPayments([...payments, payment]);
         setMembers(
-          members.map((m) => (m.id === selectedMember.id ? updatedMember : m)),
+          members.map((m) => (m.id === selectedMember.id ? updatedMember : m))
         );
       } else if (newPayment.type === "existing_plan") {
         if (!selectedPlan) return;
@@ -347,7 +354,7 @@ export function PaymentManagement({
         }
         if (newPayment.amount > balanceDueActual) {
           alert(
-            `El monto no puede ser mayor a ${balanceDueActual.toLocaleString()}`,
+            `El monto no puede ser mayor a ${balanceDueActual.toLocaleString()}`
           );
           return;
         }
@@ -382,7 +389,12 @@ export function PaymentManagement({
             newPayment.method === "Tarjeta de Crédito"
               ? newPayment.cardBrand
               : undefined,
+          card_installments:
+            newPayment.method === "Tarjeta de Crédito"
+              ? newPayment.cardInstallments
+              : undefined,
           type: "plan",
+          description: newPayment.description || undefined,
           plan_id: selectedPlan.id,
         };
 
@@ -412,7 +424,7 @@ export function PaymentManagement({
 
         setPayments([...payments, payment]);
         setMembers(
-          members.map((m) => (m.id === selectedMember.id ? updatedMember : m)),
+          members.map((m) => (m.id === selectedMember.id ? updatedMember : m))
         );
       } else {
         const payment: Payment = {
@@ -426,6 +438,10 @@ export function PaymentManagement({
           card_brand:
             newPayment.method === "Tarjeta de Crédito"
               ? newPayment.cardBrand
+              : undefined,
+          card_installments:
+            newPayment.method === "Tarjeta de Crédito"
+              ? newPayment.cardInstallments
               : undefined,
           type: "product",
           description: newPayment.description,
@@ -446,6 +462,7 @@ export function PaymentManagement({
         planId: "",
         method: "",
         cardBrand: "",
+        cardInstallments: 1,
         date: new Date().toLocaleDateString("en-CA"),
         startDate: new Date().toLocaleDateString("en-CA"),
         type: "new_plan",
@@ -464,7 +481,7 @@ export function PaymentManagement({
 
   const totalPayments = filteredPayments.reduce(
     (sum, payment) => sum + payment.amount,
-    0,
+    0
   );
   const currentMonthPayments = payments.filter((payment) => {
     const paymentDate = parseLocalDate(payment.date);
@@ -481,12 +498,12 @@ export function PaymentManagement({
       acc[payment.method] = (acc[payment.method] || 0) + 1;
       return acc;
     },
-    {} as Record<string, number>,
+    {} as Record<string, number>
   );
 
   const monthlyTotal = currentMonthPayments.reduce(
     (sum, payment) => sum + payment.amount,
-    0,
+    0
   );
 
   return (
@@ -573,7 +590,7 @@ export function PaymentManagement({
                   onValueChange={(value) => {
                     setNewPayment({
                       ...newPayment,
-                       type: value as "new_plan" | "existing_plan" | "product",
+                      type: value as "new_plan" | "existing_plan" | "product",
                       planId: "",
                       description: "",
                       amount: 0,
@@ -586,7 +603,9 @@ export function PaymentManagement({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="new_plan">Nuevo plan</SelectItem>
-                    <SelectItem value="existing_plan">Plan existente</SelectItem>
+                    <SelectItem value="existing_plan">
+                      Plan existente
+                    </SelectItem>
                     <SelectItem value="product">Producto</SelectItem>
                   </SelectContent>
                 </Select>
@@ -606,13 +625,13 @@ export function PaymentManagement({
                           installments: 1,
                         });
                         if (newPayment.memberId && contractTable) {
-                           let { data, error } = await supabase
+                          let { data, error } = await supabase
                             .from(contractTable)
                             .select("*")
                             .eq("member_id", newPayment.memberId)
                             .eq("plan_id", value)
                             .single();
-                            if (error) {
+                          if (error) {
                             const fallback = await supabase
                               .from("plan_contract")
                               .select("*")
@@ -699,7 +718,7 @@ export function PaymentManagement({
                 </>
               )}
 
-               {/* PAGO DE PLAN EXISTENTE */}
+              {/* PAGO DE PLAN EXISTENTE */}
               {newPayment.type === "existing_plan" && selectedMember && (
                 <>
                   <div className="grid gap-2">
@@ -726,7 +745,10 @@ export function PaymentManagement({
                     {newPayment.amount > 0 && (
                       <p className="text-xs text-muted-foreground">
                         Saldo restante: $
-                        {Math.max(balanceDueActual - newPayment.amount, 0).toLocaleString()}
+                        {Math.max(
+                          balanceDueActual - newPayment.amount,
+                          0
+                        ).toLocaleString()}
                       </p>
                     )}
                   </div>
@@ -735,35 +757,20 @@ export function PaymentManagement({
 
               {/* CAMPOS DE PRODUCTO */}
               {newPayment.type === "product" && (
-                <>
-                  <div className="grid gap-2">
-                    <Label htmlFor="description">Descripción</Label>
-                    <Input
-                      id="description"
-                      value={newPayment.description}
-                      onChange={(e) =>
-                        setNewPayment({
-                          ...newPayment,
-                          description: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="amount">Monto</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      value={newPayment.amount}
-                      onChange={(e) =>
-                        setNewPayment({
-                          ...newPayment,
-                          amount: parseFloat(e.target.value),
-                        })
-                      }
-                    />
-                  </div>
-                </>
+                <div className="grid gap-2">
+                  <Label htmlFor="amount">Monto</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    value={newPayment.amount}
+                    onChange={(e) =>
+                      setNewPayment({
+                        ...newPayment,
+                        amount: parseFloat(e.target.value),
+                      })
+                    }
+                  />
+                </div>
               )}
 
               {/* MÉTODO DE PAGO */}
@@ -789,26 +796,45 @@ export function PaymentManagement({
               </div>
 
               {newPayment.method === "Tarjeta de Crédito" && (
-                <div className="grid gap-2">
-                  <Label htmlFor="cardBrand">Tipo de Tarjeta</Label>
-                  <Select
-                    value={newPayment.cardBrand}
-                    onValueChange={(value) =>
-                      setNewPayment({ ...newPayment, cardBrand: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona tarjeta" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cardBrands.map((brand) => (
-                        <SelectItem key={brand} value={brand}>
-                          {brand}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="cardBrand">Tipo de Tarjeta</Label>
+                    <Select
+                      value={newPayment.cardBrand}
+                      onValueChange={(value) =>
+                        setNewPayment({ ...newPayment, cardBrand: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona tarjeta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cardBrands.map((brand) => (
+                          <SelectItem key={brand} value={brand}>
+                            {brand}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="cardInstallments">
+                      Número de cuotas en la tarjeta
+                    </Label>
+                    <Input
+                      id="cardInstallments"
+                      type="number"
+                      min={1}
+                      value={newPayment.cardInstallments}
+                      onChange={(e) =>
+                        setNewPayment({
+                          ...newPayment,
+                          cardInstallments: parseInt(e.target.value) || 1,
+                        })
+                      }
+                    />
+                  </div>
+                </>
               )}
 
               {/* FECHA */}
@@ -845,16 +871,31 @@ export function PaymentManagement({
                 </div>
               )}
 
+               {/* DESCRIPCIÓN */}
+              <div className="grid gap-2">
+                <Label htmlFor="description">Descripción</Label>
+                <Input
+                  id="description"
+                  value={newPayment.description}
+                  onChange={(e) =>
+                    setNewPayment({
+                      ...newPayment,
+                      description: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
               {/* RESUMEN */}
               {newPayment.type === "new_plan" &&
                 newPayment.memberId &&
                 newPayment.planId &&
                 newPayment.amount > 0 && (
                   <div className="p-3 bg-green-50 rounded-lg">
-                  <h4 className="font-medium text-green-800 mb-2">
-                    Resumen de Renovación
-                  </h4>
-                  <div className="text-sm text-green-700">
+                    <h4 className="font-medium text-green-800 mb-2">
+                      Resumen de Renovación
+                    </h4>
+                    <div className="text-sm text-green-700">
                       <p>
                         <strong>Socio:</strong>{" "}
                         {
@@ -877,7 +918,7 @@ export function PaymentManagement({
                     </div>
                   </div>
                 )}
-                 {newPayment.type === "existing_plan" &&
+              {newPayment.type === "existing_plan" &&
                 newPayment.memberId &&
                 newPayment.amount > 0 && (
                   <div className="p-3 bg-green-50 rounded-lg">
@@ -887,19 +928,23 @@ export function PaymentManagement({
                     <div className="text-sm text-green-700">
                       <p>
                         <strong>Socio:</strong>{" "}
-                        {members.find((m) => m.id === newPayment.memberId)?.name}
+                        {
+                          members.find((m) => m.id === newPayment.memberId)
+                            ?.name
+                        }
                       </p>
                       <p>
                         <strong>Plan:</strong> {selectedMember?.plan}
                       </p>
                       <p>
-                        <strong>Monto:</strong> ${newPayment.amount.toLocaleString()}
+                        <strong>Monto:</strong> $
+                        {newPayment.amount.toLocaleString()}
                       </p>
                       <p className="mt-1 text-xs">
                         Saldo restante: $
                         {Math.max(
                           balanceDueActual - newPayment.amount,
-                          0,
+                          0
                         ).toLocaleString()}
                       </p>
                     </div>
@@ -945,9 +990,9 @@ export function PaymentManagement({
                     ? !newPayment.planId ||
                       !newPayment.startDate ||
                       !newPayment.amount
-                     : newPayment.type === "existing_plan"
-                      ? newPayment.amount <= 0
-                      : !newPayment.description || !newPayment.amount)
+                    : newPayment.type === "existing_plan"
+                    ? newPayment.amount <= 0
+                    : !newPayment.description || !newPayment.amount)
                 }
               >
                 Registrar Pago

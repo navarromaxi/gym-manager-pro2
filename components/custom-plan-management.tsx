@@ -66,6 +66,8 @@ export function CustomPlanManagement({
     payment_date: new Date().toLocaleDateString("en-CA"),
     payment_method: "",
     card_brand: "",
+    card_installments: 1,
+    payment_description: "",
   });
 
   const filteredPlans = customPlans.filter(
@@ -122,7 +124,12 @@ export function CustomPlanManagement({
         newPlan.payment_method === "Tarjeta de Crédito"
           ? newPlan.card_brand
           : undefined,
+      card_installments:
+        newPlan.payment_method === "Tarjeta de Crédito"
+          ? newPlan.card_installments
+          : undefined,
       type: "plan",
+      description: newPlan.payment_description || undefined,
       plan_id: id,
     };
 
@@ -147,6 +154,8 @@ export function CustomPlanManagement({
       payment_date: new Date().toLocaleDateString("en-CA"),
       payment_method: "",
       card_brand: "",
+       card_installments: 1,
+      payment_description: "",
     });
     setMemberSearch("");
   };
@@ -276,27 +285,59 @@ export function CustomPlanManagement({
               </div>
 
               {newPlan.payment_method === "Tarjeta de Crédito" && (
-                <div className="grid gap-2">
-                  <Label>Tipo de Tarjeta</Label>
-                  <Select
-                    value={newPlan.card_brand}
-                    onValueChange={(v) =>
-                      setNewPlan({ ...newPlan, card_brand: v })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar tarjeta" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cardBrands.map((brand) => (
-                        <SelectItem key={brand} value={brand}>
-                          {brand}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <>
+                  <div className="grid gap-2">
+                    <Label>Tipo de Tarjeta</Label>
+                    <Select
+                      value={newPlan.card_brand}
+                      onValueChange={(v) =>
+                        setNewPlan({ ...newPlan, card_brand: v })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar tarjeta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cardBrands.map((brand) => (
+                          <SelectItem key={brand} value={brand}>
+                            {brand}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="cardInstallments">
+                      Número de cuotas en la tarjeta
+                    </Label>
+                    <Input
+                      id="cardInstallments"
+                      type="number"
+                      min={1}
+                      value={newPlan.card_installments}
+                      onChange={(e) =>
+                        setNewPlan({
+                          ...newPlan,
+                          card_installments: parseInt(e.target.value) || 1,
+                        })
+                      }
+                    />
+                  </div>
+                </>
               )}
+              <div className="grid gap-2">
+                <Label htmlFor="payment_description">Descripción del pago</Label>
+                <Input
+                  id="payment_description"
+                  value={newPlan.payment_description}
+                  onChange={(e) =>
+                    setNewPlan({
+                      ...newPlan,
+                      payment_description: e.target.value,
+                    })
+                  }
+                />
+              </div>
               <div className="grid gap-2">
                 <Label>Fecha de finalización</Label>
                 <Input
