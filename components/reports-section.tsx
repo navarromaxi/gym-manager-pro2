@@ -59,8 +59,10 @@ interface Member {
 
 interface Payment {
   id: string;
-  memberId: string;
-  memberName: string;
+  memberId?: string;
+  member_id?: string;
+  memberName?: string;
+  member_name?: string;
   amount: number;
   date: string;
   plan?: string;
@@ -73,7 +75,6 @@ interface Payment {
   description?: string;
   plan_id?: string;
   product_id?: string;
-
 }
 
 interface Expense {
@@ -410,7 +411,8 @@ const getRenewalStats = () => {
 
   const creditCardStats = creditCardPayments.reduce(
     (acc, payment) => {
-      const brand = payment.cardBrand || payment.card_brand || "Otra";
+      const brand =
+        pick(payment as any, "card_brand", "cardBrand") || "Otra";
       if (!acc[brand]) acc[brand] = { count: 0, amount: 0 };
       acc[brand].count += 1;
       acc[brand].amount += payment.amount;
@@ -494,16 +496,27 @@ const getRenewalStats = () => {
       },
     ];
 
-    const pagos = filteredPayments.map((p) => ({
-      PagoId: p.id,
-      SocioId: p.memberId,
-      Socio: p.memberName,
-      Monto: p.amount,
-      Fecha: toLocalDate(p.date).toLocaleDateString(),
-      Concepto: p.type === "plan" ? p.plan : p.description,
-      Metodo: p.method,
-      Tipo: p.type,
-    }));
+    const pagos = filteredPayments.map((p) => {
+      const memberId = pick(p as any, "member_id", "memberId");
+      const memberName =
+        pick(p as any, "member_name", "memberName") ||
+        members.find((m) => m.id === memberId)?.name ||
+        "";
+
+      return {
+        PagoId: p.id,
+        SocioId: memberId,
+        Socio: memberName,
+        Monto: p.amount,
+        Fecha: toLocalDate(p.date).toLocaleDateString(),
+        Concepto: p.type === "plan" ? p.plan : p.description,
+        Metodo: p.method,
+        Tarjeta: pick(p as any, "card_brand", "cardBrand") || "",
+        Cuotas:
+          pick(p as any, "card_installments", "cardInstallments") ?? "",
+        Tipo: p.type,
+      };
+    });
 
     const gastos = filteredExpenses.map((e) => ({
       GastoId: e.id,

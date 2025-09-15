@@ -124,6 +124,17 @@ const getRealStatus = (m: Member): "active" | "expired" | "inactive" => {
   return "inactive";
 };
 
+const DEFAULT_GYM_NAME = "Sistema de Gestión Multi-Gimnasio";
+
+const sanitizeGymName = (name: string) => {
+  const cleaned = name
+    .replace(/^\s*Gimnasio\s+/i, "")
+    .replace(/^['"]+|['"]+$/g, "")
+    .trim();
+
+  return cleaned.length > 0 ? cleaned : name.trim();
+};
+
 export default function GymManagementSystem() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [members, setMembers] = useState<Member[]>([]);
@@ -139,6 +150,10 @@ export default function GymManagementSystem() {
   >(null);
   const [memberFilter, setMemberFilter] = useState("all");
   const [loading, setLoading] = useState(false);
+
+  const displayGymName = gymData?.name
+    ? sanitizeGymName(gymData.name)
+    : DEFAULT_GYM_NAME;
 
   const handleLogin = (data: { name: string; id: string }) => {
     setGymData(data);
@@ -770,20 +785,20 @@ export default function GymManagementSystem() {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-3">
+             <div className="flex items-center space-x-4">
               {gymData?.logo_url && (
                 <img
                   src={gymData.logo_url}
                   alt={`Logo de ${gymData.name}`}
-                  className="h-10 w-10 rounded-full object-cover"
+                  className="h-12 w-12 rounded-full object-cover"
                 />
               )}
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  GymManagerPro 2.0
+                 <h1 className="text-[1.75rem] font-bold leading-tight text-gray-900">
+                  {/* GymManagerPro 2.0 */}
                 </h1>
-                <p className="text-sm text-gray-500">
-                  {gymData?.name || "Sistema de Gestión Multi-Gimnasio"}
+                 <p className="text-base text-gray-500">
+                  {displayGymName}
                 </p>
               </div>
             </div>
