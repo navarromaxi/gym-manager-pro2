@@ -66,7 +66,9 @@ interface Payment {
   plan?: string;
   method: string;
   cardBrand?: string;
+  card_brand?: string;
   cardInstallments?: number;
+  card_installments?: number;
   type: "plan" | "product";
   description?: string;
   plan_id?: string;
@@ -408,7 +410,7 @@ const getRenewalStats = () => {
 
   const creditCardStats = creditCardPayments.reduce(
     (acc, payment) => {
-      const brand = payment.cardBrand || "Otra";
+      const brand = payment.cardBrand || payment.card_brand || "Otra";
       if (!acc[brand]) acc[brand] = { count: 0, amount: 0 };
       acc[brand].count += 1;
       acc[brand].amount += payment.amount;
@@ -740,31 +742,6 @@ const getRenewalStats = () => {
                 Para renovación
               </div>
             </div>
-          </div>
-
-          {/* Comparativo Visual */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-medium mb-3">Comparativo de Renovaciones</h4>
-             <ChartContainer
-              config={renewalChartConfig}
-              className="mx-auto aspect-square h-[200px]"
-            >
-              <PieChart>
-                <Pie
-                  data={renewalChartData}
-                  dataKey="value"
-                  nameKey="status"
-                  innerRadius={40}
-                  strokeWidth={5}
-                />
-                <ChartTooltip
-                  content={<ChartTooltipContent nameKey="status" />}
-                />
-                <ChartLegend
-                  content={<ChartLegendContent nameKey="status" />}
-                />
-              </PieChart>
-            </ChartContainer>
           </div>
         </CardContent>
       </Card>
