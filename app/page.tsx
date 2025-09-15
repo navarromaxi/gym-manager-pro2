@@ -1,3 +1,6 @@
+
+// ESTE ARCHIVO ES EL QUE MANEJA LA ENTRADA AL SOFTWARE
+
 "use client";
 //import { LoginSystem } from "@/components/login-system";
 import { useState, useEffect } from "react";
@@ -131,15 +134,28 @@ export default function GymManagementSystem() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [customPlans, setCustomPlans] = useState<CustomPlan[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [gymData, setGymData] = useState<{ name: string; id: string } | null>(
-    null
-  );
+  const [gymData, setGymData] = useState<
+    { name: string; id: string; logo_url?: string | null } | null
+  >(null);
   const [memberFilter, setMemberFilter] = useState("all");
   const [loading, setLoading] = useState(false);
 
   const handleLogin = (data: { name: string; id: string }) => {
     setGymData(data);
     setIsAuthenticated(true);
+
+    supabase
+      .from("gyms")
+      .select("logo_url")
+      .eq("id", data.id)
+      .single()
+      .then(({ data: gym }) => {
+        if (gym?.logo_url) {
+          setGymData((prev) =>
+            prev ? { ...prev, logo_url: gym.logo_url } : prev
+          );
+        }
+      });
   };
 
   const handleLogout = () => {
@@ -433,7 +449,7 @@ export default function GymManagementSystem() {
     if (gymData?.id) {
       loadData(gymData.id);
     }
-  }, [gymData]);
+  }, [gymData?.id]);
 
   // Función para actualizar estados de miembros
   const updateMemberStatuses = (members: Member[]) => {
@@ -754,13 +770,22 @@ export default function GymManagementSystem() {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                GymManagerPro 2.0
-              </h1>
-              <p className="text-sm text-gray-500">
-                {gymData?.name || "Sistema de Gestión Multi-Gimnasio"}
-              </p>
+            <div className="flex items-center space-x-3">
+              {gymData?.logo_url && (
+                <img
+                  src={gymData.logo_url}
+                  alt={`Logo de ${gymData.name}`}
+                  className="h-10 w-10 rounded-full object-cover"
+                />
+              )}
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  GymManagerPro 2.0
+                </h1>
+                <p className="text-sm text-gray-500">
+                  {gymData?.name || "Sistema de Gestión Multi-Gimnasio"}
+                </p>
+              </div>
             </div>
             <Button variant="outline" onClick={handleLogout}>
               Cerrar Sesión
