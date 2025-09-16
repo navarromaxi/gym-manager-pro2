@@ -47,6 +47,19 @@ interface ProspectManagementProps {
   gymId: string;
 }
 
+interface ConversionData {
+  plan: string;
+  planPrice: number;
+  planStartDate: string;
+  paymentDate: string;
+  installments: number;
+  paymentAmount: number;
+  paymentMethod: string;
+  cardBrand: string;
+  cardInstallments: number;
+  description: string;
+}
+
 export function ProspectManagement({
   prospects,
   setProspects,
@@ -77,19 +90,59 @@ export function ProspectManagement({
     notes: "",
     priority_level: "green" as "green" | "yellow" | "red", // Nuevo campo con valor por defecto
   });
-  const [conversionPlan, setConversionPlan] = useState<string | undefined>(
-    undefined
-  );
-  const [conversionPaymentMethod, setConversionPaymentMethod] =
-    useState("Efectivo");
+  
   const paymentMethods = [
     "Efectivo",
     "Transferencia",
     "Tarjeta de Débito",
     "Tarjeta de Crédito",
   ];
+  const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
+  const getInitialConversionData = (): ConversionData => {
+    const today = new Date().toISOString().split("T")[0];
+    return {
+      plan: "",
+      planPrice: 0,
+      planStartDate: today,
+      paymentDate: today,
+      installments: 1,
+      paymentAmount: 0,
+      paymentMethod: "Efectivo",
+      cardBrand: "",
+      cardInstallments: 1,
+      description: "",
+    };
+  };
+  const [conversionData, setConversionData] = useState<ConversionData>(
+    getInitialConversionData
+  );
+  const [contractTable, setContractTable] = useState<
+    "plan_contracts" | "plan_contract" | null
+  >(null);
 
   const [isClient, setIsClient] = useState(false);
+
+   useEffect(() => {
+    const checkTable = async () => {
+      const { data, error } = await supabase
+        .from("pg_tables")
+        .select("tablename")
+        .in("tablename", ["plan_contracts", "plan_contract"]);
+
+      if (error) {
+        console.warn("Error verificando tablas de contratos:", error);
+        return;
+      }
+
+      const tableName = data?.[0]?.tablename as
+        | "plan_contracts"
+        | "plan_contract"
+        | undefined;
+      setContractTable(tableName ?? null);
+    };
+
+    checkTable();
+  }, []);
 
   useEffect(() => {
     setIsClient(true);
@@ -105,6 +158,12 @@ export function ProspectManagement({
     const matchesPriority =
       priorityFilter === "all" || prospect.priority_level === priorityFilter; // Nuevo filtro
     return matchesSearch && matchesStatus && matchesPriority;
+  });
+
+  const sortedProspects = [...filteredProspects].sort((a, b) => {
+    const dateA = new Date(`${a.contact_date}T00:00:00`).getTime();
+    const dateB = new Date(`${b.contact_date}T00:00:00`).getTime();
+    return dateB - dateA;
   });
 
   const handleAddProspect = async () => {
@@ -205,19 +264,48 @@ export function ProspectManagement({
       alert("Error al eliminar el interesado. Inténtalo de nuevo.");
     }
   };
+   const handleConvertDialogOpenChange = (open: boolean) => {
+    setIsConvertDialogOpen(open);
+    if (!open) {
+      setConvertingProspect(null);
+      setConversionData(getInitialConversionData());
+    }
+  };
+
+  const startConversion = (prospect: Prospect) => {
+    setConvertingProspect(prospect);
+    setConversionData(getInitialConversionData());
+    setIsConvertDialogOpen(true);
+  };
 
   const handleConvertProspectToMember = async () => {
-    if (!convertingProspect || !conversionPlan) return;
+    if (!convertingProspect) return;
     try {
-      const selectedPlan = plans.find((p) => p.id === conversionPlan);
+      const selectedPlan = plans.find((p) => p.name === conversionData.plan);
       if (!selectedPlan) {
-        alert("Plan seleccionado no válido.");
+        alert("Debes seleccionar un plan");
         return;
       }
 
       // 1. Crear el nuevo miembro
-      const joinDate = new Date().toISOString().split("T")[0];
-      const nextPayment = new Date(joinDate);
+      const installments = conversionData.installments || 1;
+      const paymentAmount =
+        installments === 1
+          ? conversionData.planPrice
+          : conversionData.paymentAmount;
+
+      if (paymentAmount <= 0) {
+        alert("Debes ingresar un monto válido");
+        return;
+      }
+
+      if (paymentAmount > conversionData.planPrice) {
+        alert("El monto no puede ser mayor al precio del plan");
+        return;
+      }
+
+      const startDate = new Date(`${conversionData.planStartDate}T00:00:00`);
+      const nextPayment = new Date(startDate);
 
       if (selectedPlan.duration_type === "days") {
         nextPayment.setDate(nextPayment.getDate() + selectedPlan.duration);
@@ -229,6 +317,26 @@ export function ProspectManagement({
         );
       }
 
+       const today = new Date();
+      const diffTime = today.getTime() - nextPayment.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      let memberStatus: "active" | "expired" | "inactive" = "active";
+      let inactiveLevel: "green" | "yellow" | "red" | undefined = undefined;
+
+      if (nextPayment > today) {
+        memberStatus = "active";
+      } else if (diffDays > 0) {
+        if (diffDays > 30) {
+          memberStatus = "inactive";
+          inactiveLevel = "yellow";
+        } else {
+          memberStatus = "expired";
+        }
+      } else {
+        memberStatus = "expired";
+      }
+
       const memberId = `${gymId}_member_${Date.now()}`;
       const newMember: Member = {
         id: memberId,
@@ -236,13 +344,15 @@ export function ProspectManagement({
         name: convertingProspect.name,
         email: convertingProspect.email || "",
         phone: convertingProspect.phone || "",
-        join_date: joinDate,
+        join_date: conversionData.paymentDate,
         plan: selectedPlan.name,
-        plan_price: selectedPlan.price,
-        last_payment: joinDate,
+        plan_price: conversionData.planPrice,
+        last_payment: conversionData.planStartDate,
         next_payment: nextPayment.toISOString().split("T")[0],
-        status: "active",
-        balance_due: 0,
+        status: memberStatus,
+        inactive_level: inactiveLevel,
+        balance_due: conversionData.planPrice - paymentAmount,
+        followed_up: false,
       };
 
       const { error: memberError } = await supabase
@@ -251,19 +361,47 @@ export function ProspectManagement({
       if (memberError) throw memberError;
 
       // 2. Crear el pago inicial
+      if (contractTable) {
+        const contractId = `${memberId}_contract_${Date.now()}`;
+        const contract = {
+          id: contractId,
+          gym_id: gymId,
+          member_id: memberId,
+          plan_id: selectedPlan.id,
+          installments_total: installments,
+          installments_paid: 1,
+        };
+
+        const { error: contractError } = await supabase
+          .from(contractTable)
+          .insert([contract]);
+
+        if (contractError) {
+          console.warn("Error registrando contrato de plan:", contractError);
+        }
+      }
+
       const newPayment: Payment = {
         id: `${gymId}_payment_${Date.now()}`,
         gym_id: gymId,
         member_id: memberId,
         member_name: newMember.name,
-        amount: newMember.plan_price,
-        date: joinDate,
-        start_date: joinDate,
+        amount: paymentAmount,
+        date: conversionData.paymentDate,
+        start_date: conversionData.planStartDate,
         plan: newMember.plan,
-        method: conversionPaymentMethod,
+        method: conversionData.paymentMethod,
+        card_brand:
+          conversionData.paymentMethod === "Tarjeta de Crédito"
+            ? conversionData.cardBrand
+            : undefined,
+        card_installments:
+          conversionData.paymentMethod === "Tarjeta de Crédito"
+            ? conversionData.cardInstallments
+            : undefined,
         type: "plan",
-        description: selectedPlan.description,
-        //plan_id: selectedPlan.id,
+        description: conversionData.description || undefined,
+        plan_id: selectedPlan.id,
       };
 
       const { error: paymentError } = await supabase
@@ -271,7 +409,6 @@ export function ProspectManagement({
         .insert([newPayment]);
       if (paymentError) throw paymentError;
 
-      // 3. Eliminar el interesado
       const { error: prospectDeleteError } = await supabase
         .from("prospects")
         .delete()
@@ -279,18 +416,13 @@ export function ProspectManagement({
         .eq("gym_id", gymId);
       if (prospectDeleteError) throw prospectDeleteError;
 
-      // 4. Actualizar estados locales
       setMembers((prevMembers) => [...prevMembers, newMember]);
       setPayments((prevPayments) => [...prevPayments, newPayment]);
       setProspects((prevProspects) =>
         prevProspects.filter((p) => p.id !== convertingProspect.id)
       );
 
-      // Limpiar y cerrar diálogos
-      setIsConvertDialogOpen(false);
-      setConvertingProspect(null);
-      setConversionPlan("");
-      setConversionPaymentMethod("Efectivo");
+      handleConvertDialogOpenChange(false);
       alert("Interesado convertido a socio exitosamente!");
     } catch (error) {
       console.error("Error convirtiendo interesado a miembro:", error);
@@ -587,7 +719,7 @@ export function ProspectManagement({
       <Card>
         <CardHeader>
           <CardTitle>
-            Lista de Interesados ({filteredProspects.length})
+             Lista de Interesados ({sortedProspects.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -607,7 +739,7 @@ export function ProspectManagement({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProspects.map((prospect) => (
+                 {sortedProspects.map((prospect) => (
                   <TableRow key={prospect.id}>
                     <TableCell className="font-medium">
                       {prospect.name}
@@ -640,10 +772,7 @@ export function ProspectManagement({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setConvertingProspect(prospect);
-                            setIsConvertDialogOpen(true);
-                          }}
+                          onClick={() => startConversion(prospect)}
                           title="Convertir a Socio"
                         >
                           <UserPlus className="h-4 w-4" />
@@ -833,7 +962,7 @@ export function ProspectManagement({
       {isClient && (
         <Dialog
           open={isConvertDialogOpen}
-          onOpenChange={setIsConvertDialogOpen}
+          onOpenChange={handleConvertDialogOpenChange}
         >
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
@@ -843,22 +972,62 @@ export function ProspectManagement({
               </DialogDescription>
             </DialogHeader>
             {convertingProspect && (
-              <div className="grid gap-4 py-4">
+               <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
                 <div className="grid gap-2">
-                  <Label htmlFor="convert-plan">Seleccionar Plan</Label>
+                  <Label htmlFor="convert-plan-start">
+                    Fecha de inicio del plan
+                  </Label>
+                  <Input
+                    id="convert-plan-start"
+                    type="date"
+                    value={conversionData.planStartDate}
+                    onChange={(e) =>
+                      setConversionData((prev) => ({
+                        ...prev,
+                        planStartDate: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="convert-payment-date">Fecha de pago</Label>
+                  <Input
+                    id="convert-payment-date"
+                    type="date"
+                    value={conversionData.paymentDate}
+                    onChange={(e) =>
+                      setConversionData((prev) => ({
+                        ...prev,
+                        paymentDate: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="convert-plan">Plan</Label>
                   <Select
-                    value={conversionPlan}
-                    onValueChange={setConversionPlan}
+                    value={conversionData.plan}
+                    onValueChange={(value) => {
+                      const selectedPlan = plans.find(
+                        (plan) => plan.name === value
+                      );
+                      setConversionData((prev) => ({
+                        ...prev,
+                        plan: value,
+                        planPrice: selectedPlan?.price || 0,
+                        installments: 1,
+                        paymentAmount: selectedPlan?.price || 0,
+                      }));
+                    }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un plan para el nuevo socio" />
+                      <SelectValue placeholder="Selecciona un plan" />
                     </SelectTrigger>
                     <SelectContent>
-                      console.log("Planes disponibles", plans);
                       {(plans ?? [])
                         .filter((plan) => plan.is_active)
                         .map((plan) => (
-                          <SelectItem key={plan.id} value={plan.id}>
+                          <SelectItem key={plan.id} value={plan.name}>
                             {plan.name} - ${plan.price.toLocaleString()} (
                             {plan.duration} {plan.duration_type})
                           </SelectItem>
@@ -866,11 +1035,95 @@ export function ProspectManagement({
                     </SelectContent>
                   </Select>
                 </div>
+                {conversionData.plan && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label htmlFor="convert-plan-price">
+                        Precio total del plan
+                      </Label>
+                      <Input
+                        id="convert-plan-price"
+                        type="number"
+                        value={conversionData.planPrice}
+                        onChange={(e) => {
+                          const price = parseFloat(e.target.value) || 0;
+                          setConversionData((prev) => ({
+                            ...prev,
+                            planPrice: price,
+                            paymentAmount:
+                              prev.installments === 1
+                                ? price
+                                : prev.paymentAmount,
+                          }));
+                        }}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="convert-installments">
+                        Cantidad de cuotas
+                      </Label>
+                      <Select
+                        value={conversionData.installments.toString()}
+                        onValueChange={(value) => {
+                          const installments = parseInt(value);
+                          setConversionData((prev) => ({
+                            ...prev,
+                            installments,
+                            paymentAmount:
+                              installments === 1
+                                ? prev.planPrice
+                                : 0,
+                          }));
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona cuotas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1</SelectItem>
+                          <SelectItem value="2">2</SelectItem>
+                          <SelectItem value="3">3</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {conversionData.installments > 1 && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="convert-payment-amount">
+                          Monto a abonar
+                        </Label>
+                        <Input
+                          id="convert-payment-amount"
+                          type="number"
+                          value={conversionData.paymentAmount}
+                          onChange={(e) =>
+                            setConversionData((prev) => ({
+                              ...prev,
+                              paymentAmount:
+                                parseFloat(e.target.value) || 0,
+                            }))
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Saldo pendiente: $
+                          {(conversionData.planPrice -
+                            conversionData.paymentAmount
+                          ).toFixed(2)}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
                 <div className="grid gap-2">
-                  <Label htmlFor="convert-method">Método de Pago Inicial</Label>
+                  <Label htmlFor="convert-method">Método de Pago</Label>
                   <Select
-                    value={conversionPaymentMethod}
-                    onValueChange={setConversionPaymentMethod}
+                    value={conversionData.paymentMethod}
+                    onValueChange={(value) =>
+                      setConversionData((prev) => ({
+                        ...prev,
+                        paymentMethod: value,
+                        cardBrand: "",
+                      }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecciona método de pago" />
@@ -884,6 +1137,64 @@ export function ProspectManagement({
                     </SelectContent>
                   </Select>
                 </div>
+                 {conversionData.paymentMethod === "Tarjeta de Crédito" && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label>Tipo de Tarjeta</Label>
+                      <Select
+                        value={conversionData.cardBrand}
+                        onValueChange={(value) =>
+                          setConversionData((prev) => ({
+                            ...prev,
+                            cardBrand: value,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona tarjeta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {cardBrands.map((brand) => (
+                            <SelectItem key={brand} value={brand}>
+                              {brand}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="convert-card-installments">
+                        Número de cuotas en la tarjeta
+                      </Label>
+                      <Input
+                        id="convert-card-installments"
+                        type="number"
+                        min={1}
+                        value={conversionData.cardInstallments}
+                        onChange={(e) =>
+                          setConversionData((prev) => ({
+                            ...prev,
+                            cardInstallments:
+                              parseInt(e.target.value) || 1,
+                          }))
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+                <div className="grid gap-2">
+                  <Label htmlFor="convert-description">Descripción</Label>
+                  <Input
+                    id="convert-description"
+                    value={conversionData.description}
+                    onChange={(e) =>
+                      setConversionData((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Se creará un nuevo socio y un pago inicial, y el interesado
                   será eliminado.
@@ -894,7 +1205,11 @@ export function ProspectManagement({
               <Button
                 type="submit"
                 onClick={handleConvertProspectToMember}
-                disabled={!conversionPlan || !conversionPaymentMethod}
+                 disabled={
+                  !conversionData.plan ||
+                  (conversionData.paymentMethod === "Tarjeta de Crédito" &&
+                    !conversionData.cardBrand)
+                }
               >
                 Convertir a Socio
               </Button>
