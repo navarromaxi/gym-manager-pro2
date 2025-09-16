@@ -552,9 +552,9 @@ export function PaymentManagement({
                       filteredMembersForSearch.map((member) => (
                         <div
                           key={member.id}
-                          className={`p-2 cursor-pointer hover:bg-gray-50 border-b last:border-b-0 ${
+                           className={`p-2 cursor-pointer transition-colors border-b last:border-b-0 hover:bg-blue-500/10 dark:hover:bg-blue-500/30 ${
                             newPayment.memberId === member.id
-                              ? "bg-blue-50"
+                              ? "bg-blue-500/20 dark:bg-blue-500/40"
                               : ""
                           }`}
                           onClick={() => {
