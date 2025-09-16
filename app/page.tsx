@@ -812,7 +812,7 @@ export default function GymManagementSystem() {
       {/* Navigation */}
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8">
+           <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:gap-8">
             {[
               { id: "dashboard", label: "Dashboard" },
               { id: "members", label: "Socios" },
@@ -853,6 +853,7 @@ export default function GymManagementSystem() {
             setPayments={setPayments}
             plans={plans}
             customPlans={customPlans}
+            setCustomPlans={setCustomPlans}
             gymId={gymData?.id || ""}
             initialFilter={memberFilter}
             onFilterChange={setMemberFilter}

@@ -591,73 +591,77 @@ export function ProspectManagement({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Teléfono</TableHead>
-                <TableHead>Fecha Contacto</TableHead>
-                <TableHead>Interés</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Prioridad</TableHead>
-                {/* Nueva columna en la tabla */}
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredProspects.map((prospect) => (
-                <TableRow key={prospect.id}>
-                  <TableCell className="font-medium">{prospect.name}</TableCell>
-                  <TableCell>{prospect.email}</TableCell>
-                  <TableCell>{prospect.phone}</TableCell>
-                  <TableCell>
-                    {new Date(prospect.contact_date).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell className="max-w-xs truncate">
-                    {prospect.interest}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(prospect.status)}</TableCell>
-                  <TableCell>
-                    {getPriorityBadge(prospect.priority_level)}
-                  </TableCell>
-                  {/* Mostrar prioridad */}
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingProspect(prospect);
-                          setIsEditDialogOpen(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setConvertingProspect(prospect);
-                          setIsConvertDialogOpen(true);
-                        }}
-                        title="Convertir a Socio"
-                      >
-                        <UserPlus className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteProspect(prospect.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          <div className="w-full overflow-x-auto">
+            <Table className="min-w-[960px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Teléfono</TableHead>
+                  <TableHead>Fecha Contacto</TableHead>
+                  <TableHead>Interés</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Prioridad</TableHead>
+                  {/* Nueva columna en la tabla */}
+                  <TableHead>Acciones</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredProspects.map((prospect) => (
+                  <TableRow key={prospect.id}>
+                    <TableCell className="font-medium">
+                      {prospect.name}
+                    </TableCell>
+                    <TableCell>{prospect.email}</TableCell>
+                    <TableCell>{prospect.phone}</TableCell>
+                    <TableCell>
+                      {new Date(prospect.contact_date).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate">
+                      {prospect.interest}
+                    </TableCell>
+                    <TableCell>{getStatusBadge(prospect.status)}</TableCell>
+                    <TableCell>
+                      {getPriorityBadge(prospect.priority_level)}
+                    </TableCell>
+                    {/* Mostrar prioridad */}
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingProspect(prospect);
+                            setIsEditDialogOpen(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setConvertingProspect(prospect);
+                            setIsConvertDialogOpen(true);
+                          }}
+                          title="Convertir a Socio"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteProspect(prospect.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

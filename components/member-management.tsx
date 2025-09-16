@@ -57,6 +57,7 @@ export interface MemberManagementProps {
   setPayments: (payments: Payment[]) => void;
   plans: Plan[];
   customPlans: CustomPlan[];
+  setCustomPlans: (plans: CustomPlan[]) => void;
   gymId: string;
   initialFilter?: string;
   onFilterChange?: (filter: string) => void;
@@ -69,6 +70,7 @@ export function MemberManagement({
   setPayments,
   plans,
   customPlans,
+  setCustomPlans,
   gymId,
   initialFilter = "all",
   onFilterChange,
@@ -379,17 +381,44 @@ export function MemberManagement({
 
       if (error) throw error;
 
-      setMembers(
-        members.map((m) =>
-          m.id === editingMember.id
-            ? {
-                ...editingMember,
-                status: newStatus,
-                inactive_level: newInactive,
-              }
-            : m
-        )
+      const { error: paymentUpdateError } = await supabase
+        .from("payments")
+        .update({ member_name: editingMember.name })
+        .eq("member_id", editingMember.id);
+
+      if (paymentUpdateError) throw paymentUpdateError;
+
+      const { error: customPlansUpdateError } = await supabase
+        .from("custom_plans")
+        .update({ member_name: editingMember.name })
+        .eq("member_id", editingMember.id);
+
+      if (customPlansUpdateError) throw customPlansUpdateError;
+
+      const updatedMembers = members.map((m) =>
+        m.id === editingMember.id
+          ? {
+              ...editingMember,
+              status: newStatus,
+              inactive_level: newInactive,
+            }
+          : m
       );
+      const updatedPayments = payments.map((payment) =>
+        payment.member_id === editingMember.id
+          ? { ...payment, member_name: editingMember.name }
+          : payment
+      );
+
+      const updatedCustomPlans = customPlans.map((plan) =>
+        plan.member_id === editingMember.id
+          ? { ...plan, member_name: editingMember.name }
+          : plan
+      );
+
+      setMembers(updatedMembers);
+      setPayments(updatedPayments);
+      setCustomPlans(updatedCustomPlans);
       setIsEditDialogOpen(false);
       setEditingMember(null);
     } catch (error) {
