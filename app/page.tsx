@@ -124,6 +124,42 @@ const getRealStatus = (m: Member): "active" | "expired" | "inactive" => {
   return "inactive";
 };
 
+const PROSPECT_STATUS_NORMALIZATION_MAP: Record<string, Prospect["status"]> = {
+  new: "new",
+  rescheduled: "rescheduled",
+  scheduled: "scheduled",
+  attended: "attended",
+  no_show: "no_show",
+  inactive: "inactive",
+  nuevo_interesado: "new",
+  nuevo: "new",
+  reagendado: "rescheduled",
+  agendado: "scheduled",
+  asistio: "attended",
+  no_asistio: "no_show",
+  noasistio: "no_show",
+  inactivo: "inactive",
+};
+
+const normalizeProspectStatus = (
+  status: string | null | undefined
+): Prospect["status"] => {
+  if (!status) {
+    return "new";
+  }
+
+  const sanitized = status
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  const key = sanitized.replace(/[\s-]+/g, "_");
+
+  return PROSPECT_STATUS_NORMALIZATION_MAP[key] ?? "new";
+};
+
 const DEFAULT_GYM_NAME = "Sistema de Gestión Multi-Gimnasio";
 
 const sanitizeGymName = (name: string) => {
@@ -276,7 +312,12 @@ export default function GymManagementSystem() {
       setMembers(membersData || []);
       setPayments(paymentsData || []);
       setExpenses(expensesData || []);
-      setProspects(prospectsData || []);
+      const normalizedProspects = (prospectsData || []).map((prospect) => ({
+        ...prospect,
+        status: normalizeProspectStatus(
+          (prospect as { status?: string | null }).status
+        ),
+      }));
       setPlans(plansData || []);
       setActivities(activitiesData || []);
       setCustomPlans(customPlansData || []);
@@ -750,21 +791,22 @@ export default function GymManagementSystem() {
                 <span>{expiredMembers} socios con plan vencido</span>
               </div>
             )}
-            {prospects.filter((p) => p.status === "nuevo_interesado").length > 0 && (
+            {prospects.filter((p) => p.status === "new").length > 0 && (
               <div
                 className="flex items-center space-x-2 text-blue-600 cursor-pointer hover:bg-blue-50 p-2 rounded"
                 onClick={goToProspects}
               >
                 <UserPlus className="h-4 w-4" />
                 <span>
-                  {prospects.filter((p) => p.status === "nuevo_interesado").length} nuevos
+                  {prospects.filter((p) => p.status === "new").length} nuevos
+                  interesados por contactar
                   interesados por contactar
                 </span>
               </div>
             )}
             {upcomingExpirations === 0 &&
               expiredMembers === 0 &&
-              prospects.filter((p) => p.status === "nuevo_interesado").length === 0 && (
+              prospects.filter((p) => p.status === "new").length === 0 && (
                 <div className="flex items-center space-x-2 text-green-600">
                   <span>✅ Todo en orden</span>
                 </div>

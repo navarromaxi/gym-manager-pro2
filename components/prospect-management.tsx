@@ -100,7 +100,7 @@ export function ProspectManagement({
     contact_date: new Date().toISOString().split("T")[0],
     scheduled_date: "",
     interest: "",
-    status: "nuevo_interesado",
+    status: "new",
     notes: "",
     priority_level: "green",
   });
@@ -458,13 +458,13 @@ export function ProspectManagement({
 
   const getStatusBadge = (status: Prospect["status"]) => {
     switch (status) {
-      case "nuevo_interesado":
+      case "new":
         return (
           <Badge variant="default" className="bg-blue-500 hover:bg-blue-500">
             Nuevo Interesado
           </Badge>
         );
-      case "reagendado":
+      case "rescheduled":
         return (
           <Badge
             variant="outline"
@@ -473,19 +473,19 @@ export function ProspectManagement({
             Re/Agendado
           </Badge>
         );
-      case "agendado":
+      case "scheduled":
         return (
           <Badge variant="outline" className="border-cyan-500 text-cyan-500">
             Agendado
           </Badge>
         );
-      case "asistio":
+      case "attended":
         return (
           <Badge className="bg-emerald-600 hover:bg-emerald-600">Asistió</Badge>
         );
-      case "no_asistio":
+      case "no_show":
         return <Badge variant="destructive">No asistió</Badge>;
-      case "inactivo":
+      case "inactive":
         return (
           <Badge variant="outline" className="border-gray-400 text-gray-500">
             Inactivo
@@ -634,14 +634,12 @@ export function ProspectManagement({
                     <SelectValue placeholder="Selecciona un estado" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="nuevo_interesado">
-                      Nuevo interesado
-                    </SelectItem>
-                    <SelectItem value="reagendado">Re/Agendado</SelectItem>
-                    <SelectItem value="agendado">Agendado</SelectItem>
-                    <SelectItem value="asistio">Asistió</SelectItem>
-                    <SelectItem value="no_asistio">No asistió</SelectItem>
-                    <SelectItem value="inactivo">Inactivo</SelectItem>
+                    <SelectItem value="new">Nuevo interesado</SelectItem>
+                    <SelectItem value="rescheduled">Re/Agendado</SelectItem>
+                    <SelectItem value="scheduled">Agendado</SelectItem>
+                    <SelectItem value="attended">Asistió</SelectItem>
+                    <SelectItem value="no_show">No asistió</SelectItem>
+                    <SelectItem value="inactive">Inactivo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -709,17 +707,15 @@ export function ProspectManagement({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="nuevo_interesado">
-                  Nuevo interesado
-                </SelectItem>
-                 <SelectItem value="reagendado">Re/Agendado</SelectItem>
-                <SelectItem value="agendado">Agendado</SelectItem>
-                <SelectItem value="asistio">Asistió</SelectItem>
-                <SelectItem value="no_asistio">No asistió</SelectItem>
-                <SelectItem value="inactivo">Inactivo</SelectItem>
+                <SelectItem value="new">Nuevo interesado</SelectItem>
+                <SelectItem value="rescheduled">Re/Agendado</SelectItem>
+                <SelectItem value="scheduled">Agendado</SelectItem>
+                <SelectItem value="attended">Asistió</SelectItem>
+                <SelectItem value="no_show">No asistió</SelectItem>
+                <SelectItem value="inactive">Inactivo</SelectItem>
               </SelectContent>
             </Select>
-             <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1">
               <span className="text-xs font-medium text-muted-foreground">
                 Fecha agendada
               </span>
@@ -760,11 +756,11 @@ export function ProspectManagement({
                   <TableHead>Email</TableHead>
                   <TableHead>Teléfono</TableHead>
                   <TableHead>Fecha Contacto</TableHead>
-                   <TableHead>Fecha Agendado</TableHead>
+                  <TableHead>Fecha Agendado</TableHead>
                   <TableHead>Interés</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Prioridad</TableHead>
-                   {/* Acciones disponibles */}
+                  {/* Acciones disponibles */}
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -776,7 +772,7 @@ export function ProspectManagement({
                     </TableCell>
                     <TableCell>{prospect.email}</TableCell>
                     <TableCell>{prospect.phone}</TableCell>
-                   <TableCell>{formatDate(prospect.contact_date)}</TableCell>
+                    <TableCell>{formatDate(prospect.contact_date)}</TableCell>
                     <TableCell>{formatDate(prospect.scheduled_date)}</TableCell>
                     <TableCell className="max-w-xs truncate">
                       {prospect.interest}
@@ -893,7 +889,7 @@ export function ProspectManagement({
                 />
               </div>
 
-               <div className="grid gap-2">
+              <div className="grid gap-2">
                 <Label htmlFor="edit-scheduled_date">Fecha Agendado</Label>
                 <Input
                   id="edit-scheduled_date"
@@ -934,14 +930,12 @@ export function ProspectManagement({
                     <SelectValue placeholder="Selecciona un estado" />
                   </SelectTrigger>
                   <SelectContent>
-                     <SelectItem value="nuevo_interesado">
-                      Nuevo interesado
-                    </SelectItem>
-                    <SelectItem value="reagendado">Re/Agendado</SelectItem>
-                    <SelectItem value="agendado">Agendado</SelectItem>
-                    <SelectItem value="asistio">Asistió</SelectItem>
-                    <SelectItem value="no_asistio">No asistió</SelectItem>
-                    <SelectItem value="inactivo">Inactivo</SelectItem>
+                    <SelectItem value="new">Nuevo interesado</SelectItem>
+                    <SelectItem value="rescheduled">Re/Agendado</SelectItem>
+                    <SelectItem value="scheduled">Agendado</SelectItem>
+                    <SelectItem value="attended">Asistió</SelectItem>
+                    <SelectItem value="no_show">No asistió</SelectItem>
+                    <SelectItem value="inactive">Inactivo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
