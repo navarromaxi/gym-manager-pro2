@@ -141,25 +141,41 @@ export function ProspectManagement({
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    const checkTable = async () => {
-      const { data, error } = await supabase
-        .from("pg_tables")
-        .select("tablename")
-        .in("tablename", ["plan_contracts", "plan_contract"]);
+     let isActive = true;
 
-      if (error) {
-        console.warn("Error verificando tablas de contratos:", error);
-        return;
+      const detectContractTable = async () => {
+      const candidates = ["plan_contracts", "plan_contract"] as const;
+
+      for (const table of candidates) {
+        const { error } = await supabase
+          .from(table)
+          .select("*", { head: true, count: "exact" });
+
+        if (!error) {
+          if (isActive) {
+            setContractTable(table);
+          }
+          return;
+        }
+
+        if (error && error.code !== "42P01") {
+          console.warn(
+            `Error verificando tabla de contratos (${table}):`,
+            error
+          );
+        }
       }
 
-      const tableName = data?.[0]?.tablename as
-        | "plan_contracts"
-        | "plan_contract"
-        | undefined;
-      setContractTable(tableName ?? null);
+      if (isActive) {
+        setContractTable(null);
+      }
     };
 
-    checkTable();
+    detectContractTable();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   useEffect(() => {
