@@ -80,6 +80,7 @@ export function ProspectManagement({
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all"); // Nuevo estado para el filtro de prioridad
+  const [scheduledDateFilter, setScheduledDateFilter] = useState("");// estado para el filtro de fecha
   const [newProspect, setNewProspect] = useState({
     name: "",
     email: "",
@@ -163,7 +164,9 @@ export function ProspectManagement({
       statusFilter === "all" || prospect.status === statusFilter;
     const matchesPriority =
       priorityFilter === "all" || prospect.priority_level === priorityFilter; // Nuevo filtro
-    return matchesSearch && matchesStatus && matchesPriority;
+    const matchesScheduledDate =
+      !scheduledDateFilter || prospect.scheduled_date === scheduledDateFilter;
+    return matchesSearch && matchesStatus && matchesPriority && matchesScheduledDate;
   });
 
   const sortedProspects = [...filteredProspects].sort((a, b) => {
@@ -700,8 +703,8 @@ export function ProspectManagement({
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
-            <div className="flex-1">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="min-w-[200px] flex-1 sm:flex-[1.5]">
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -717,7 +720,7 @@ export function ProspectManagement({
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">Todos los estados</SelectItem>
                 <SelectItem value="new">Nuevo</SelectItem>
                 <SelectItem value="contacted">Contactado</SelectItem>
                 <SelectItem value="waiting_response">
@@ -734,12 +737,43 @@ export function ProspectManagement({
                 <SelectValue placeholder="Prioridad" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas las Prioridades</SelectItem>
+                <SelectItem value="all">Tipo Prioridad</SelectItem>
                 <SelectItem value="red">Alta</SelectItem>
                 <SelectItem value="yellow">Media</SelectItem>
                 <SelectItem value="green">Baja</SelectItem>
               </SelectContent>
             </Select>
+            <div className="flex w-full min-w-[200px] flex-col gap-2 sm:w-[220px]">
+              <Label htmlFor="scheduled-date-filter" className="text-sm font-medium">
+                Fecha agendada
+              </Label>
+              <Input
+                id="scheduled-date-filter"
+                type="date"
+                value={scheduledDateFilter}
+                onChange={(event) => setScheduledDateFilter(event.target.value)}
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() =>
+                    setScheduledDateFilter(new Date().toISOString().split("T")[0])
+                  }
+                >
+                  Hoy
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={() => setScheduledDateFilter("")}
+                >
+                  Limpiar
+                </Button>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
