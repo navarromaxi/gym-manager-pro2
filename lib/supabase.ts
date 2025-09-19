@@ -71,15 +71,16 @@ export interface Prospect {
   email: string
   phone: string
   contact_date: string
-  scheduled_date?: string | null
   interest: string
   status:
-    | "nuevo_interesado"
-    | "reagendado"
-    | "agendado"
-    | "asistio"
-    | "no_asistio"
-    | "inactivo";
+    | "new"
+    | "contacted"
+    | "waiting_response"
+    | "waiting_info"
+    | "trial_scheduled"
+    | "trial_completed"
+    | "not_interested"
+    | "contact_later";
   notes: string
   priority_level?: "green" | "yellow" | "red" // ¡NUEVA PROPIEDAD!
 }

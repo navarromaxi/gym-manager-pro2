@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useState } from "react";
 import { supabase, Member, CustomPlan, Payment } from "@/lib/supabase";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,10 +49,10 @@ import {
 
 interface CustomPlanManagementProps {
   customPlans: CustomPlan[];
-  setCustomPlans: Dispatch<SetStateAction<CustomPlan[]>>;
+  setCustomPlans: (plans: CustomPlan[]) => void;
   members: Member[];
   payments: Payment[];
-  setPayments: Dispatch<SetStateAction<Payment[]>>;
+  setPayments: (payments: Payment[]) => void;
   gymId: string;
 }
 
@@ -117,65 +122,11 @@ export function CustomPlanManagement({
     });
   };
 
-  const formatPaymentDate = (value?: string) => {
-    if (!value) return "Sin pagos";
-    const paymentDate = parseDate(value);
-    if (!paymentDate) return "Sin pagos";
-    return paymentDate.toLocaleDateString("es-AR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
   const currencyFormatter = new Intl.NumberFormat("es-AR", {
     style: "currency",
     currency: "ARS",
     maximumFractionDigits: 0,
   });
-
-  const paymentLookup = useMemo(() => {
-    const map = new Map<string, Payment>();
-
-    payments.forEach((payment) => {
-      const paymentDate = parseDate(payment.date);
-      if (!paymentDate) return;
-
-      const keys: string[] = [];
-
-      if (payment.plan_id) {
-        keys.push(payment.plan_id);
-      }
-
-      if (payment.plan) {
-        keys.push(`${payment.member_id}::${payment.plan.trim().toLowerCase()}`);
-      }
-
-      keys.forEach((key) => {
-        const existing = map.get(key);
-        if (!existing) {
-          map.set(key, payment);
-          return;
-        }
-
-        const existingDate = parseDate(existing.date);
-        if (!existingDate || paymentDate.getTime() > existingDate.getTime()) {
-          map.set(key, payment);
-        }
-      });
-    });
-
-    return map;
-  }, [payments]);
-
-  const getLatestPaymentForPlan = (plan: CustomPlan) => {
-    const normalizedKey = `${plan.member_id}::${plan.name
-      .trim()
-      .toLowerCase()}`;
-    return (
-      paymentLookup.get(plan.id) ?? paymentLookup.get(normalizedKey) ?? null
-    );
-  };
 
   const totalPlans = customPlans.length;
   const activePlans = customPlans.filter(
@@ -198,7 +149,7 @@ export function CustomPlanManagement({
       plan.member_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredPlans = searchFilteredPlans.filter((plan) => {
+   const filteredPlans = searchFilteredPlans.filter((plan) => {
     switch (statusFilter) {
       case "active":
         return plan.is_active && !isPlanExpired(plan);
@@ -238,7 +189,9 @@ export function CustomPlanManagement({
   const hasActiveFilters =
     statusFilter !== "all" || searchTerm.trim().length > 0;
   const resultsLabel =
-    filteredPlans.length === 1 ? "1 plan" : `${filteredPlans.length} planes`;
+    filteredPlans.length === 1
+      ? "1 plan"
+      : `${filteredPlans.length} planes`;
 
   const handleClearFilters = () => {
     setSearchTerm("");
@@ -305,7 +258,9 @@ export function CustomPlanManagement({
 
     if (days === 0) {
       return (
-        <span className="text-xs font-medium text-amber-600">Vence hoy</span>
+        <span className="text-xs font-medium text-amber-600">
+          Vence hoy
+        </span>
       );
     }
 
@@ -316,7 +271,12 @@ export function CustomPlanManagement({
     );
   };
 
-  const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
+  const cardBrands = [
+    "Visa",
+    "Mastercard",
+    "American Express",
+    "Otra",
+  ];
 
   const handleAddPlan = async () => {
     const member = members.find((m) => m.id === newPlan.member_id);
@@ -361,22 +321,20 @@ export function CustomPlanManagement({
           : undefined,
       type: "plan",
       description: newPlan.payment_description || undefined,
+      plan_id: id,
     };
 
     const { error: paymentError } = await supabase
       .from("payments")
       .insert([payment]);
     if (paymentError) {
-      console.error(
-        "Error al registrar pago de personalizado:",
-        paymentError.message,
-        paymentError.details
-      );
+      console.error("Error al registrar pago de personalizado:", paymentError);
     } else {
-      setPayments((prev) => [...prev, payment]);
+      setPayments([...payments, payment]);
     }
 
-    setCustomPlans((prev) => [...prev, plan]);
+
+    setCustomPlans([...customPlans, plan]);
     setIsAddDialogOpen(false);
     setNewPlan({
       member_id: "",
@@ -399,7 +357,7 @@ export function CustomPlanManagement({
       console.error("Error al eliminar plan personalizado:", error);
       return;
     }
-    setCustomPlans((prev) => prev.filter((p) => p.id !== id));
+    setCustomPlans(customPlans.filter((p) => p.id !== id));
   };
 
   return (
@@ -441,9 +399,7 @@ export function CustomPlanManagement({
                 </div>
                 <Select
                   value={newPlan.member_id}
-                  onValueChange={(v) =>
-                    setNewPlan({ ...newPlan, member_id: v })
-                  }
+                  onValueChange={(v) => setNewPlan({ ...newPlan, member_id: v })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar socio" />
@@ -513,12 +469,8 @@ export function CustomPlanManagement({
                   <SelectContent>
                     <SelectItem value="Efectivo">Efectivo</SelectItem>
                     <SelectItem value="Transferencia">Transferencia</SelectItem>
-                    <SelectItem value="Tarjeta de Débito">
-                      Tarjeta de Débito
-                    </SelectItem>
-                    <SelectItem value="Tarjeta de Crédito">
-                      Tarjeta de Crédito
-                    </SelectItem>
+                    <SelectItem value="Tarjeta de Débito">Tarjeta de Débito</SelectItem>
+                    <SelectItem value="Tarjeta de Crédito">Tarjeta de Crédito</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -565,9 +517,7 @@ export function CustomPlanManagement({
                 </>
               )}
               <div className="grid gap-2">
-                <Label htmlFor="payment_description">
-                  Descripción del pago
-                </Label>
+                <Label htmlFor="payment_description">Descripción del pago</Label>
                 <Input
                   id="payment_description"
                   value={newPlan.payment_description}
@@ -662,14 +612,13 @@ export function CustomPlanManagement({
         </Card>
       </div>
 
-      {expiringSoonCount > 0 && (
+        {expiringSoonCount > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 text-sm shadow-sm">
           <div className="flex items-start gap-3 text-amber-800">
             <CalendarClock className="mt-0.5 h-5 w-5 flex-shrink-0" />
             <div>
               <p className="font-medium">
-                {expiringSoonCount} plan{expiringSoonCount === 1 ? "" : "es"}{" "}
-                próximo
+                {expiringSoonCount} plan{expiringSoonCount === 1 ? "" : "es"} próximo
                 {expiringSoonCount === 1 ? "" : "s"} a vencer
               </p>
               <p className="text-xs text-amber-700">
@@ -734,9 +683,9 @@ export function CustomPlanManagement({
             {resultsLabel}
           </Badge>
         </CardHeader>
-        <CardContent className="p-0">
+         <CardContent className="p-0">
           <ScrollArea className="w-full">
-            <div className="min-w-[720px]">
+            <div className="min-w-[640px]">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -745,86 +694,63 @@ export function CustomPlanManagement({
                     <TableHead className="hidden text-right md:table-cell">
                       Precio
                     </TableHead>
-                    <TableHead>Último pago</TableHead>
                     <TableHead>Fin</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedPlans.map((plan) => {
-                    const latestPayment = getLatestPaymentForPlan(plan);
-
-                    return (
-                      <TableRow key={plan.id} className="hover:bg-muted/40">
-                        <TableCell className="align-top">
-                          <div className="font-medium text-sm text-foreground">
-                            {plan.member_name}
-                          </div>
-                        </TableCell>
-                        <TableCell className="align-top">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-sm font-medium">
-                                {plan.name}
-                              </span>
-                              {renderStatusBadge(plan)}
-                            </div>
-                            {plan.description && (
-                              <p className="text-xs text-muted-foreground">
-                                {plan.description}
-                              </p>
-                            )}
-                            <div className="text-xs text-muted-foreground md:hidden">
-                              {currencyFormatter.format(plan.price)}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden align-top text-right font-medium md:table-cell">
-                          {currencyFormatter.format(plan.price)}
-                        </TableCell>
-                        <TableCell className="align-top">
-                          {latestPayment ? (
-                            <div className="flex flex-col gap-1">
-                              <span className="text-sm font-medium">
-                                {formatPaymentDate(latestPayment.date)}
-                              </span>
-                              {latestPayment.method && (
-                                <span className="text-xs text-muted-foreground">
-                                  {latestPayment.method}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              Sin pagos registrados
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="align-top">
-                          <div className="flex flex-col gap-1">
+                  {sortedPlans.map((plan) => (
+                    <TableRow key={plan.id} className="hover:bg-muted/40">
+                      <TableCell className="align-top">
+                        <div className="font-medium text-sm text-foreground">
+                          {plan.member_name}
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="text-sm font-medium">
-                              {formatEndDate(plan.end_date)}
+                              {plan.name}
                             </span>
-                            {renderTimeLeft(plan)}
+                            {renderStatusBadge(plan)}
                           </div>
-                        </TableCell>
-                        <TableCell className="text-right align-top">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeletePlan(plan.id)}
-                            className="text-muted-foreground hover:bg-red-50 hover:text-red-600"
-                            aria-label={`Eliminar plan ${plan.name}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                          {plan.description && (
+                            <p className="text-xs text-muted-foreground">
+                              {plan.description}
+                            </p>
+                          )}
+                          <div className="text-xs text-muted-foreground md:hidden">
+                            {currencyFormatter.format(plan.price)}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden align-top text-right font-medium md:table-cell">
+                        {currencyFormatter.format(plan.price)}
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-medium">
+                            {formatEndDate(plan.end_date)}
+                          </span>
+                          {renderTimeLeft(plan)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right align-top">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeletePlan(plan.id)}
+                          className="text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                          aria-label={`Eliminar plan ${plan.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                   {sortedPlans.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6}>
+                      <TableCell colSpan={5}>
                         <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
                           <p className="text-sm font-medium text-muted-foreground">
                             No encontramos planes con los filtros actuales.

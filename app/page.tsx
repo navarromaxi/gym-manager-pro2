@@ -750,21 +750,21 @@ export default function GymManagementSystem() {
                 <span>{expiredMembers} socios con plan vencido</span>
               </div>
             )}
-            {prospects.filter((p) => p.status === "nuevo_interesado").length > 0 && (
+            {prospects.filter((p) => p.status === "new").length > 0 && (
               <div
                 className="flex items-center space-x-2 text-blue-600 cursor-pointer hover:bg-blue-50 p-2 rounded"
                 onClick={goToProspects}
               >
                 <UserPlus className="h-4 w-4" />
                 <span>
-                  {prospects.filter((p) => p.status === "nuevo_interesado").length} nuevos
+                  {prospects.filter((p) => p.status === "new").length} nuevos
                   interesados por contactar
                 </span>
               </div>
             )}
             {upcomingExpirations === 0 &&
               expiredMembers === 0 &&
-              prospects.filter((p) => p.status === "nuevo_interesado").length === 0 && (
+              prospects.filter((p) => p.status === "new").length === 0 && (
                 <div className="flex items-center space-x-2 text-green-600">
                   <span>✅ Todo en orden</span>
                 </div>
