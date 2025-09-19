@@ -141,9 +141,9 @@ export function ProspectManagement({
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-     let isActive = true;
+    let isActive = true;
 
-      const detectContractTable = async () => {
+    const detectContractTable = async () => {
       const candidates = ["plan_contracts", "plan_contract"] as const;
 
       for (const table of candidates) {
@@ -480,34 +480,44 @@ export function ProspectManagement({
             Nuevo Interesado
           </Badge>
         );
-      case "rescheduled":
+      case "contacted":
         return (
-          <Badge
-            variant="outline"
-            className="border-purple-500 text-purple-500"
-          >
-            Re/Agendado
+          <Badge variant="outline" className="border-blue-500 text-blue-600">
+            Contactado
           </Badge>
         );
-      case "scheduled":
+      case "waiting_response":
         return (
-          <Badge variant="outline" className="border-cyan-500 text-cyan-500">
-            Agendado
+          <Badge variant="outline" className="border-amber-500 text-amber-600">
+            Esperando respuesta
           </Badge>
         );
-      case "attended":
+      case "waiting_info":
         return (
-          <Badge className="bg-emerald-600 hover:bg-emerald-600">Asistió</Badge>
+           <Badge variant="outline" className="border-purple-500 text-purple-500">
+            Esperando información
+          </Badge>
         );
-      case "no_show":
-        return <Badge variant="destructive">No asistió</Badge>;
-      case "inactive":
+      case "trial_scheduled":
+        return (
+          <Badge variant="outline" className="border-cyan-500 text-cyan-600">
+            Clase prueba agendada
+          </Badge>
+        );
+       case "trial_completed":
+        return (
+          <Badge className="bg-emerald-600 hover:bg-emerald-600">
+            Clase prueba completada
+          </Badge>
+        );
+      case "not_interested":
+        return <Badge variant="destructive">No interesado</Badge>;
+      case "contact_later":
         return (
           <Badge variant="outline" className="border-gray-400 text-gray-500">
-            Inactivo
+            Contactar luego
           </Badge>
         );
-
       default:
         return <Badge variant="secondary">Desconocido</Badge>;
     }
@@ -650,12 +660,21 @@ export function ProspectManagement({
                     <SelectValue placeholder="Selecciona un estado" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="new">Nuevo interesado</SelectItem>
-                    <SelectItem value="rescheduled">Re/Agendado</SelectItem>
-                    <SelectItem value="scheduled">Agendado</SelectItem>
-                    <SelectItem value="attended">Asistió</SelectItem>
-                    <SelectItem value="no_show">No asistió</SelectItem>
-                    <SelectItem value="inactive">Inactivo</SelectItem>
+                   <SelectItem value="contacted">Contactado</SelectItem>
+                    <SelectItem value="waiting_response">
+                      Esperando respuesta
+                    </SelectItem>
+                    <SelectItem value="waiting_info">
+                      Esperando información
+                    </SelectItem>
+                    <SelectItem value="trial_scheduled">
+                      Clase de prueba agendada
+                    </SelectItem>
+                    <SelectItem value="trial_completed">
+                      Clase de prueba completada
+                    </SelectItem>
+                    <SelectItem value="not_interested">No interesado</SelectItem>
+                    <SelectItem value="contact_later">Contactar luego</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -724,11 +743,13 @@ export function ProspectManagement({
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="new">Nuevo interesado</SelectItem>
-                <SelectItem value="rescheduled">Re/Agendado</SelectItem>
-                <SelectItem value="scheduled">Agendado</SelectItem>
-                <SelectItem value="attended">Asistió</SelectItem>
-                <SelectItem value="no_show">No asistió</SelectItem>
-                <SelectItem value="inactive">Inactivo</SelectItem>
+                 <SelectItem value="contacted">Contactado</SelectItem>
+                <SelectItem value="waiting_response">Esperando respuesta</SelectItem>
+                <SelectItem value="waiting_info">Esperando información</SelectItem>
+                <SelectItem value="trial_scheduled">Clase de prueba agendada</SelectItem>
+                <SelectItem value="trial_completed">Clase de prueba completada</SelectItem>
+                <SelectItem value="not_interested">No interesado</SelectItem>
+                <SelectItem value="contact_later">Contactar luego</SelectItem>
               </SelectContent>
             </Select>
             <div className="flex flex-col gap-1">
@@ -947,11 +968,21 @@ export function ProspectManagement({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="new">Nuevo interesado</SelectItem>
-                    <SelectItem value="rescheduled">Re/Agendado</SelectItem>
-                    <SelectItem value="scheduled">Agendado</SelectItem>
-                    <SelectItem value="attended">Asistió</SelectItem>
-                    <SelectItem value="no_show">No asistió</SelectItem>
-                    <SelectItem value="inactive">Inactivo</SelectItem>
+                     <SelectItem value="contacted">Contactado</SelectItem>
+                    <SelectItem value="waiting_response">
+                      Esperando respuesta
+                    </SelectItem>
+                    <SelectItem value="waiting_info">
+                      Esperando información
+                    </SelectItem>
+                    <SelectItem value="trial_scheduled">
+                      Clase de prueba agendada
+                    </SelectItem>
+                    <SelectItem value="trial_completed">
+                      Clase de prueba completada
+                    </SelectItem>
+                    <SelectItem value="not_interested">No interesado</SelectItem>
+                    <SelectItem value="contact_later">Contactar luego</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

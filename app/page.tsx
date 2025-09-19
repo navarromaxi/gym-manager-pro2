@@ -126,19 +126,46 @@ const getRealStatus = (m: Member): "active" | "expired" | "inactive" => {
 
 const PROSPECT_STATUS_NORMALIZATION_MAP: Record<string, Prospect["status"]> = {
   new: "new",
-  rescheduled: "rescheduled",
-  scheduled: "scheduled",
-  attended: "attended",
-  no_show: "no_show",
-  inactive: "inactive",
-  nuevo_interesado: "new",
+  
   nuevo: "new",
-  reagendado: "rescheduled",
-  agendado: "scheduled",
-  asistio: "attended",
-  no_asistio: "no_show",
-  noasistio: "no_show",
-  inactivo: "inactive",
+  nuevos: "new",
+  nuevo_interesado: "new",
+  interes: "new",
+  contacted: "contacted",
+  contactado: "contacted",
+  contacto_realizado: "contacted",
+  waiting_response: "waiting_response",
+  esperando_respuesta: "waiting_response",
+  espera_respuesta: "waiting_response",
+  waitingresponse: "waiting_response",
+  waiting_info: "waiting_info",
+  esperando_info: "waiting_info",
+  espera_info: "waiting_info",
+  waitinginfo: "waiting_info",
+  trial_scheduled: "trial_scheduled",
+  clase_agendada: "trial_scheduled",
+  prueba_agendada: "trial_scheduled",
+  scheduled: "trial_scheduled",
+  rescheduled: "trial_scheduled",
+  reagendado: "trial_scheduled",
+  agendado: "trial_scheduled",
+  trial_completed: "trial_completed",
+  clase_completada: "trial_completed",
+  prueba_completada: "trial_completed",
+  attended: "trial_completed",
+  asistio: "trial_completed",
+  not_interested: "not_interested",
+  no_interesado: "not_interested",
+  no_show: "not_interested",
+  noasistio: "not_interested",
+  no_asistio: "not_interested",
+  uninterested: "not_interested",
+  contact_later: "contact_later",
+  contactar_luego: "contact_later",
+  contactarluego: "contact_later",
+  follow_up: "contact_later",
+  inactive: "contact_later",
+  inactivo: "contact_later",
 };
 
 const normalizeProspectStatus = (
@@ -318,6 +345,7 @@ export default function GymManagementSystem() {
           (prospect as { status?: string | null }).status
         ),
       }));
+      setProspects(normalizedProspects as Prospect[]);
       setPlans(plansData || []);
       setActivities(activitiesData || []);
       setCustomPlans(customPlansData || []);
