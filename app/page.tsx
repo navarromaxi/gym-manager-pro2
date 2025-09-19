@@ -3,7 +3,7 @@
 
 "use client";
 //import { LoginSystem } from "@/components/login-system";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,6 @@ import {
 
 import type { MemberManagementProps } from "@/components/member-management";
 import dynamic from "next/dynamic";
-import { differenceInCalendarDays, format } from "date-fns";
 
 const LoginSystem = dynamic(
   () => import("@/components/login-system").then((m) => m.LoginSystem),
@@ -100,7 +99,6 @@ const InactiveManagement = dynamic(
 
 //Sigue aca
 import { supabase } from "@/lib/supabase";
-import { toast } from "@/hooks/use-toast";
 import type {
   Member,
   Payment,
@@ -152,7 +150,6 @@ export default function GymManagementSystem() {
   >(null);
   const [memberFilter, setMemberFilter] = useState("all");
   const [loading, setLoading] = useState(false);
-  const reminderShownKeysRef = useRef<Set<string>>(new Set());
 
   const displayGymName = gymData?.name
     ? sanitizeGymName(gymData.name)
@@ -178,7 +175,6 @@ export default function GymManagementSystem() {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    reminderShownKeysRef.current.clear();
     setGymData(null);
     setMembers([]);
     setPayments([]);
@@ -463,65 +459,12 @@ export default function GymManagementSystem() {
     }
   };
 
-   // Cargar datos cuando se autentica
+  // Cargar datos cuando se autentica
   useEffect(() => {
     if (gymData?.id) {
       loadData(gymData.id);
     }
   }, [gymData?.id]);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      return;
-    }
-
-    const now = new Date();
-    const normalizedToday = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate()
-    );
-
-    const activeReminderKeys = new Set<string>();
-
-    prospects.forEach((prospect) => {
-      if (!prospect.scheduled_date) {
-        return;
-      }
-
-      const scheduled = toLocalDate(prospect.scheduled_date);
-      if (Number.isNaN(scheduled.getTime())) {
-        return;
-      }
-      const diffDays = differenceInCalendarDays(scheduled, normalizedToday);
-
-      if (diffDays === 1) {
-        const reminderKey = `${prospect.id}-${prospect.scheduled_date}`;
-        activeReminderKeys.add(reminderKey);
-
-        if (reminderShownKeysRef.current.has(reminderKey)) {
-          return;
-        }
-
-        const reminderDateLabel = format(normalizedToday, "yyyy-MM-dd");
-        const prospectName = prospect.name?.trim() || "Interesado";
-
-        toast({
-          description: `Mandar recordatorio de clase a ${prospectName} - ${reminderDateLabel}`,
-          className:
-            "pointer-events-auto rounded-md border border-sky-200 bg-sky-50 p-4 pr-10 text-sm font-medium text-sky-900 shadow-lg",
-          duration: 1000 * 60 * 60 * 24,
-        });
-
-        reminderShownKeysRef.current.add(reminderKey);
-      }
-    });
-
-    reminderShownKeysRef.current.forEach((key) => {
-      if (!activeReminderKeys.has(key)) {
-        reminderShownKeysRef.current.delete(key);
-      }
-    });
 
   // Función para actualizar estados de miembros
   const updateMemberStatuses = (members: Member[]) => {
