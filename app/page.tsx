@@ -109,6 +109,8 @@ import type {
   CustomPlan,
 } from "@/lib/supabase";
 
+const NEW_PROSPECT_STATUSES: Prospect["status"][] = ["averiguador"];
+
 // === Helpers de fecha/estado para el dashboard ===
 const toLocalDate = (iso: string) => {
   const [year, month, day] = iso.split("-").map(Number);
@@ -561,6 +563,10 @@ export default function GymManagementSystem() {
     }).length;
   })();
 
+  const newProspectsCount = prospects.filter((prospect) =>
+    NEW_PROSPECT_STATUSES.includes(prospect.status)
+  ).length;
+
   const goToMembersWithFilter = (filter: string) => {
     setMemberFilter(filter);
     setActiveTab("members");
@@ -750,21 +756,21 @@ export default function GymManagementSystem() {
                 <span>{expiredMembers} socios con plan vencido</span>
               </div>
             )}
-            {prospects.filter((p) => p.status === "new").length > 0 && (
+            {newProspectsCount > 0 && (
               <div
                 className="flex items-center space-x-2 text-blue-600 cursor-pointer hover:bg-blue-50 p-2 rounded"
                 onClick={goToProspects}
               >
                 <UserPlus className="h-4 w-4" />
                 <span>
-                  {prospects.filter((p) => p.status === "new").length} nuevos
+                   {newProspectsCount} nuevos
                   interesados por contactar
                 </span>
               </div>
             )}
             {upcomingExpirations === 0 &&
               expiredMembers === 0 &&
-              prospects.filter((p) => p.status === "new").length === 0 && (
+              newProspectsCount === 0 && (
                 <div className="flex items-center space-x-2 text-green-600">
                   <span>✅ Todo en orden</span>
                 </div>
