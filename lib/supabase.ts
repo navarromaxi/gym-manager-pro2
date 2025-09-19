@@ -74,14 +74,12 @@ export interface Prospect {
   scheduled_date?: string | null
   interest: string
   status:
-    | "new"
-    | "contacted"
-    | "waiting_response"
-    | "waiting_info"
-    | "trial_scheduled"
-    | "trial_completed"
-    | "not_interested"
-    | "contact_later";
+    | "nuevo_interesado"
+    | "reagendado"
+    | "agendado"
+    | "asistio"
+    | "no_asistio"
+    | "inactivo";
   notes: string
   priority_level?: "green" | "yellow" | "red" // ¡NUEVA PROPIEDAD!
 }

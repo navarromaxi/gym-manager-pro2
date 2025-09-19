@@ -100,7 +100,7 @@ export function ProspectManagement({
     contact_date: new Date().toISOString().split("T")[0],
     scheduled_date: "",
     interest: "",
-    status: "new",
+    status: "nuevo_interesado",
     notes: "",
     priority_level: "green",
   });
@@ -141,41 +141,25 @@ export function ProspectManagement({
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    let isActive = true;
+    const checkTable = async () => {
+      const { data, error } = await supabase
+        .from("pg_tables")
+        .select("tablename")
+        .in("tablename", ["plan_contracts", "plan_contract"]);
 
-    const detectContractTable = async () => {
-      const candidates = ["plan_contracts", "plan_contract"] as const;
-
-      for (const table of candidates) {
-        const { error } = await supabase
-          .from(table)
-          .select("*", { head: true, count: "exact" });
-
-        if (!error) {
-          if (isActive) {
-            setContractTable(table);
-          }
-          return;
-        }
-
-        if (error && error.code !== "42P01") {
-          console.warn(
-            `Error verificando tabla de contratos (${table}):`,
-            error
-          );
-        }
+      if (error) {
+        console.warn("Error verificando tablas de contratos:", error);
+        return;
       }
 
-      if (isActive) {
-        setContractTable(null);
-      }
+      const tableName = data?.[0]?.tablename as
+        | "plan_contracts"
+        | "plan_contract"
+        | undefined;
+      setContractTable(tableName ?? null);
     };
 
-    detectContractTable();
-
-    return () => {
-      isActive = false;
-    };
+    checkTable();
   }, []);
 
   useEffect(() => {
@@ -474,50 +458,40 @@ export function ProspectManagement({
 
   const getStatusBadge = (status: Prospect["status"]) => {
     switch (status) {
-      case "new":
+      case "nuevo_interesado":
         return (
           <Badge variant="default" className="bg-blue-500 hover:bg-blue-500">
             Nuevo Interesado
           </Badge>
         );
-      case "contacted":
+      case "reagendado":
         return (
-          <Badge variant="outline" className="border-blue-500 text-blue-600">
-            Contactado
+          <Badge
+            variant="outline"
+            className="border-purple-500 text-purple-500"
+          >
+            Re/Agendado
           </Badge>
         );
-      case "waiting_response":
+      case "agendado":
         return (
-          <Badge variant="outline" className="border-amber-500 text-amber-600">
-            Esperando respuesta
+          <Badge variant="outline" className="border-cyan-500 text-cyan-500">
+            Agendado
           </Badge>
         );
-      case "waiting_info":
+      case "asistio":
         return (
-           <Badge variant="outline" className="border-purple-500 text-purple-500">
-            Esperando información
-          </Badge>
+          <Badge className="bg-emerald-600 hover:bg-emerald-600">Asistió</Badge>
         );
-      case "trial_scheduled":
-        return (
-          <Badge variant="outline" className="border-cyan-500 text-cyan-600">
-            Clase prueba agendada
-          </Badge>
-        );
-       case "trial_completed":
-        return (
-          <Badge className="bg-emerald-600 hover:bg-emerald-600">
-            Clase prueba completada
-          </Badge>
-        );
-      case "not_interested":
-        return <Badge variant="destructive">No interesado</Badge>;
-      case "contact_later":
+      case "no_asistio":
+        return <Badge variant="destructive">No asistió</Badge>;
+      case "inactivo":
         return (
           <Badge variant="outline" className="border-gray-400 text-gray-500">
-            Contactar luego
+            Inactivo
           </Badge>
         );
+
       default:
         return <Badge variant="secondary">Desconocido</Badge>;
     }
@@ -660,21 +634,14 @@ export function ProspectManagement({
                     <SelectValue placeholder="Selecciona un estado" />
                   </SelectTrigger>
                   <SelectContent>
-                   <SelectItem value="contacted">Contactado</SelectItem>
-                    <SelectItem value="waiting_response">
-                      Esperando respuesta
+                    <SelectItem value="nuevo_interesado">
+                      Nuevo interesado
                     </SelectItem>
-                    <SelectItem value="waiting_info">
-                      Esperando información
-                    </SelectItem>
-                    <SelectItem value="trial_scheduled">
-                      Clase de prueba agendada
-                    </SelectItem>
-                    <SelectItem value="trial_completed">
-                      Clase de prueba completada
-                    </SelectItem>
-                    <SelectItem value="not_interested">No interesado</SelectItem>
-                    <SelectItem value="contact_later">Contactar luego</SelectItem>
+                    <SelectItem value="reagendado">Re/Agendado</SelectItem>
+                    <SelectItem value="agendado">Agendado</SelectItem>
+                    <SelectItem value="asistio">Asistió</SelectItem>
+                    <SelectItem value="no_asistio">No asistió</SelectItem>
+                    <SelectItem value="inactivo">Inactivo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -742,17 +709,17 @@ export function ProspectManagement({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="new">Nuevo interesado</SelectItem>
-                 <SelectItem value="contacted">Contactado</SelectItem>
-                <SelectItem value="waiting_response">Esperando respuesta</SelectItem>
-                <SelectItem value="waiting_info">Esperando información</SelectItem>
-                <SelectItem value="trial_scheduled">Clase de prueba agendada</SelectItem>
-                <SelectItem value="trial_completed">Clase de prueba completada</SelectItem>
-                <SelectItem value="not_interested">No interesado</SelectItem>
-                <SelectItem value="contact_later">Contactar luego</SelectItem>
+                <SelectItem value="nuevo_interesado">
+                  Nuevo interesado
+                </SelectItem>
+                 <SelectItem value="reagendado">Re/Agendado</SelectItem>
+                <SelectItem value="agendado">Agendado</SelectItem>
+                <SelectItem value="asistio">Asistió</SelectItem>
+                <SelectItem value="no_asistio">No asistió</SelectItem>
+                <SelectItem value="inactivo">Inactivo</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex flex-col gap-1">
+             <div className="flex flex-col gap-1">
               <span className="text-xs font-medium text-muted-foreground">
                 Fecha agendada
               </span>
@@ -793,11 +760,11 @@ export function ProspectManagement({
                   <TableHead>Email</TableHead>
                   <TableHead>Teléfono</TableHead>
                   <TableHead>Fecha Contacto</TableHead>
-                  <TableHead>Fecha Agendado</TableHead>
+                   <TableHead>Fecha Agendado</TableHead>
                   <TableHead>Interés</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Prioridad</TableHead>
-                  {/* Acciones disponibles */}
+                   {/* Acciones disponibles */}
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -809,7 +776,7 @@ export function ProspectManagement({
                     </TableCell>
                     <TableCell>{prospect.email}</TableCell>
                     <TableCell>{prospect.phone}</TableCell>
-                    <TableCell>{formatDate(prospect.contact_date)}</TableCell>
+                   <TableCell>{formatDate(prospect.contact_date)}</TableCell>
                     <TableCell>{formatDate(prospect.scheduled_date)}</TableCell>
                     <TableCell className="max-w-xs truncate">
                       {prospect.interest}
@@ -926,7 +893,7 @@ export function ProspectManagement({
                 />
               </div>
 
-              <div className="grid gap-2">
+               <div className="grid gap-2">
                 <Label htmlFor="edit-scheduled_date">Fecha Agendado</Label>
                 <Input
                   id="edit-scheduled_date"
@@ -967,22 +934,14 @@ export function ProspectManagement({
                     <SelectValue placeholder="Selecciona un estado" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="new">Nuevo interesado</SelectItem>
-                     <SelectItem value="contacted">Contactado</SelectItem>
-                    <SelectItem value="waiting_response">
-                      Esperando respuesta
+                     <SelectItem value="nuevo_interesado">
+                      Nuevo interesado
                     </SelectItem>
-                    <SelectItem value="waiting_info">
-                      Esperando información
-                    </SelectItem>
-                    <SelectItem value="trial_scheduled">
-                      Clase de prueba agendada
-                    </SelectItem>
-                    <SelectItem value="trial_completed">
-                      Clase de prueba completada
-                    </SelectItem>
-                    <SelectItem value="not_interested">No interesado</SelectItem>
-                    <SelectItem value="contact_later">Contactar luego</SelectItem>
+                    <SelectItem value="reagendado">Re/Agendado</SelectItem>
+                    <SelectItem value="agendado">Agendado</SelectItem>
+                    <SelectItem value="asistio">Asistió</SelectItem>
+                    <SelectItem value="no_asistio">No asistió</SelectItem>
+                    <SelectItem value="inactivo">Inactivo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

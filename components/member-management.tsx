@@ -120,41 +120,14 @@ export function MemberManagement({
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    let isActive = true;
-
-    const detectContractTable = async () => {
-      const candidates = ["plan_contracts", "plan_contract"] as const;
-
-      for (const table of candidates) {
-        const { error } = await supabase
-          .from(table)
-          .select("*", { head: true, count: "exact" });
-
-        if (!error) {
-          if (isActive) {
-            setContractTable(table);
-          }
-          return;
-        }
-
-        if (error && error.code !== "42P01") {
-          console.warn(
-            `Error verificando tabla de contratos (${table}):`,
-            error
-          );
-        }
-      }
-
-      if (isActive) {
-        setContractTable(null);
-      }
+    const checkTable = async () => {
+      const { data } = await supabase
+        .from("pg_tables")
+        .select("tablename")
+        .in("tablename", ["plan_contracts", "plan_contract"]);
+      setContractTable((data && data[0]?.tablename) || null);
     };
-
-    detectContractTable();
-
-    return () => {
-      isActive = false;
-    };
+    checkTable();
   }, []);
   useEffect(() => {
     setStatusFilter(initialFilter);

@@ -124,69 +124,6 @@ const getRealStatus = (m: Member): "active" | "expired" | "inactive" => {
   return "inactive";
 };
 
-const PROSPECT_STATUS_NORMALIZATION_MAP: Record<string, Prospect["status"]> = {
-  new: "new",
-  
-  nuevo: "new",
-  nuevos: "new",
-  nuevo_interesado: "new",
-  interes: "new",
-  contacted: "contacted",
-  contactado: "contacted",
-  contacto_realizado: "contacted",
-  waiting_response: "waiting_response",
-  esperando_respuesta: "waiting_response",
-  espera_respuesta: "waiting_response",
-  waitingresponse: "waiting_response",
-  waiting_info: "waiting_info",
-  esperando_info: "waiting_info",
-  espera_info: "waiting_info",
-  waitinginfo: "waiting_info",
-  trial_scheduled: "trial_scheduled",
-  clase_agendada: "trial_scheduled",
-  prueba_agendada: "trial_scheduled",
-  scheduled: "trial_scheduled",
-  rescheduled: "trial_scheduled",
-  reagendado: "trial_scheduled",
-  agendado: "trial_scheduled",
-  trial_completed: "trial_completed",
-  clase_completada: "trial_completed",
-  prueba_completada: "trial_completed",
-  attended: "trial_completed",
-  asistio: "trial_completed",
-  not_interested: "not_interested",
-  no_interesado: "not_interested",
-  no_show: "not_interested",
-  noasistio: "not_interested",
-  no_asistio: "not_interested",
-  uninterested: "not_interested",
-  contact_later: "contact_later",
-  contactar_luego: "contact_later",
-  contactarluego: "contact_later",
-  follow_up: "contact_later",
-  inactive: "contact_later",
-  inactivo: "contact_later",
-};
-
-const normalizeProspectStatus = (
-  status: string | null | undefined
-): Prospect["status"] => {
-  if (!status) {
-    return "new";
-  }
-
-  const sanitized = status
-    .toString()
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-
-  const key = sanitized.replace(/[\s-]+/g, "_");
-
-  return PROSPECT_STATUS_NORMALIZATION_MAP[key] ?? "new";
-};
-
 const DEFAULT_GYM_NAME = "Sistema de Gestión Multi-Gimnasio";
 
 const sanitizeGymName = (name: string) => {
@@ -339,13 +276,7 @@ export default function GymManagementSystem() {
       setMembers(membersData || []);
       setPayments(paymentsData || []);
       setExpenses(expensesData || []);
-      const normalizedProspects = (prospectsData || []).map((prospect) => ({
-        ...prospect,
-        status: normalizeProspectStatus(
-          (prospect as { status?: string | null }).status
-        ),
-      }));
-      setProspects(normalizedProspects as Prospect[]);
+      setProspects(prospectsData || []);
       setPlans(plansData || []);
       setActivities(activitiesData || []);
       setCustomPlans(customPlansData || []);
@@ -819,22 +750,21 @@ export default function GymManagementSystem() {
                 <span>{expiredMembers} socios con plan vencido</span>
               </div>
             )}
-            {prospects.filter((p) => p.status === "new").length > 0 && (
+            {prospects.filter((p) => p.status === "nuevo_interesado").length > 0 && (
               <div
                 className="flex items-center space-x-2 text-blue-600 cursor-pointer hover:bg-blue-50 p-2 rounded"
                 onClick={goToProspects}
               >
                 <UserPlus className="h-4 w-4" />
                 <span>
-                  {prospects.filter((p) => p.status === "new").length} nuevos
-                  interesados por contactar
+                  {prospects.filter((p) => p.status === "nuevo_interesado").length} nuevos
                   interesados por contactar
                 </span>
               </div>
             )}
             {upcomingExpirations === 0 &&
               expiredMembers === 0 &&
-              prospects.filter((p) => p.status === "new").length === 0 && (
+              prospects.filter((p) => p.status === "nuevo_interesado").length === 0 && (
                 <div className="flex items-center space-x-2 text-green-600">
                   <span>✅ Todo en orden</span>
                 </div>
