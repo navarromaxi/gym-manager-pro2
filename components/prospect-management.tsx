@@ -89,6 +89,7 @@ export function ProspectManagement({
     status: "new" as Prospect["status"],
     notes: "",
     priority_level: "green" as "green" | "yellow" | "red", // Nuevo campo con valor por defecto
+    scheduled_date: "",
   });
   
   const paymentMethods = [
@@ -121,6 +122,11 @@ export function ProspectManagement({
   >(null);
 
   const [isClient, setIsClient] = useState(false);
+
+   const formatDate = (date?: string | null) => {
+    if (!date) return null;
+    return new Date(`${date}T00:00:00`).toLocaleDateString();
+  };
 
    useEffect(() => {
     const checkTable = async () => {
@@ -181,6 +187,9 @@ export function ProspectManagement({
         status: newProspect.status,
         notes: newProspect.notes,
         priority_level: newProspect.priority_level,
+        scheduled_date: newProspect.scheduled_date
+          ? newProspect.scheduled_date
+          : null,
       };
 
       const { data, error } = await supabase
@@ -202,6 +211,7 @@ export function ProspectManagement({
           status: "new",
           notes: "",
           priority_level: "green", // Resetear a verde por defecto
+          scheduled_date: "",
         });
         setIsAddDialogOpen(false);
       }
@@ -230,6 +240,7 @@ export function ProspectManagement({
           status: editingProspect.status,
           notes: editingProspect.notes,
           priority_level: editingProspect.priority_level, // Incluir el nuevo campo
+          scheduled_date: editingProspect.scheduled_date || null,
         })
         .eq("id", editingProspect.id)
         .eq("gym_id", gymId);
@@ -626,6 +637,23 @@ export function ProspectManagement({
                   </SelectContent>
                 </Select>
               </div>
+               <div className="grid gap-2">
+                <Label htmlFor="scheduled_date">Fecha agendada</Label>
+                <Input
+                  id="scheduled_date"
+                  type="date"
+                  value={newProspect.scheduled_date}
+                  onChange={(e) =>
+                    setNewProspect({
+                      ...newProspect,
+                      scheduled_date: e.target.value,
+                    })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Fecha prevista para la clase de prueba (opcional).
+                </p>
+              </div>
               {/* Nuevo campo para la prioridad */}
               <div className="grid gap-2">
                 <Label htmlFor="priority_level">Prioridad</Label>
@@ -733,19 +761,22 @@ export function ProspectManagement({
                   <TableHead>Fecha Contacto</TableHead>
                   <TableHead>Interés</TableHead>
                   <TableHead>Estado</TableHead>
+                   <TableHead>Fecha agendada</TableHead>
                   <TableHead>Prioridad</TableHead>
                   {/* Nueva columna en la tabla */}
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                 {sortedProspects.map((prospect) => (
-                  <TableRow key={prospect.id}>
-                    <TableCell className="font-medium">
-                      {prospect.name}
-                    </TableCell>
-                    <TableCell>{prospect.email}</TableCell>
-                    <TableCell>{prospect.phone}</TableCell>
+                  {sortedProspects.map((prospect) => {
+                  const scheduledDate = formatDate(prospect.scheduled_date);
+                  return (
+                    <TableRow key={prospect.id}>
+                      <TableCell className="font-medium">
+                        {prospect.name}
+                      </TableCell>
+                      <TableCell>{prospect.email}</TableCell>
+                      <TableCell>{prospect.phone}</TableCell>
                     <TableCell>
                       {new Date(prospect.contact_date).toLocaleDateString()}
                     </TableCell>
@@ -753,6 +784,20 @@ export function ProspectManagement({
                       {prospect.interest}
                     </TableCell>
                     <TableCell>{getStatusBadge(prospect.status)}</TableCell>
+                    <TableCell>
+                      {scheduledDate ? (
+                        <Badge
+                          variant="outline"
+                          className="border-cyan-500 text-cyan-600"
+                        >
+                          {scheduledDate}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Sin coordinar
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {getPriorityBadge(prospect.priority_level)}
                     </TableCell>
@@ -787,7 +832,8 @@ export function ProspectManagement({
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                );
+              })}
               </TableBody>
             </Table>
           </div>
@@ -912,6 +958,23 @@ export function ProspectManagement({
                 </Select>
               </div>
 
+               <div className="grid gap-2">
+                <Label htmlFor="edit-scheduled_date">Fecha agendada</Label>
+                <Input
+                  id="edit-scheduled_date"
+                  type="date"
+                  value={editingProspect.scheduled_date ?? ""}
+                  onChange={(e) =>
+                    setEditingProspect({
+                      ...editingProspect,
+                      scheduled_date: e.target.value ? e.target.value : null,
+                    })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Fecha coordinada para la clase de prueba (opcional).
+                </p>
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-priority_level">Prioridad</Label>
                 <Select
