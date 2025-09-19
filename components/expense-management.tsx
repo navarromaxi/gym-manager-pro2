@@ -83,7 +83,9 @@ export function ExpenseManagement({
   );
   const [monthFilter, setMonthFilter] = useState("all");
   const [selectedRecurringExpense, setSelectedRecurringExpense] = useState("");
+  const [generatedExpenseAmount, setGeneratedExpenseAmount] = useState("");
   const [yearFilter, setYearFilter] = useState("all");
+  
 
   const categories = [
     "Fijos",
@@ -224,14 +226,28 @@ export function ExpenseManagement({
     const updatedExpenses = expenses.filter((e) => e.id !== id);
     setExpenses((prev) => updatedExpenses);
   };
+  const handleGenerateDialogChange = (open: boolean) => {
+    setIsGenerateDialogOpen(open);
+    if (!open) {
+      setSelectedRecurringExpense("");
+      setGeneratedExpenseAmount("");
+    }
+  };
 
   const generateSpecificRecurringExpense = async () => {
     if (!selectedRecurringExpense) return;
+
+    if (!isGeneratedAmountValid) {
+      alert("Ingresa un monto válido para generar el gasto.");
+      return;
+    }
 
     const recurringExpense = expenses.find(
       (e) => e.id === selectedRecurringExpense
     );
     if (!recurringExpense) return;
+
+    const parsedAmount = parseFloat(generatedExpenseAmount);
 
     const today = new Date();
     const currentMonth = today.getMonth();
@@ -241,7 +257,6 @@ export function ExpenseManagement({
       (expense) =>
         expense.description.includes(recurringExpense.description) &&
         expense.category === recurringExpense.category &&
-        expense.amount === recurringExpense.amount &&
         !expense.isRecurring &&
         new Date(expense.date).getMonth() === currentMonth &&
         new Date(expense.date).getFullYear() === currentYear
@@ -254,7 +269,7 @@ export function ExpenseManagement({
         description: `${recurringExpense.description} (${
           today.getMonth() + 1
         }/${today.getFullYear()})`,
-        amount: recurringExpense.amount,
+        amount: parsedAmount,
         date: generatedExpenseDate,
         category: recurringExpense.category,
         isRecurring: false,
@@ -285,6 +300,7 @@ export function ExpenseManagement({
 
       setExpenses((prev) => [...prev, generatedExpense]);
       setSelectedRecurringExpense("");
+      setGeneratedExpenseAmount("");
       setIsGenerateDialogOpen(false);
     } else {
       alert("Este gasto fijo ya fue generado este mes");
@@ -319,7 +335,13 @@ export function ExpenseManagement({
     .filter((item) => item.total > 0);
 
   const recurringExpenses = expenses.filter((e) => e.isRecurring);
-
+    const parsedGeneratedAmountForValidation = parseFloat(generatedExpenseAmount);
+  const isGeneratedAmountValid =
+    generatedExpenseAmount !== "" &&
+    !Number.isNaN(parsedGeneratedAmountForValidation) &&
+    parsedGeneratedAmountForValidation > 0;
+  const isGenerateButtonDisabled =
+    !selectedRecurringExpense || !isGeneratedAmountValid;
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -335,7 +357,7 @@ export function ExpenseManagement({
           {/* BOTÓN PARA GENERAR GASTO FIJO ESPECÍFICO */}
           <Dialog
             open={isGenerateDialogOpen}
-            onOpenChange={setIsGenerateDialogOpen}
+            onOpenChange={handleGenerateDialogChange}
           >
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -366,7 +388,13 @@ export function ExpenseManagement({
                   </Label>
                   <Select
                     value={selectedRecurringExpense}
-                    onValueChange={setSelectedRecurringExpense}
+                    onValueChange={(value) => {
+                      setSelectedRecurringExpense(value);
+                      const expense = expenses.find((e) => e.id === value);
+                      if (expense) {
+                        setGeneratedExpenseAmount(expense.amount.toString());
+                      }
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecciona un gasto fijo" />
@@ -374,8 +402,7 @@ export function ExpenseManagement({
                     <SelectContent>
                       {recurringExpenses.map((expense) => (
                         <SelectItem key={expense.id} value={expense.id}>
-                          {expense.description} - $
-                          {expense.amount.toLocaleString()} ({expense.category})
+                          {expense.description}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -387,11 +414,23 @@ export function ExpenseManagement({
                     </p>
                   )}
                 </div>
+                 <div className="grid gap-2">
+                  <Label htmlFor="generated-amount">Monto</Label>
+                  <Input
+                    id="generated-amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={generatedExpenseAmount}
+                    onChange={(e) => setGeneratedExpenseAmount(e.target.value)}
+                    placeholder="Ingresa el monto a generar"
+                  />
+                </div>
               </div>
               <DialogFooter>
                 <Button
                   onClick={generateSpecificRecurringExpense}
-                  disabled={!selectedRecurringExpense}
+                  disabled={isGenerateButtonDisabled}
                 >
                   Generar Gasto
                 </Button>

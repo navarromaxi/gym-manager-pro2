@@ -32,7 +32,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Search, UserPlus } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Search,
+  UserPlus,
+  AlertTriangle,
+  X,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Prospect, Member, Payment, Plan } from "@/lib/supabase";
 
@@ -122,11 +130,65 @@ export function ProspectManagement({
     "plan_contracts" | "plan_contract" | null
   >(null);
 
+  const [dismissedReminders, setDismissedReminders] = useState<string[]>([]);
+
   const [isClient, setIsClient] = useState(false);
 
   const formatDate = (date?: string | null) => {
     if (!date) return null;
     return new Date(`${date}T00:00:00`).toLocaleDateString();
+  };
+
+   const parseScheduledDate = (value?: string | null) => {
+    if (!value) return null;
+    const trimmedValue = value.trim();
+    if (!trimmedValue) return null;
+
+    const normalizedValue = trimmedValue.includes("T")
+      ? trimmedValue
+      : trimmedValue.includes(" ")
+        ? trimmedValue.replace(" ", "T")
+        : `${trimmedValue}T00:00:00`;
+
+    let parsedDate = new Date(normalizedValue);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      const slashDateMatch = trimmedValue.match(
+        /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}:\d{2}))?$/
+      );
+
+      if (slashDateMatch) {
+        const [, day, month, year, time] = slashDateMatch;
+        const isoDate = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}${
+          time ? `T${time}` : "T00:00"
+        }:00`;
+        parsedDate = new Date(isoDate);
+      }
+    }
+
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+  };
+
+  const formatScheduledDateTime = (value?: string | null) => {
+    if (!value) return null;
+    const parsed = parseScheduledDate(value);
+    if (!parsed) return null;
+
+    const hasTime = value.includes(":");
+    const formatterOptions: Intl.DateTimeFormatOptions = hasTime
+      ? { dateStyle: "short", timeStyle: "short" }
+      : { dateStyle: "short" };
+
+    return parsed.toLocaleString(undefined, formatterOptions);
+  };
+
+  const getReminderKey = (prospect: Prospect) =>
+    `${prospect.id}-${prospect.scheduled_date ?? ""}`;
+
+  const handleDismissReminder = (key: string) => {
+    setDismissedReminders((prev) =>
+      prev.includes(key) ? prev : [...prev, key]
+    );
   };
 
   useEffect(() => {
@@ -154,6 +216,40 @@ export function ProspectManagement({
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+   const upcomingTrialReminders = (() => {
+    if (!isClient) return [] as Prospect[];
+
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setHours(0, 0, 0, 0);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return prospects.filter((prospect) => {
+      if (
+        !prospect.scheduled_date ||
+        (prospect.status !== "trial_scheduled" &&
+          prospect.status !== "reagendado")
+      ) {
+        return false;
+      }
+
+      const reminderKey = getReminderKey(prospect);
+      if (dismissedReminders.includes(reminderKey)) {
+        return false;
+      }
+
+      const scheduled = parseScheduledDate(prospect.scheduled_date);
+      if (!scheduled) {
+        return false;
+      }
+
+      const scheduledDate = new Date(scheduled);
+      scheduledDate.setHours(0, 0, 0, 0);
+
+      return scheduledDate.getTime() === tomorrow.getTime();
+    });
+  })();
 
   const filteredProspects = prospects.filter((prospect) => {
     const matchesSearch =
@@ -1287,6 +1383,43 @@ export function ProspectManagement({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+       {isClient && upcomingTrialReminders.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2">
+          {upcomingTrialReminders.map((prospect) => {
+            const reminderKey = getReminderKey(prospect);
+            const scheduledLabel = formatScheduledDateTime(
+              prospect.scheduled_date
+            );
+
+            return (
+              <div
+                key={reminderKey}
+                className="flex items-start gap-3 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800 shadow-lg"
+              >
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600" />
+                <div className="flex-1">
+                  <p className="font-semibold">
+                    Mandar recordatorio a {prospect.name}
+                  </p>
+                  {scheduledLabel ? (
+                    <p className="text-xs text-green-700">
+                      Clase agendada: {scheduledLabel}
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDismissReminder(reminderKey)}
+                  className="ml-2 text-green-600 transition hover:text-green-800"
+                  aria-label={`Cerrar recordatorio para ${prospect.name}`}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
