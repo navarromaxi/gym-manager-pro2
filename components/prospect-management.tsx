@@ -80,19 +80,19 @@ export function ProspectManagement({
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all"); // Nuevo estado para el filtro de prioridad
-  const [scheduledDateFilter, setScheduledDateFilter] = useState("");// estado para el filtro de fecha
+  const [scheduledDateFilter, setScheduledDateFilter] = useState(""); // estado para el filtro de fecha
   const [newProspect, setNewProspect] = useState({
     name: "",
     email: "",
     phone: "",
     contact_date: new Date().toISOString().split("T")[0],
     interest: "",
-    status: "new" as Prospect["status"],
+    status: "averiguador" as Prospect["status"],
     notes: "",
     priority_level: "green" as "green" | "yellow" | "red", // Nuevo campo con valor por defecto
     scheduled_date: "",
   });
-  
+
   const paymentMethods = [
     "Efectivo",
     "Transferencia",
@@ -124,12 +124,12 @@ export function ProspectManagement({
 
   const [isClient, setIsClient] = useState(false);
 
-   const formatDate = (date?: string | null) => {
+  const formatDate = (date?: string | null) => {
     if (!date) return null;
     return new Date(`${date}T00:00:00`).toLocaleDateString();
   };
 
-   useEffect(() => {
+  useEffect(() => {
     const checkTable = async () => {
       const { data, error } = await supabase
         .from("pg_tables")
@@ -166,7 +166,9 @@ export function ProspectManagement({
       priorityFilter === "all" || prospect.priority_level === priorityFilter; // Nuevo filtro
     const matchesScheduledDate =
       !scheduledDateFilter || prospect.scheduled_date === scheduledDateFilter;
-    return matchesSearch && matchesStatus && matchesPriority && matchesScheduledDate;
+    return (
+      matchesSearch && matchesStatus && matchesPriority && matchesScheduledDate
+    );
   });
 
   const sortedProspects = [...filteredProspects].sort((a, b) => {
@@ -211,7 +213,7 @@ export function ProspectManagement({
           phone: "",
           contact_date: new Date().toISOString().split("T")[0],
           interest: "",
-          status: "new",
+          status: "averiguador",
           notes: "",
           priority_level: "green", // Resetear a verde por defecto
           scheduled_date: "",
@@ -278,7 +280,7 @@ export function ProspectManagement({
       alert("Error al eliminar el interesado. Inténtalo de nuevo.");
     }
   };
-   const handleConvertDialogOpenChange = (open: boolean) => {
+  const handleConvertDialogOpenChange = (open: boolean) => {
     setIsConvertDialogOpen(open);
     if (!open) {
       setConvertingProspect(null);
@@ -331,7 +333,7 @@ export function ProspectManagement({
         );
       }
 
-       const today = new Date();
+      const today = new Date();
       const diffTime = today.getTime() - nextPayment.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -446,51 +448,40 @@ export function ProspectManagement({
 
   const getStatusBadge = (status: Prospect["status"]) => {
     switch (status) {
-      case "new":
+      case "averiguador":
         return (
-          <Badge variant="default" className="bg-blue-500 hover:bg-blue-500">
-            Nuevo
-          </Badge>
-        );
-      case "contacted":
-        return <Badge variant="secondary">Contactado</Badge>;
-      case "waiting_response":
-        return (
-          <Badge
-            variant="outline"
-            className="border-orange-500 text-orange-500"
-          >
-            Esperando Respuesta
-          </Badge>
-        );
-      case "waiting_info":
-        return (
-          <Badge
-            variant="outline"
-            className="border-purple-500 text-purple-500"
-          >
-            Esperando Info
+          <Badge className="bg-blue-500 hover:bg-blue-500 text-white">
+            Averiguador
           </Badge>
         );
       case "trial_scheduled":
         return (
           <Badge variant="outline" className="border-cyan-500 text-cyan-500">
-            Coordinamos Clase
+            Coordinamos clase de prueba
           </Badge>
         );
-      case "trial_completed":
+      case "reagendado":
         return (
-          <Badge
-            variant="outline"
-            className="border-emerald-600 text-emerald-600"
-          >
-            Clase Realizada
+          <Badge variant="outline" className="border-amber-500 text-amber-500">
+            Re/Agendado
           </Badge>
         );
-      case "not_interested":
-        return <Badge variant="destructive">No Interesado</Badge>;
-      case "contact_later":
-        return <Badge variant="outline">Contactar Después</Badge>;
+      case "asistio":
+        return (
+          <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">
+            Asistio
+          </Badge>
+        );
+      case "no_asistio":
+        return <Badge variant="destructive">No asistio</Badge>;
+      case "inactivo":
+        return (
+          <Badge variant="outline" className="border-slate-500 text-slate-500">
+            Inactivo
+          </Badge>
+        );
+      case "otro":
+        return <Badge variant="secondary">Otro</Badge>;
       default:
         return <Badge variant="secondary">Desconocido</Badge>;
     }
@@ -619,28 +610,19 @@ export function ProspectManagement({
                     <SelectValue placeholder="Selecciona un estado" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="new">Nuevo</SelectItem>
-                    <SelectItem value="contacted">Contactado</SelectItem>
-                    <SelectItem value="waiting_response">
-                      Esperando Respuesta
-                    </SelectItem>
-                    <SelectItem value="waiting_info">Esperando Info</SelectItem>
+                    <SelectItem value="averiguador">Averiguador</SelectItem>
                     <SelectItem value="trial_scheduled">
                       Coordinamos clase de prueba
                     </SelectItem>
-                    <SelectItem value="trial_completed">
-                      Ya hizo clase de prueba
-                    </SelectItem>
-                    <SelectItem value="not_interested">
-                      No Interesado
-                    </SelectItem>
-                    <SelectItem value="contact_later">
-                      Contactar Después
-                    </SelectItem>
+                    <SelectItem value="reagendado">Re/Agendado</SelectItem>
+                    <SelectItem value="asistio">Asistio</SelectItem>
+                    <SelectItem value="no_asistio">No asistio</SelectItem>
+                    <SelectItem value="inactivo">Inactivo</SelectItem>
+                    <SelectItem value="otro">Otro</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-               <div className="grid gap-2">
+              <div className="grid gap-2">
                 <Label htmlFor="scheduled_date">Fecha agendada</Label>
                 <Input
                   id="scheduled_date"
@@ -721,14 +703,15 @@ export function ProspectManagement({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="new">Nuevo</SelectItem>
-                <SelectItem value="contacted">Contactado</SelectItem>
-                <SelectItem value="waiting_response">
-                  Esperando Respuesta
+                <SelectItem value="averiguador">Averiguador</SelectItem>
+                <SelectItem value="trial_scheduled">
+                  Coordinamos clase de prueba
                 </SelectItem>
-                <SelectItem value="waiting_info">Esperando Info</SelectItem>
-                <SelectItem value="not_interested">No Interesado</SelectItem>
-                <SelectItem value="contact_later">Contactar Después</SelectItem>
+                <SelectItem value="reagendado">Re/Agendado</SelectItem>
+                <SelectItem value="asistio">Asistio</SelectItem>
+                <SelectItem value="no_asistio">No asistio</SelectItem>
+                <SelectItem value="inactivo">Inactivo</SelectItem>
+                <SelectItem value="otro">Otro</SelectItem>
               </SelectContent>
             </Select>
             {/* Nuevo filtro por prioridad */}
@@ -744,7 +727,10 @@ export function ProspectManagement({
               </SelectContent>
             </Select>
             <div className="flex w-full min-w-[200px] flex-col gap-2 sm:w-[220px]">
-              <Label htmlFor="scheduled-date-filter" className="text-sm font-medium">
+              <Label
+                htmlFor="scheduled-date-filter"
+                className="text-sm font-medium"
+              >
                 Fecha agendada
               </Label>
               <Input
@@ -759,7 +745,9 @@ export function ProspectManagement({
                   variant="outline"
                   className="flex-1"
                   onClick={() =>
-                    setScheduledDateFilter(new Date().toISOString().split("T")[0])
+                    setScheduledDateFilter(
+                      new Date().toISOString().split("T")[0]
+                    )
                   }
                 >
                   Hoy
@@ -780,9 +768,7 @@ export function ProspectManagement({
       {/* Prospects Table */}
       <Card>
         <CardHeader>
-          <CardTitle>
-             Lista de Interesados ({sortedProspects.length})
-          </CardTitle>
+          <CardTitle>Lista de Interesados ({sortedProspects.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="w-full overflow-x-auto">
@@ -795,14 +781,14 @@ export function ProspectManagement({
                   <TableHead>Fecha Contacto</TableHead>
                   <TableHead>Interés</TableHead>
                   <TableHead>Estado</TableHead>
-                   <TableHead>Fecha agendada</TableHead>
+                  <TableHead>Fecha agendada</TableHead>
                   <TableHead>Prioridad</TableHead>
                   {/* Nueva columna en la tabla */}
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                  {sortedProspects.map((prospect) => {
+                {sortedProspects.map((prospect) => {
                   const scheduledDate = formatDate(prospect.scheduled_date);
                   return (
                     <TableRow key={prospect.id}>
@@ -811,63 +797,63 @@ export function ProspectManagement({
                       </TableCell>
                       <TableCell>{prospect.email}</TableCell>
                       <TableCell>{prospect.phone}</TableCell>
-                    <TableCell>
-                      {new Date(prospect.contact_date).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      {prospect.interest}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(prospect.status)}</TableCell>
-                    <TableCell>
-                      {scheduledDate ? (
-                        <Badge
-                          variant="outline"
-                          className="border-cyan-500 text-cyan-600"
-                        >
-                          {scheduledDate}
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          Sin coordinar
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {getPriorityBadge(prospect.priority_level)}
-                    </TableCell>
-                    {/* Mostrar prioridad */}
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingProspect(prospect);
-                            setIsEditDialogOpen(true);
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => startConversion(prospect)}
-                          title="Convertir a Socio"
-                        >
-                          <UserPlus className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteProspect(prospect.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+                      <TableCell>
+                        {new Date(prospect.contact_date).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {prospect.interest}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(prospect.status)}</TableCell>
+                      <TableCell>
+                        {scheduledDate ? (
+                          <Badge
+                            variant="outline"
+                            className="border-cyan-500 text-cyan-600"
+                          >
+                            {scheduledDate}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Sin coordinar
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {getPriorityBadge(prospect.priority_level)}
+                      </TableCell>
+                      {/* Mostrar prioridad */}
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingProspect(prospect);
+                              setIsEditDialogOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startConversion(prospect)}
+                            title="Convertir a Socio"
+                          >
+                            <UserPlus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteProspect(prospect.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -970,29 +956,20 @@ export function ProspectManagement({
                     <SelectValue placeholder="Selecciona un estado" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="new">Nuevo</SelectItem>
-                    <SelectItem value="contacted">Contactado</SelectItem>
-                    <SelectItem value="waiting_response">
-                      Esperando Respuesta
-                    </SelectItem>
-                    <SelectItem value="waiting_info">Esperando Info</SelectItem>
+                    <SelectItem value="averiguador">Averiguador</SelectItem>
                     <SelectItem value="trial_scheduled">
                       Coordinamos clase de prueba
                     </SelectItem>
-                    <SelectItem value="trial_completed">
-                      Ya hizo clase de prueba
-                    </SelectItem>
-                    <SelectItem value="not_interested">
-                      No Interesado
-                    </SelectItem>
-                    <SelectItem value="contact_later">
-                      Contactar Después
-                    </SelectItem>
+                    <SelectItem value="reagendado">Re/Agendado</SelectItem>
+                    <SelectItem value="asistio">Asistio</SelectItem>
+                    <SelectItem value="no_asistio">No asistio</SelectItem>
+                    <SelectItem value="inactivo">Inactivo</SelectItem>
+                    <SelectItem value="otro">Otro</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-               <div className="grid gap-2">
+              <div className="grid gap-2">
                 <Label htmlFor="edit-scheduled_date">Fecha agendada</Label>
                 <Input
                   id="edit-scheduled_date"
@@ -1069,7 +1046,7 @@ export function ProspectManagement({
               </DialogDescription>
             </DialogHeader>
             {convertingProspect && (
-               <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
+              <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
                 <div className="grid gap-2">
                   <Label htmlFor="convert-plan-start">
                     Fecha de inicio del plan
@@ -1167,9 +1144,7 @@ export function ProspectManagement({
                             ...prev,
                             installments,
                             paymentAmount:
-                              installments === 1
-                                ? prev.planPrice
-                                : 0,
+                              installments === 1 ? prev.planPrice : 0,
                           }));
                         }}
                       >
@@ -1195,14 +1170,14 @@ export function ProspectManagement({
                           onChange={(e) =>
                             setConversionData((prev) => ({
                               ...prev,
-                              paymentAmount:
-                                parseFloat(e.target.value) || 0,
+                              paymentAmount: parseFloat(e.target.value) || 0,
                             }))
                           }
                         />
                         <p className="text-xs text-muted-foreground">
                           Saldo pendiente: $
-                          {(conversionData.planPrice -
+                          {(
+                            conversionData.planPrice -
                             conversionData.paymentAmount
                           ).toFixed(2)}
                         </p>
@@ -1234,7 +1209,7 @@ export function ProspectManagement({
                     </SelectContent>
                   </Select>
                 </div>
-                 {conversionData.paymentMethod === "Tarjeta de Crédito" && (
+                {conversionData.paymentMethod === "Tarjeta de Crédito" && (
                   <>
                     <div className="grid gap-2">
                       <Label>Tipo de Tarjeta</Label>
@@ -1271,8 +1246,7 @@ export function ProspectManagement({
                         onChange={(e) =>
                           setConversionData((prev) => ({
                             ...prev,
-                            cardInstallments:
-                              parseInt(e.target.value) || 1,
+                            cardInstallments: parseInt(e.target.value) || 1,
                           }))
                         }
                       />
@@ -1302,7 +1276,7 @@ export function ProspectManagement({
               <Button
                 type="submit"
                 onClick={handleConvertProspectToMember}
-                 disabled={
+                disabled={
                   !conversionData.plan ||
                   (conversionData.paymentMethod === "Tarjeta de Crédito" &&
                     !conversionData.cardBrand)
