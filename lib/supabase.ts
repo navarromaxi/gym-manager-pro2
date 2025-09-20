@@ -30,6 +30,7 @@ export interface Member {
   balance_due?: number
   last_payment: string
   next_payment: string
+  next_installment_due?: string | null
   status: "active" | "expired" | "inactive"
   inactive_level?: "green" | "yellow" | "red"
   inactive_comment?: string

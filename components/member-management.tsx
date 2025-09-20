@@ -37,6 +37,26 @@ import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
 // Normaliza "YYYY-MM-DD" a medianoche local (evita desfase por UTC)
 const toLocalDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
 
+const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
+  if (!startDate) return "";
+  const baseDate = new Date(`${startDate}T00:00:00`);
+  if (Number.isNaN(baseDate.getTime())) {
+    return startDate;
+  }
+
+  if (plan) {
+    if (plan.duration_type === "days") {
+      baseDate.setDate(baseDate.getDate() + plan.duration);
+    } else if (plan.duration_type === "months") {
+      baseDate.setMonth(baseDate.getMonth() + plan.duration);
+    } else if (plan.duration_type === "years") {
+      baseDate.setFullYear(baseDate.getFullYear() + plan.duration);
+    }
+  }
+
+  return baseDate.toISOString().split("T")[0];
+};
+
 const getRealStatus = (member: Member): "active" | "expired" | "inactive" => {
   const today = new Date();
   //const next = new Date(member.next_payment);
@@ -104,6 +124,7 @@ export function MemberManagement({
     cardBrand: "",
     cardInstallments: 1,
     description: "",
+    nextInstallmentDue: new Date().toISOString().split("T")[0],
   });
 
   const paymentMethods = [
@@ -118,6 +139,20 @@ export function MemberManagement({
     "plan_contracts" | "plan_contract" | null
   >(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const selectedPlanForNewMember = useMemo(() => {
+    return plans.find((p) => p.name === newMember.plan) ?? null;
+  }, [plans, newMember.plan]);
+
+  const calculatedPlanEndDate = useMemo(
+    () => calculatePlanEndDate(newMember.planStartDate, selectedPlanForNewMember),
+    [newMember.planStartDate, selectedPlanForNewMember]
+  );
+
+  const nextInstallmentDueValue =
+    newMember.installments === 1
+      ? calculatedPlanEndDate
+      : newMember.nextInstallmentDue || calculatedPlanEndDate;
 
   useEffect(() => {
     const checkTable = async () => {
@@ -226,6 +261,12 @@ export function MemberManagement({
         );
       }
 
+      const nextPaymentISO = nextPayment.toISOString().split("T")[0];
+      const nextInstallmentDue =
+        installments === 1
+          ? nextPaymentISO
+          : newMember.nextInstallmentDue || nextPaymentISO;
+          
       const today = new Date();
       const diffTime = today.getTime() - nextPayment.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -258,7 +299,8 @@ export function MemberManagement({
         plan_price: newMember.planPrice,
         join_date: newMember.paymentDate,
         last_payment: newMember.planStartDate,
-        next_payment: nextPayment.toISOString().split("T")[0],
+        next_payment: nextPaymentISO,
+        next_installment_due: nextInstallmentDue,
         status: memberStatus,
         inactive_level: inactiveLevel,
         balance_due: newMember.planPrice - paymentAmount,
@@ -340,6 +382,7 @@ export function MemberManagement({
         cardBrand: "",
         cardInstallments: 1,
         description: "",
+        nextInstallmentDue: new Date().toISOString().split("T")[0],
       });
       setIsAddDialogOpen(false);
     } catch (error) {
@@ -374,6 +417,8 @@ export function MemberManagement({
           email: editingMember.email,
           phone: editingMember.phone,
           next_payment: editingMember.next_payment,
+          next_installment_due:
+            editingMember.next_installment_due || editingMember.next_payment,
           status: newStatus,
           inactive_level: newInactive,
         })
@@ -598,12 +643,21 @@ export function MemberManagement({
                   id="planStartDate"
                   type="date"
                   value={newMember.planStartDate}
-                  onChange={(e) =>
+                   onChange={(e) => {
+                    const value = e.target.value;
+                    const computedNext = calculatePlanEndDate(
+                      value,
+                      selectedPlanForNewMember
+                    );
                     setNewMember({
                       ...newMember,
-                      planStartDate: e.target.value,
-                    })
-                  }
+                     planStartDate: value,
+                      nextInstallmentDue:
+                        newMember.installments === 1
+                          ? computedNext
+                          : newMember.nextInstallmentDue || computedNext,
+                    });
+                  }}
                 />
                 <p className="text-xs text-muted-foreground">
                   El plan se calculará desde esta fecha (útil si se registra con
@@ -627,12 +681,17 @@ export function MemberManagement({
                   value={newMember.plan}
                   onValueChange={(value) => {
                     const selectedPlan = plans.find((p) => p.name === value);
+                    const computedNext = calculatePlanEndDate(
+                      newMember.planStartDate,
+                      selectedPlan
+                    );
                     setNewMember({
                       ...newMember,
                       plan: value,
                       planPrice: selectedPlan?.price || 0,
                       installments: 1,
                       paymentAmount: selectedPlan?.price || 0,
+                       nextInstallmentDue: computedNext,
                     });
                   }}
                 >
@@ -677,6 +736,10 @@ export function MemberManagement({
                   value={newMember.installments.toString()}
                   onValueChange={(value) => {
                     const installments = parseInt(value);
+                     const computedNext = calculatePlanEndDate(
+                      newMember.planStartDate,
+                      selectedPlanForNewMember
+                    );
                     setNewMember({
                       ...newMember,
                       installments,
@@ -684,6 +747,10 @@ export function MemberManagement({
                         installments === 1
                           ? newMember.planPrice
                           : 0,
+                          nextInstallmentDue:
+                        installments === 1
+                          ? computedNext
+                          : newMember.nextInstallmentDue || computedNext,
                     });
                   }}
                 >
@@ -717,6 +784,28 @@ export function MemberManagement({
                   </p>
                 </div>
               )}
+              <div className="grid gap-2">
+                <Label htmlFor="nextInstallmentDue">
+                  Vencimiento próxima cuota
+                </Label>
+                <Input
+                  id="nextInstallmentDue"
+                  type="date"
+                  value={nextInstallmentDueValue}
+                  onChange={(e) =>
+                    setNewMember({
+                      ...newMember,
+                      nextInstallmentDue: e.target.value,
+                    })
+                  }
+                  disabled={newMember.installments === 1}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {newMember.installments === 1
+                    ? "Se utilizará la misma fecha que el fin del plan."
+                    : "Registra cuándo debería abonarse la próxima cuota."}
+                </p>
+              </div>
             </>
           )}
               <div className="grid gap-2">
@@ -1088,6 +1177,29 @@ export function MemberManagement({
                     })
                   }
                 />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-next-installment">
+                  Vencimiento próxima cuota
+                </Label>
+                <Input
+                  id="edit-next-installment"
+                  type="date"
+                  value={
+                    editingMember.next_installment_due ||
+                    editingMember.next_payment ||
+                    ""
+                  }
+                  onChange={(e) =>
+                    setEditingMember({
+                      ...editingMember,
+                      next_installment_due: e.target.value,
+                    })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Actualiza cuándo debería pagarse la próxima cuota pendiente.
+                </p>
               </div>
             </div>
           )}

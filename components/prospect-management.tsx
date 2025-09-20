@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,7 +65,28 @@ interface ConversionData {
   cardBrand: string;
   cardInstallments: number;
   description: string;
+  nextInstallmentDue: string;
 }
+
+const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
+  if (!startDate) return "";
+  const baseDate = new Date(`${startDate}T00:00:00`);
+  if (Number.isNaN(baseDate.getTime())) {
+    return startDate;
+  }
+
+  if (plan) {
+    if (plan.duration_type === "days") {
+      baseDate.setDate(baseDate.getDate() + plan.duration);
+    } else if (plan.duration_type === "months") {
+      baseDate.setMonth(baseDate.getMonth() + plan.duration);
+    } else if (plan.duration_type === "years") {
+      baseDate.setFullYear(baseDate.getFullYear() + plan.duration);
+    }
+  }
+
+  return baseDate.toISOString().split("T")[0];
+};
 
 export function ProspectManagement({
   prospects,
@@ -121,6 +141,7 @@ export function ProspectManagement({
       cardBrand: "",
       cardInstallments: 1,
       description: "",
+      nextInstallmentDue: today,
     };
   };
   const [conversionData, setConversionData] = useState<ConversionData>(
@@ -129,6 +150,24 @@ export function ProspectManagement({
   const [contractTable, setContractTable] = useState<
     "plan_contracts" | "plan_contract" | null
   >(null);
+
+  const selectedConversionPlan = useMemo(() => {
+    return plans.find((plan) => plan.name === conversionData.plan) ?? null;
+  }, [plans, conversionData.plan]);
+
+  const calculatedConversionEndDate = useMemo(
+    () =>
+      calculatePlanEndDate(
+        conversionData.planStartDate,
+        selectedConversionPlan
+      ),
+    [conversionData.planStartDate, selectedConversionPlan]
+  );
+
+  const conversionNextInstallmentValue =
+    conversionData.installments === 1
+      ? calculatedConversionEndDate
+      : conversionData.nextInstallmentDue || calculatedConversionEndDate;
 
   const [dismissedReminders, setDismissedReminders] = useState<string[]>([]);
 
@@ -359,6 +398,8 @@ export function ProspectManagement({
     }
   };
 
+  
+
   const handleDeleteProspect = async (id: string) => {
     if (!confirm("¿Estás seguro de que quieres eliminar este interesado?"))
       return;
@@ -376,6 +417,8 @@ export function ProspectManagement({
       alert("Error al eliminar el interesado. Inténtalo de nuevo.");
     }
   };
+
+  
   const handleConvertDialogOpenChange = (open: boolean) => {
     setIsConvertDialogOpen(open);
     if (!open) {
@@ -429,6 +472,12 @@ export function ProspectManagement({
         );
       }
 
+      const nextPaymentISO = nextPayment.toISOString().split("T")[0];
+      const nextInstallmentDue =
+        installments === 1
+          ? nextPaymentISO
+          : conversionData.nextInstallmentDue || nextPaymentISO;
+
       const today = new Date();
       const diffTime = today.getTime() - nextPayment.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -460,7 +509,8 @@ export function ProspectManagement({
         plan: selectedPlan.name,
         plan_price: conversionData.planPrice,
         last_payment: conversionData.planStartDate,
-        next_payment: nextPayment.toISOString().split("T")[0],
+        next_payment: nextPaymentISO,
+        next_installment_due: nextInstallmentDue,
         status: memberStatus,
         inactive_level: inactiveLevel,
         balance_due: conversionData.planPrice - paymentAmount,
@@ -1151,12 +1201,24 @@ export function ProspectManagement({
                     id="convert-plan-start"
                     type="date"
                     value={conversionData.planStartDate}
-                    onChange={(e) =>
-                      setConversionData((prev) => ({
-                        ...prev,
-                        planStartDate: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setConversionData((prev) => {
+                        const plan = plans.find((p) => p.name === prev.plan);
+                        const computedNext = calculatePlanEndDate(
+                          value,
+                          plan
+                        );
+                        return {
+                          ...prev,
+                          planStartDate: value,
+                          nextInstallmentDue:
+                            prev.installments === 1
+                              ? computedNext
+                              : prev.nextInstallmentDue || computedNext,
+                        };
+                      });
+                    }}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -1181,12 +1243,17 @@ export function ProspectManagement({
                       const selectedPlan = plans.find(
                         (plan) => plan.name === value
                       );
+                      const computedNext = calculatePlanEndDate(
+                        conversionData.planStartDate,
+                        selectedPlan
+                      );
                       setConversionData((prev) => ({
                         ...prev,
                         plan: value,
                         planPrice: selectedPlan?.price || 0,
                         installments: 1,
                         paymentAmount: selectedPlan?.price || 0,
+                        nextInstallmentDue: computedNext,
                       }));
                     }}
                   >
@@ -1236,12 +1303,25 @@ export function ProspectManagement({
                         value={conversionData.installments.toString()}
                         onValueChange={(value) => {
                           const installments = parseInt(value);
-                          setConversionData((prev) => ({
-                            ...prev,
-                            installments,
-                            paymentAmount:
-                              installments === 1 ? prev.planPrice : 0,
-                          }));
+                          setConversionData((prev) => {
+                            const plan = plans.find(
+                              (p) => p.name === prev.plan
+                            );
+                            const computedNext = calculatePlanEndDate(
+                              prev.planStartDate,
+                              plan
+                            );
+                            return {
+                              ...prev,
+                              installments,
+                              paymentAmount:
+                                installments === 1 ? prev.planPrice : 0,
+                              nextInstallmentDue:
+                                installments === 1
+                                  ? computedNext
+                                  : prev.nextInstallmentDue || computedNext,
+                            };
+                          });
                         }}
                       >
                         <SelectTrigger>
@@ -1279,6 +1359,28 @@ export function ProspectManagement({
                         </p>
                       </div>
                     )}
+                    <div className="grid gap-2">
+                      <Label htmlFor="convert-next-installment">
+                        Vencimiento próxima cuota
+                      </Label>
+                      <Input
+                        id="convert-next-installment"
+                        type="date"
+                        value={conversionNextInstallmentValue}
+                        onChange={(e) =>
+                          setConversionData((prev) => ({
+                            ...prev,
+                            nextInstallmentDue: e.target.value,
+                          }))
+                        }
+                        disabled={conversionData.installments === 1}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {conversionData.installments === 1
+                          ? "Se utilizará la misma fecha que el fin del plan."
+                          : "Registra cuándo vence la próxima cuota del socio."}
+                      </p>
+                    </div>
                   </>
                 )}
                 <div className="grid gap-2">

@@ -197,7 +197,7 @@ export default function GymManagementSystem() {
       const { data: membersData, error: membersError } = await supabase
         .from("members")
         .select(
-          "id, gym_id, name, email, phone, join_date, plan, plan_price, last_payment, next_payment, status, inactive_level, inactive_comment, followed_up, balance_due"
+          "id, gym_id, name, email, phone, join_date, plan, plan_price, last_payment, next_payment, next_installment_due, status, inactive_level, inactive_comment, followed_up, balance_due"
         )
         .eq("gym_id", gymId)
         .order("balance_due", { ascending: false })
@@ -402,6 +402,7 @@ export default function GymManagementSystem() {
           plan_price: 2500,
           last_payment: "2024-12-01",
           next_payment: "2025-01-01",
+          next_installment_due: "2025-01-01",
           status: "active",
           balance_due: 0,
         },
@@ -416,6 +417,7 @@ export default function GymManagementSystem() {
           plan_price: 6500,
           last_payment: "2024-11-15",
           next_payment: "2024-12-15",
+          next_installment_due: "2025-01-01",
           status: "expired",
           balance_due: 0,
         },

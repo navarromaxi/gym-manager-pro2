@@ -315,6 +315,9 @@ export function PaymentManagement({
           );
         }
 
+        const nextPaymentISO = nextPayment.toISOString().split("T")[0];
+        const nextInstallmentDue = nextPaymentISO;
+
         const newBalance = isFirstInstallment
           ? balanceDueActual + selectedPlan.price - newPayment.amount
           : balanceDueActual - newPayment.amount;
@@ -326,7 +329,8 @@ export function PaymentManagement({
             plan_price: selectedPlan.price,
             balance_due: Math.max(newBalance, 0),
             last_payment: newPayment.startDate,
-            next_payment: nextPayment.toISOString().split("T")[0],
+            next_payment: nextPaymentISO,
+            next_installment_due: nextInstallmentDue,
             status: "active",
           })
           .eq("id", selectedMember.id);
@@ -338,7 +342,8 @@ export function PaymentManagement({
           plan_price: selectedPlan.price,
           balance_due: Math.max(newBalance, 0),
           last_payment: newPayment.startDate,
-          next_payment: nextPayment.toISOString().split("T")[0],
+          next_payment: nextPaymentISO,
+          next_installment_due: nextInstallmentDue,
           status: "active" as const,
         };
 
