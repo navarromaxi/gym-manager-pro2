@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,19 +40,28 @@ import {
   UserPlus,
   AlertTriangle,
   X,
+  History,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import type { Prospect, Member, Payment, Plan } from "@/lib/supabase";
+import type {
+  Prospect,
+  Member,
+  Payment,
+  Plan,
+  ProspectHistory,
+} from "@/lib/supabase";
 
 interface ProspectManagementProps {
   prospects: Prospect[];
-  setProspects: (updater: (prev: Prospect[]) => Prospect[]) => void;
+  setProspects: Dispatch<SetStateAction<Prospect[]>>;
   members: Member[];
-  setMembers: (updater: (prev: Member[]) => Member[]) => void;
+  setMembers: Dispatch<SetStateAction<Member[]>>;
   payments: Payment[];
-  setPayments: (updater: (prev: Payment[]) => Payment[]) => void;
+  setPayments: Dispatch<SetStateAction<Payment[]>>;
   plans: Plan[];
   gymId: string;
+  prospectHistories: ProspectHistory[];
+  setProspectHistories: Dispatch<SetStateAction<ProspectHistory[]>>;
 }
 
 interface ConversionData {
@@ -97,6 +107,8 @@ export function ProspectManagement({
   setPayments,
   plans,
   gymId,
+  prospectHistories,
+  setProspectHistories,
 }: ProspectManagementProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -120,6 +132,29 @@ export function ProspectManagement({
     priority_level: "green" as "green" | "yellow" | "red", // Nuevo campo con valor por defecto
     scheduled_date: "",
   });
+  const [originalProspect, setOriginalProspect] = useState<Prospect | null>(null);
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [selectedHistoryProspect, setSelectedHistoryProspect] =
+    useState<Prospect | null>(null);
+  const [historySaving, setHistorySaving] = useState(false);
+  const [historyTableError, setHistoryTableError] = useState<string | null>(
+    null
+  );
+  const getEmptyHistoryForm = () => ({
+    actionType: "seguimiento",
+    summary: "",
+    detail: "",
+  });
+  const [historyForm, setHistoryForm] = useState(getEmptyHistoryForm);
+
+  const historyActionOptions = [
+    { value: "seguimiento", label: "Seguimiento" },
+    { value: "llamada", label: "Llamada telefónica" },
+    { value: "whatsapp", label: "Mensaje / WhatsApp" },
+    { value: "email", label: "Email" },
+    { value: "actualizacion", label: "Actualización interna" },
+    { value: "otro", label: "Otro" },
+  ];
 
   const paymentMethods = [
     "Efectivo",
@@ -128,6 +163,48 @@ export function ProspectManagement({
     "Tarjeta de Crédito",
   ];
   const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
+   const statusLabels: Record<Prospect["status"], string> = {
+    averiguador: "Averiguador",
+    trial_scheduled: "Coordinamos clase de prueba",
+    reagendado: "Re/Agendado",
+    asistio: "Asistio",
+    no_asistio: "No asistio",
+    inactivo: "Inactivo",
+    otro: "Otro",
+  };
+  const priorityLabels: Record<"green" | "yellow" | "red", string> = {
+    red: "Alta",
+    yellow: "Media",
+    green: "Baja",
+  };
+  const actionLabels: Record<string, string> = {
+    seguimiento: "Seguimiento",
+    llamada: "Llamada telefónica",
+    whatsapp: "Mensaje / WhatsApp",
+    email: "Email",
+    actualizacion: "Actualización interna",
+    otro: "Otro",
+    creacion: "Creación",
+    cambio_estado: "Cambio de estado",
+    agenda_actualizada: "Agenda actualizada",
+    notas_actualizadas: "Notas actualizadas",
+    prioridad_actualizada: "Prioridad actualizada",
+    interes_actualizado: "Interés actualizado",
+  };
+  const getStatusLabel = (status?: Prospect["status"] | null) => {
+    if (!status) return "Sin estado";
+    return statusLabels[status] ?? status;
+  };
+  const getPriorityLabel = (
+    priority?: "green" | "yellow" | "red" | null
+  ) => {
+    if (!priority) return "Sin prioridad";
+    return priorityLabels[priority] ?? priority;
+  };
+  const getActionLabel = (action: string) => {
+    if (!action) return "Registro";
+    return actionLabels[action] ?? action.replace(/_/g, " ");
+  };
   const getInitialConversionData = (): ConversionData => {
     const today = new Date().toISOString().split("T")[0];
     return {
@@ -172,6 +249,32 @@ export function ProspectManagement({
   const [dismissedReminders, setDismissedReminders] = useState<string[]>([]);
 
   const [isClient, setIsClient] = useState(false);
+
+  const historiesByProspect = useMemo(() => {
+    const grouped: Record<string, ProspectHistory[]> = {};
+    for (const history of prospectHistories) {
+      if (!grouped[history.prospect_id]) {
+        grouped[history.prospect_id] = [];
+      }
+      grouped[history.prospect_id].push(history);
+    }
+    for (const key of Object.keys(grouped)) {
+      grouped[key].sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() -
+          new Date(a.created_at).getTime()
+      );
+    }
+    return grouped;
+  }, [prospectHistories]);
+
+  const selectedProspectHistories = useMemo(
+    () =>
+      selectedHistoryProspect
+        ? historiesByProspect[selectedHistoryProspect.id] ?? []
+        : [],
+    [historiesByProspect, selectedHistoryProspect]
+  );
 
   const formatDate = (date?: string | null) => {
     if (!date) return null;
@@ -221,13 +324,135 @@ export function ProspectManagement({
     return parsed.toLocaleString(undefined, formatterOptions);
   };
 
+   const formatHistoryDate = (value: string) => {
+    if (!value) return "";
+    return new Date(value).toLocaleString();
+  };
+
   const getReminderKey = (prospect: Prospect) =>
     `${prospect.id}-${prospect.scheduled_date ?? ""}`;
+
+   const logProspectHistory = async (
+    prospect: Prospect,
+    entry: {
+      actionType: string;
+      summary: string;
+      detail?: string;
+      previousStatus?: Prospect["status"] | null;
+      newStatus?: Prospect["status"] | null;
+      previousScheduledDate?: string | null;
+      newScheduledDate?: string | null;
+      manualEntry?: boolean;
+    }
+  ) => {
+    if (!gymId) return false;
+
+    try {
+      const payload = {
+        gym_id: gymId,
+        prospect_id: prospect.id,
+        action_type: entry.actionType,
+        summary: entry.summary,
+        detail: entry.detail ?? null,
+        previous_status: entry.previousStatus ?? null,
+        new_status: entry.newStatus ?? null,
+        previous_scheduled_date: entry.previousScheduledDate ?? null,
+        new_scheduled_date: entry.newScheduledDate ?? null,
+        manual_entry: entry.manualEntry ?? false,
+      };
+
+      const { data, error } = await supabase
+        .from("prospect_history")
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const inserted = data as ProspectHistory;
+        setProspectHistories((prev) => {
+          const filtered = prev.filter((item) => item.id !== inserted.id);
+          return [inserted, ...filtered];
+        });
+      }
+
+      setHistoryTableError(null);
+      return true;
+    } catch (error: any) {
+      console.error("Error registrando historial:", error);
+      const message =
+        error?.code === "42P01"
+          ? "La tabla prospect_history no existe. Crea la tabla en Supabase para habilitar el historial."
+          : error?.message || "Error al guardar el historial.";
+      setHistoryTableError(message);
+      return false;
+    }
+  };
 
   const handleDismissReminder = (key: string) => {
     setDismissedReminders((prev) =>
       prev.includes(key) ? prev : [...prev, key]
     );
+  };
+
+  const handleEditDialogOpenChange = (open: boolean) => {
+    setIsEditDialogOpen(open);
+    if (!open) {
+      setEditingProspect(null);
+      setOriginalProspect(null);
+    }
+  };
+
+  const handleHistoryDialogOpenChange = (open: boolean) => {
+    setIsHistoryDialogOpen(open);
+    if (!open) {
+      setSelectedHistoryProspect(null);
+      setHistoryForm(getEmptyHistoryForm());
+      setHistorySaving(false);
+      setHistoryTableError(null);
+    }
+  };
+
+  const openHistoryDialog = (prospect: Prospect) => {
+    setSelectedHistoryProspect(prospect);
+    setHistoryForm((prev) => ({
+      actionType: prev.actionType || "seguimiento",
+      summary: "",
+      detail: "",
+    }));
+    setHistoryTableError(null);
+    setIsHistoryDialogOpen(true);
+  };
+
+  const handleSaveHistoryEntry = async () => {
+    if (!selectedHistoryProspect) return;
+
+    const summary = historyForm.summary.trim();
+    const detail = historyForm.detail.trim();
+
+    if (!summary) {
+      alert("Por favor ingresa un título o resumen corto para el registro.");
+      return;
+    }
+
+    setHistorySaving(true);
+    const saved = await logProspectHistory(selectedHistoryProspect, {
+      actionType: historyForm.actionType,
+      summary,
+      detail: detail || undefined,
+      manualEntry: true,
+    });
+
+    if (saved) {
+      setHistoryForm((prev) => ({
+        ...prev,
+        summary: "",
+        detail: "",
+      }));
+    }
+
+    setHistorySaving(false);
   };
 
   useEffect(() => {
@@ -255,6 +480,16 @@ export function ProspectManagement({
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+   useEffect(() => {
+    if (!selectedHistoryProspect) return;
+    const updated = prospects.find(
+      (p) => p.id === selectedHistoryProspect.id
+    );
+    if (updated && updated !== selectedHistoryProspect) {
+      setSelectedHistoryProspect(updated);
+    }
+  }, [prospects, selectedHistoryProspect]);
 
    const upcomingTrialReminders = (() => {
     if (!isClient) return [] as Prospect[];
@@ -342,6 +577,15 @@ export function ProspectManagement({
       if (data && data.length > 0) {
         const addedProspect = data[0] as Prospect;
         setProspects((prev) => [...prev, addedProspect]);
+        await logProspectHistory(addedProspect, {
+          actionType: "creacion",
+          summary: "Interesado creado",
+          detail: `Se registró al interesado con estado ${getStatusLabel(
+            addedProspect.status
+          )}.`,
+          newStatus: addedProspect.status,
+          newScheduledDate: addedProspect.scheduled_date ?? null,
+        });
         setNewProspect({
           name: "",
           email: "",
@@ -390,8 +634,85 @@ export function ProspectManagement({
       setProspects((prev) =>
         prev.map((p) => (p.id === editingProspect.id ? editingProspect : p))
       );
-      setIsEditDialogOpen(false);
-      setEditingProspect(null);
+      const previousData =
+        originalProspect ||
+        prospects.find((p) => p.id === editingProspect.id) ||
+        null;
+
+      if (previousData) {
+        if (previousData.status !== editingProspect.status) {
+          await logProspectHistory(editingProspect, {
+            actionType: "cambio_estado",
+            summary: `Estado actualizado a ${getStatusLabel(
+              editingProspect.status
+            )}`,
+            detail: `El estado se modificó de ${getStatusLabel(
+              previousData.status
+            )} a ${getStatusLabel(editingProspect.status)}.`,
+            previousStatus: previousData.status,
+            newStatus: editingProspect.status,
+          });
+        }
+
+        const previousScheduled = previousData.scheduled_date ?? null;
+        const newScheduled = editingProspect.scheduled_date ?? null;
+        if (previousScheduled !== newScheduled) {
+          const previousText =
+            previousScheduled && formatScheduledDateTime(previousScheduled);
+          const newText = newScheduled && formatScheduledDateTime(newScheduled);
+          await logProspectHistory(editingProspect, {
+            actionType: "agenda_actualizada",
+            summary: newScheduled
+              ? `Clase agendada para ${newText ?? newScheduled}`
+              : "Clase de prueba sin agendar",
+            detail: `Fecha anterior: ${
+              previousText ?? "Sin fecha"
+            } | Nueva fecha: ${newText ?? "Sin fecha"}`,
+            previousScheduledDate: previousScheduled,
+            newScheduledDate: newScheduled,
+          });
+        }
+
+        if ((previousData.notes || "") !== (editingProspect.notes || "")) {
+          await logProspectHistory(editingProspect, {
+            actionType: "notas_actualizadas",
+            summary: "Notas actualizadas",
+            detail: "Se modificaron las notas internas del interesado.",
+          });
+        }
+
+        const previousPriority = previousData.priority_level ?? null;
+        const newPriority = editingProspect.priority_level ?? null;
+        if (previousPriority !== newPriority) {
+          await logProspectHistory(editingProspect, {
+            actionType: "prioridad_actualizada",
+            summary: `Prioridad ${
+              newPriority ? `actualizada a ${getPriorityLabel(newPriority)}` : "eliminada"
+            }`,
+            detail: `Valor anterior: ${
+              previousPriority
+                ? getPriorityLabel(previousPriority)
+                : "Sin prioridad"
+            } | Nuevo valor: ${
+              newPriority ? getPriorityLabel(newPriority) : "Sin prioridad"
+            }`,
+          });
+        }
+
+        if (
+          (previousData.interest || "") !== (editingProspect.interest || "")
+        ) {
+          await logProspectHistory(editingProspect, {
+            actionType: "interes_actualizado",
+            summary: "Interés actualizado",
+            detail: `Interés anterior: ${
+              previousData.interest || "Sin datos"
+            } | Nuevo interés: ${editingProspect.interest || "Sin datos"}`,
+          });
+        }
+      }
+
+      handleEditDialogOpenChange(false);
     } catch (error) {
       console.error("Error editando interesado:", error);
       alert("Error al editar el interesado. Inténtalo de nuevo.");
@@ -973,8 +1294,17 @@ export function ProspectManagement({
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => openHistoryDialog(prospect)}
+                            title="Ver historial"
+                          >
+                            <History className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => {
-                              setEditingProspect(prospect);
+                              setOriginalProspect({ ...prospect });
+                              setEditingProspect({ ...prospect });
                               setIsEditDialogOpen(true);
                             }}
                           >
@@ -1007,7 +1337,10 @@ export function ProspectManagement({
       </Card>
 
       {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={handleEditDialogOpenChange}
+      >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Editar Interesado</DialogTitle>
@@ -1486,6 +1819,172 @@ export function ProspectManagement({
           </DialogContent>
         </Dialog>
       )}
+
+       <Dialog
+        open={isHistoryDialogOpen}
+        onOpenChange={handleHistoryDialogOpenChange}
+      >
+        <DialogContent className="sm:max-w-[640px] max-h-[85vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>
+              Historial de {selectedHistoryProspect?.name ?? "interesado"}
+            </DialogTitle>
+            <DialogDescription>
+              Revisa y registra comunicaciones o cambios importantes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 overflow-hidden">
+            {selectedHistoryProspect && (
+              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <span>Estado actual:</span>
+                  {getStatusBadge(selectedHistoryProspect.status)}
+                </div>
+                {selectedHistoryProspect.priority_level && (
+                  <div className="flex items-center gap-2">
+                    <span>Prioridad:</span>
+                    {getPriorityBadge(selectedHistoryProspect.priority_level)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {historyTableError && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {historyTableError}
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto pr-1">
+              {selectedProspectHistories.length > 0 ? (
+                <div className="space-y-3">
+                  {selectedProspectHistories.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="rounded-lg border bg-card p-3 text-sm shadow-sm"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">
+                            {getActionLabel(entry.action_type)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatHistoryDate(entry.created_at)}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {entry.new_status && (
+                            <Badge variant="outline">
+                              {getStatusLabel(entry.new_status)}
+                            </Badge>
+                          )}
+                          {entry.manual_entry && (
+                            <Badge variant="secondary">Manual</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <p className="mt-2 font-medium">{entry.summary}</p>
+                      {entry.detail && (
+                        <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
+                          {entry.detail}
+                        </p>
+                      )}
+                      {(entry.previous_status ||
+                        entry.previous_scheduled_date ||
+                        entry.new_scheduled_date) && (
+                        <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                          {entry.previous_status && (
+                            <p>
+                              Estado anterior: {getStatusLabel(entry.previous_status)}
+                            </p>
+                          )}
+                          {entry.previous_scheduled_date && (
+                            <p>
+                              Fecha previa: {" "}
+                              {formatScheduledDateTime(
+                                entry.previous_scheduled_date
+                              ) ?? entry.previous_scheduled_date}
+                            </p>
+                          )}
+                          {entry.new_scheduled_date && (
+                            <p>
+                              Nueva fecha: {" "}
+                              {formatScheduledDateTime(entry.new_scheduled_date) ??
+                                entry.new_scheduled_date}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Aún no hay registros asociados a este interesado. Cada cambio
+                  de estado, agenda o nota generará una entrada automática. También
+                  podés crear registros manuales utilizando el formulario de abajo.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+              <h4 className="text-sm font-semibold">Agregar nuevo registro</h4>
+              <div className="grid gap-2">
+                <Label htmlFor="history-action">Tipo</Label>
+                <Select
+                  value={historyForm.actionType}
+                  onValueChange={(value) =>
+                    setHistoryForm((prev) => ({ ...prev, actionType: value }))
+                  }
+                >
+                  <SelectTrigger id="history-action">
+                    <SelectValue placeholder="Selecciona tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {historyActionOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="history-summary">Título o resumen</Label>
+                <Input
+                  id="history-summary"
+                  value={historyForm.summary}
+                  onChange={(e) =>
+                    setHistoryForm((prev) => ({
+                      ...prev,
+                      summary: e.target.value,
+                    }))
+                  }
+                  placeholder="Ej: Llamada de seguimiento"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="history-detail">Detalle</Label>
+                <Textarea
+                  id="history-detail"
+                  value={historyForm.detail}
+                  onChange={(e) =>
+                    setHistoryForm((prev) => ({
+                      ...prev,
+                      detail: e.target.value,
+                    }))
+                  }
+                  rows={4}
+                  placeholder="Describe qué se habló o qué acción se realizó."
+                />
+              </div>
+              <Button onClick={handleSaveHistoryEntry} disabled={historySaving}>
+                {historySaving ? "Guardando..." : "Agregar registro"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
        {isClient && upcomingTrialReminders.length > 0 && (
         <div className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2">
           {upcomingTrialReminders.map((prospect) => {

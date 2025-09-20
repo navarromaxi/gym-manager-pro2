@@ -107,6 +107,7 @@ import type {
   Plan,
   Activity,
   CustomPlan,
+  ProspectHistory,
 } from "@/lib/supabase";
 
 const NEW_PROSPECT_STATUSES: Prospect["status"][] = ["averiguador"];
@@ -142,6 +143,7 @@ export default function GymManagementSystem() {
   const [members, setMembers] = useState<Member[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [prospectHistories, setProspectHistories] = useState<ProspectHistory[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -181,6 +183,7 @@ export default function GymManagementSystem() {
     setMembers([]);
     setPayments([]);
     setProspects([]);
+    setProspectHistories([]);
     setExpenses([]);
     setPlans([]);
     setActivities([]);
@@ -241,6 +244,28 @@ export default function GymManagementSystem() {
         console.error("Error cargando interesados:", prospectsError);
       }
 
+      const {
+        data: prospectHistoryData,
+        error: prospectHistoryError,
+      } = await supabase
+        .from("prospect_history")
+        .select("*")
+        .eq("gym_id", gymId)
+        .order("created_at", { ascending: false });
+
+      if (prospectHistoryError) {
+        if ((prospectHistoryError as any)?.code === "42P01") {
+          console.warn(
+            "La tabla prospect_history no existe todavía. Crea la tabla para habilitar el historial de interesados."
+          );
+        } else {
+          console.error(
+            "Error cargando historial de interesados:",
+            prospectHistoryError
+          );
+        }
+      }
+
       // Cargar planes
       const { data: plansData, error: plansError } = await supabase
         .from("plans")
@@ -279,6 +304,7 @@ export default function GymManagementSystem() {
       setPayments(paymentsData || []);
       setExpenses(expensesData || []);
       setProspects(prospectsData || []);
+      setProspectHistories((prospectHistoryData as ProspectHistory[]) || []);
       setPlans(plansData || []);
       setActivities(activitiesData || []);
       setCustomPlans(customPlansData || []);
@@ -286,6 +312,7 @@ export default function GymManagementSystem() {
       console.log("Datos cargados:", {
         members: membersData?.length || 0,
         payments: paymentsData?.length || 0,
+        prospectHistory: prospectHistoryData?.length || 0,
         plans: plansData?.length || 0,
         activities: activitiesData?.length || 0,
         customPlans: customPlansData?.length || 0,
@@ -888,6 +915,8 @@ export default function GymManagementSystem() {
             setPayments={setPayments}
             plans={plans}
             gymId={gymData?.id || ""}
+            prospectHistories={prospectHistories}
+            setProspectHistories={setProspectHistories}
           />
         )}
         {activeTab === "expenses" && (

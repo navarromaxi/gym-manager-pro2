@@ -87,6 +87,22 @@ export interface Prospect {
   created_at?: string
 }
 
+export interface ProspectHistory {
+  id: string
+  gym_id: string
+  prospect_id: string
+  action_type: string
+  summary: string
+  detail?: string | null
+  previous_status?: Prospect["status"] | null
+  new_status?: Prospect["status"] | null
+  previous_scheduled_date?: string | null
+  new_scheduled_date?: string | null
+  manual_entry?: boolean
+  created_at: string
+  created_by?: string | null
+}
+
 export interface Plan {
   id: string
   gym_id: string
