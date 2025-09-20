@@ -1010,7 +1010,7 @@ export function MemberManagement({
                 <TableHead>Email</TableHead>
                 <TableHead>Plan</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Próximo Pago</TableHead>
+                <TableHead>Fin del plan</TableHead>
                 <TableHead>Días Restantes</TableHead>
                 <TableHead>Saldo Pendiente</TableHead>
                 <TableHead>Acciones</TableHead>
