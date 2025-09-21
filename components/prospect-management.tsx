@@ -1021,7 +1021,7 @@ export function ProspectManagement({
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+         <DialogContent className="sm:max-w-[900px]">
           <DialogHeader>
             <DialogTitle>Editar Interesado</DialogTitle>
             <DialogDescription>
@@ -1030,156 +1030,157 @@ export function ProspectManagement({
           </DialogHeader>
 
           {editingProspect && (
-            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-name">Nombre completo</Label>
-                <Input
-                  id="edit-name"
-                  value={editingProspect.name}
-                  onChange={(e) =>
-                    setEditingProspect({
-                      ...editingProspect,
-                      name: e.target.value,
-                    })
-                  }
-                />
-              </div>
+            <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-2">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-name">Nombre completo</Label>
+                  <Input
+                    id="edit-name"
+                    value={editingProspect.name}
+                    onChange={(e) =>
+                      setEditingProspect({
+                        ...editingProspect,
+                        name: e.target.value,
+                      })
+                    }
+                  />
+                </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="edit-email">Email</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={editingProspect.email || ""}
-                  onChange={(e) =>
-                    setEditingProspect({
-                      ...editingProspect,
-                      email: e.target.value,
-                    })
-                  }
-                />
-              </div>
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={editingProspect.email || ""}
+                    onChange={(e) =>
+                      setEditingProspect({
+                        ...editingProspect,
+                        email: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+               <div className="grid gap-2">
+                  <Label htmlFor="edit-phone">Teléfono</Label>
+                  <Input
+                    id="edit-phone"
+                    value={editingProspect.phone || ""}
+                    onChange={(e) =>
+                      setEditingProspect({
+                        ...editingProspect,
+                        phone: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+               <div className="grid gap-2">
+                  <Label htmlFor="edit-contact_date">Fecha de Contacto</Label>
+                  <Input
+                    id="edit-contact_date"
+                    type="date"
+                    value={editingProspect.contact_date}
+                    onChange={(e) =>
+                      setEditingProspect({
+                        ...editingProspect,
+                        contact_date: e.target.value,
+                      })
+                    }
+                  />
+                </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="edit-phone">Teléfono</Label>
-                <Input
-                  id="edit-phone"
-                  value={editingProspect.phone || ""}
-                  onChange={(e) =>
-                    setEditingProspect({
-                      ...editingProspect,
-                      phone: e.target.value,
-                    })
-                  }
-                />
-              </div>
+                  <Label htmlFor="edit-interest">Interés</Label>
+                  <Input
+                    id="edit-interest"
+                    value={editingProspect.interest || ""}
+                    onChange={(e) =>
+                      setEditingProspect({
+                        ...editingProspect,
+                        interest: e.target.value,
+                      })
+                    }
+                  />
+                </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="edit-contact_date">Fecha de Contacto</Label>
-                <Input
-                  id="edit-contact_date"
-                  type="date"
-                  value={editingProspect.contact_date}
-                  onChange={(e) =>
-                    setEditingProspect({
-                      ...editingProspect,
-                      contact_date: e.target.value,
-                    })
-                  }
-                />
-              </div>
+               <div className="grid gap-2">
+                  <Label htmlFor="edit-status">Estado</Label>
+                  <Select
+                    value={editingProspect.status}
+                    onValueChange={(value: Prospect["status"]) =>
+                      setEditingProspect({ ...editingProspect, status: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="averiguador">Averiguador</SelectItem>
+                      <SelectItem value="trial_scheduled">
+                        Coordinamos clase de prueba
+                      </SelectItem>
+                      <SelectItem value="reagendado">Re/Agendado</SelectItem>
+                      <SelectItem value="asistio">Asistio</SelectItem>
+                      <SelectItem value="no_asistio">No asistio</SelectItem>
+                      <SelectItem value="inactivo">Inactivo</SelectItem>
+                      <SelectItem value="otro">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="edit-interest">Interés</Label>
-                <Input
-                  id="edit-interest"
-                  value={editingProspect.interest || ""}
-                  onChange={(e) =>
-                    setEditingProspect({
-                      ...editingProspect,
-                      interest: e.target.value,
-                    })
-                  }
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-status">Estado</Label>
-                <Select
-                  value={editingProspect.status}
-                  onValueChange={(value: Prospect["status"]) =>
-                    setEditingProspect({ ...editingProspect, status: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona un estado" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="averiguador">Averiguador</SelectItem>
-                    <SelectItem value="trial_scheduled">
-                      Coordinamos clase de prueba
-                    </SelectItem>
-                    <SelectItem value="reagendado">Re/Agendado</SelectItem>
-                    <SelectItem value="asistio">Asistio</SelectItem>
-                    <SelectItem value="no_asistio">No asistio</SelectItem>
-                    <SelectItem value="inactivo">Inactivo</SelectItem>
-                    <SelectItem value="otro">Otro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-scheduled_date">Fecha agendada</Label>
-                <Input
-                  id="edit-scheduled_date"
-                  type="date"
-                  value={editingProspect.scheduled_date ?? ""}
-                  onChange={(e) =>
-                    setEditingProspect({
-                      ...editingProspect,
-                      scheduled_date: e.target.value ? e.target.value : null,
-                    })
-                  }
-                />
-                <p className="text-xs text-muted-foreground">
-                  Fecha coordinada para la clase de prueba (opcional).
-                </p>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-priority_level">Prioridad</Label>
-                <Select
-                  value={editingProspect.priority_level}
-                  onValueChange={(value: "green" | "yellow" | "red") =>
-                    setEditingProspect({
-                      ...editingProspect,
-                      priority_level: value,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona prioridad" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="red">Alta</SelectItem>
-                    <SelectItem value="yellow">Media</SelectItem>
-                    <SelectItem value="green">Baja</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-notes">Notas</Label>
-                <Textarea
-                  id="edit-notes"
-                  value={editingProspect.notes || ""}
-                  onChange={(e) =>
-                    setEditingProspect({
-                      ...editingProspect,
-                      notes: e.target.value,
-                    })
-                  }
-                  className="min-h-[80px]"
-                />
+               <div className="grid gap-2">
+                  <Label htmlFor="edit-scheduled_date">Fecha agendada</Label>
+                  <Input
+                    id="edit-scheduled_date"
+                    type="date"
+                    value={editingProspect.scheduled_date ?? ""}
+                    onChange={(e) =>
+                      setEditingProspect({
+                        ...editingProspect,
+                        scheduled_date: e.target.value ? e.target.value : null,
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Fecha coordinada para la clase de prueba (opcional).
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-priority_level">Prioridad</Label>
+                  <Select
+                    value={editingProspect.priority_level}
+                    onValueChange={(value: "green" | "yellow" | "red") =>
+                      setEditingProspect({
+                        ...editingProspect,
+                        priority_level: value,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona prioridad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="red">Alta</SelectItem>
+                      <SelectItem value="yellow">Media</SelectItem>
+                      <SelectItem value="green">Baja</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="edit-notes">Notas</Label>
+                  <Textarea
+                    id="edit-notes"
+                    value={editingProspect.notes || ""}
+                    onChange={(e) =>
+                      setEditingProspect({
+                        ...editingProspect,
+                        notes: e.target.value,
+                      })
+                    }
+                    className="min-h-[120px]"
+                  />
+                </div>
               </div>
             </div>
           )}
