@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,6 +106,7 @@ export function ProspectManagement({
   const [convertingProspect, setConvertingProspect] = useState<Prospect | null>(
     null
   );
+  const editNotesRef = useRef<HTMLTextAreaElement | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all"); // Nuevo estado para el filtro de prioridad
@@ -174,12 +175,21 @@ export function ProspectManagement({
 
   const [isClient, setIsClient] = useState(false);
 
+  useEffect(() => {
+    if (!isEditDialogOpen) return;
+    const textarea = editNotesRef.current;
+    if (textarea) {
+      textarea.style.height = "auto";
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  }, [isEditDialogOpen, editingProspect?.notes]);
+
   const formatDate = (date?: string | null) => {
     if (!date) return null;
     return new Date(`${date}T00:00:00`).toLocaleDateString();
   };
 
-   const parseScheduledDate = (value?: string | null) => {
+  const parseScheduledDate = (value?: string | null) => {
     if (!value) return null;
     const trimmedValue = value.trim();
     if (!trimmedValue) return null;
@@ -187,8 +197,8 @@ export function ProspectManagement({
     const normalizedValue = trimmedValue.includes("T")
       ? trimmedValue
       : trimmedValue.includes(" ")
-        ? trimmedValue.replace(" ", "T")
-        : `${trimmedValue}T00:00:00`;
+      ? trimmedValue.replace(" ", "T")
+      : `${trimmedValue}T00:00:00`;
 
     let parsedDate = new Date(normalizedValue);
 
@@ -199,9 +209,10 @@ export function ProspectManagement({
 
       if (slashDateMatch) {
         const [, day, month, year, time] = slashDateMatch;
-        const isoDate = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}${
-          time ? `T${time}` : "T00:00"
-        }:00`;
+        const isoDate = `${year}-${month.padStart(2, "0")}-${day.padStart(
+          2,
+          "0"
+        )}${time ? `T${time}` : "T00:00"}:00`;
         parsedDate = new Date(isoDate);
       }
     }
@@ -257,7 +268,7 @@ export function ProspectManagement({
     setIsClient(true);
   }, []);
 
-   const upcomingTrialReminders = (() => {
+  const upcomingTrialReminders = (() => {
     if (!isClient) return [] as Prospect[];
 
     const today = new Date();
@@ -321,23 +332,21 @@ export function ProspectManagement({
         ? newProspect.scheduled_date
         : null;
 
-      const { error } = await supabase
-        .from("prospects")
-        .insert([
-          {
-            id: prospectId,
-            gym_id: gymId,
-            name: newProspect.name,
-            email: newProspect.email,
-            phone: newProspect.phone,
-            contact_date: newProspect.contact_date,
-            interest: newProspect.interest,
-            status: mapProspectStatusToDb(newProspect.status),
-            notes: newProspect.notes,
-            priority_level: newProspect.priority_level,
-            scheduled_date: scheduledDateValue,
-          },
-        ]);
+      const { error } = await supabase.from("prospects").insert([
+        {
+          id: prospectId,
+          gym_id: gymId,
+          name: newProspect.name,
+          email: newProspect.email,
+          phone: newProspect.phone,
+          contact_date: newProspect.contact_date,
+          interest: newProspect.interest,
+          status: mapProspectStatusToDb(newProspect.status),
+          notes: newProspect.notes,
+          priority_level: newProspect.priority_level,
+          scheduled_date: scheduledDateValue,
+        },
+      ]);
 
       if (error) throw error;
 
@@ -411,8 +420,6 @@ export function ProspectManagement({
     }
   };
 
-  
-
   const handleDeleteProspect = async (id: string) => {
     if (!confirm("¿Estás seguro de que quieres eliminar este interesado?"))
       return;
@@ -431,7 +438,6 @@ export function ProspectManagement({
     }
   };
 
-  
   const handleConvertDialogOpenChange = (open: boolean) => {
     setIsConvertDialogOpen(open);
     if (!open) {
@@ -1021,7 +1027,7 @@ export function ProspectManagement({
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-         <DialogContent className="sm:max-w-[900px]">
+        <DialogContent className="sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>Editar Interesado</DialogTitle>
             <DialogDescription>
@@ -1030,7 +1036,7 @@ export function ProspectManagement({
           </DialogHeader>
 
           {editingProspect && (
-            <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-2">
+            <div className="grid gap-6 py-4 max-h-[80vh] overflow-y-auto pr-2">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="edit-name">Nombre completo</Label>
@@ -1046,7 +1052,7 @@ export function ProspectManagement({
                   />
                 </div>
 
-              <div className="grid gap-2">
+                <div className="grid gap-2">
                   <Label htmlFor="edit-email">Email</Label>
                   <Input
                     id="edit-email"
@@ -1061,7 +1067,7 @@ export function ProspectManagement({
                   />
                 </div>
 
-               <div className="grid gap-2">
+                <div className="grid gap-2">
                   <Label htmlFor="edit-phone">Teléfono</Label>
                   <Input
                     id="edit-phone"
@@ -1075,7 +1081,7 @@ export function ProspectManagement({
                   />
                 </div>
 
-               <div className="grid gap-2">
+                <div className="grid gap-2">
                   <Label htmlFor="edit-contact_date">Fecha de Contacto</Label>
                   <Input
                     id="edit-contact_date"
@@ -1090,7 +1096,7 @@ export function ProspectManagement({
                   />
                 </div>
 
-              <div className="grid gap-2">
+                <div className="grid gap-2">
                   <Label htmlFor="edit-interest">Interés</Label>
                   <Input
                     id="edit-interest"
@@ -1104,7 +1110,7 @@ export function ProspectManagement({
                   />
                 </div>
 
-               <div className="grid gap-2">
+                <div className="grid gap-2">
                   <Label htmlFor="edit-status">Estado</Label>
                   <Select
                     value={editingProspect.status}
@@ -1129,7 +1135,7 @@ export function ProspectManagement({
                   </Select>
                 </div>
 
-               <div className="grid gap-2">
+                <div className="grid gap-2">
                   <Label htmlFor="edit-scheduled_date">Fecha agendada</Label>
                   <Input
                     id="edit-scheduled_date"
@@ -1171,14 +1177,18 @@ export function ProspectManagement({
                   <Label htmlFor="edit-notes">Notas</Label>
                   <Textarea
                     id="edit-notes"
+                    ref={editNotesRef}
                     value={editingProspect.notes || ""}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const { value } = e.currentTarget;
                       setEditingProspect({
                         ...editingProspect,
-                        notes: e.target.value,
-                      })
-                    }
-                    className="min-h-[120px]"
+                        notes: value,
+                      });
+                      e.currentTarget.style.height = "auto";
+                      e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
+                    }}
+                    className="min-h-[240px] resize-none overflow-hidden"
                   />
                 </div>
               </div>
@@ -1219,10 +1229,7 @@ export function ProspectManagement({
                       const value = e.target.value;
                       setConversionData((prev) => {
                         const plan = plans.find((p) => p.name === prev.plan);
-                        const computedNext = calculatePlanEndDate(
-                          value,
-                          plan
-                        );
+                        const computedNext = calculatePlanEndDate(value, plan);
                         return {
                           ...prev,
                           planStartDate: value,
@@ -1500,7 +1507,7 @@ export function ProspectManagement({
           </DialogContent>
         </Dialog>
       )}
-       {isClient && upcomingTrialReminders.length > 0 && (
+      {isClient && upcomingTrialReminders.length > 0 && (
         <div className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2">
           {upcomingTrialReminders.map((prospect) => {
             const reminderKey = getReminderKey(prospect);
