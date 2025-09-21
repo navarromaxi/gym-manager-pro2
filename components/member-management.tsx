@@ -574,9 +574,7 @@ export function MemberManagement({
       return !member.followed_up && diffDays >= 5 && diffDays <= 12;
     });
   };
-  const getMembersWithBalanceDue = () => {
-    return members.filter((member) => (member.balance_due || 0) > 0);
-  };
+  
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -987,31 +985,18 @@ export function MemberManagement({
               : "Aún no hay socios para mostrar con este filtro."}
           </div>
         )}
-         {getMembersWithBalanceDue().length > 0 && (
-            <div className="mt-2 text-sm text-red-700 bg-red-100 border-l-4 border-red-500 p-3 rounded flex items-center justify-between">
-              <span>
-                ⚠️ Tienes {getMembersWithBalanceDue().length} socios con saldo pendiente.
-              </span>
-              <Button
-                variant="ghost"
-                className="text-red-700 hover:underline"
-                onClick={() => setStatusFilter("balance_due")}
-              >
-                Ver socios con saldo
-              </Button>
-            </div>
-          )}
 
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead>Teléfono</TableHead>
                 <TableHead>Plan</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Fin del plan</TableHead>
                 <TableHead>Días Restantes</TableHead>
+                <TableHead>Próxima cuota</TableHead>
                 <TableHead>Saldo Pendiente</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
@@ -1027,7 +1012,7 @@ export function MemberManagement({
                 return (
                   <TableRow key={member.id}>
                     <TableCell className="font-medium">{member.name}</TableCell>
-                    <TableCell>{member.email}</TableCell>
+                    <TableCell>{member.phone || "-"}</TableCell>
                     <TableCell>
                       <div>
                         {member.plan} - ${member.plan_price}
@@ -1070,6 +1055,13 @@ export function MemberManagement({
                           ? "Vence hoy"
                           : `${daysUntilExpiration} días`}
                       </span>
+                    </TableCell>
+                     <TableCell>
+                      {member.next_installment_due
+                        ? toLocalDate(member.next_installment_due).toLocaleDateString()
+                        : member.next_payment
+                        ? toLocalDate(member.next_payment).toLocaleDateString()
+                        : "-"}
                     </TableCell>
                     <TableCell>
                       {(member.balance_due ?? 0) > 0 ? (
