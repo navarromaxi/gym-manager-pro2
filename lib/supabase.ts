@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
+import type { ProspectStatusUI } from "./prospect-status"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -74,14 +75,7 @@ export interface Prospect {
   phone: string
   contact_date: string
   interest: string
-  status:
-    | "averiguador"
-    | "trial_scheduled"
-    | "reagendado"
-    | "asistio"
-    | "no_asistio"
-    | "inactivo"
-    | "otro";
+  status: ProspectStatusUI
   notes: string
   priority_level?: "green" | "yellow" | "red" // ¡NUEVA PROPIEDAD!
   scheduled_date?: string | null

@@ -99,6 +99,7 @@ const InactiveManagement = dynamic(
 
 //Sigue aca
 import { supabase } from "@/lib/supabase";
+import { mapProspectStatusFromDb } from "@/lib/prospect-status";
 import type {
   Member,
   Payment,
@@ -278,7 +279,11 @@ export default function GymManagementSystem() {
       setMembers(membersData || []);
       setPayments(paymentsData || []);
       setExpenses(expensesData || []);
-      setProspects(prospectsData || []);
+      const normalizedProspects = (prospectsData ?? []).map((prospect: any) => ({
+        ...prospect,
+        status: mapProspectStatusFromDb(prospect.status),
+      })) as Prospect[];
+      setProspects(normalizedProspects);
       setPlans(plansData || []);
       setActivities(activitiesData || []);
       setCustomPlans(customPlansData || []);

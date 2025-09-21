@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Prospect, Member, Payment, Plan } from "@/lib/supabase";
+import { mapProspectStatusToDb } from "@/lib/prospect-status";
 
 interface ProspectManagementProps {
   prospects: Prospect[];
@@ -316,7 +317,31 @@ export function ProspectManagement({
     try {
       const prospectId = `${gymId}_prospect_${Date.now()}`;
 
-      const prospectToAdd: Prospect = {
+      const scheduledDateValue = newProspect.scheduled_date
+        ? newProspect.scheduled_date
+        : null;
+
+      const { error } = await supabase
+        .from("prospects")
+        .insert([
+          {
+            id: prospectId,
+            gym_id: gymId,
+            name: newProspect.name,
+            email: newProspect.email,
+            phone: newProspect.phone,
+            contact_date: newProspect.contact_date,
+            interest: newProspect.interest,
+            status: mapProspectStatusToDb(newProspect.status),
+            notes: newProspect.notes,
+            priority_level: newProspect.priority_level,
+            scheduled_date: scheduledDateValue,
+          },
+        ]);
+
+      if (error) throw error;
+
+      const addedProspect: Prospect = {
         id: prospectId,
         gym_id: gymId,
         name: newProspect.name,
@@ -327,34 +352,22 @@ export function ProspectManagement({
         status: newProspect.status,
         notes: newProspect.notes,
         priority_level: newProspect.priority_level,
-        scheduled_date: newProspect.scheduled_date
-          ? newProspect.scheduled_date
-          : null,
+        scheduled_date: scheduledDateValue,
       };
 
-      const { data, error } = await supabase
-        .from("prospects")
-        .insert([prospectToAdd])
-        .select();
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const addedProspect = data[0] as Prospect;
-        setProspects((prev) => [...prev, addedProspect]);
-        setNewProspect({
-          name: "",
-          email: "",
-          phone: "",
-          contact_date: new Date().toISOString().split("T")[0],
-          interest: "",
-          status: "averiguador",
-          notes: "",
-          priority_level: "green", // Resetear a verde por defecto
-          scheduled_date: "",
-        });
-        setIsAddDialogOpen(false);
-      }
+      setProspects((prev) => [...prev, addedProspect]);
+      setNewProspect({
+        name: "",
+        email: "",
+        phone: "",
+        contact_date: new Date().toISOString().split("T")[0],
+        interest: "",
+        status: "averiguador",
+        notes: "",
+        priority_level: "green", // Resetear a verde por defecto
+        scheduled_date: "",
+      });
+      setIsAddDialogOpen(false);
     } catch (error: any) {
       // Usar 'any' para acceder a 'message'
       console.error("Error agregando interesado:", error.message || error);
@@ -377,7 +390,7 @@ export function ProspectManagement({
           phone: editingProspect.phone,
           contact_date: editingProspect.contact_date,
           interest: editingProspect.interest,
-          status: editingProspect.status,
+          status: mapProspectStatusToDb(editingProspect.status),
           notes: editingProspect.notes,
           priority_level: editingProspect.priority_level, // Incluir el nuevo campo
           scheduled_date: editingProspect.scheduled_date || null,
