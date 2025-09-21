@@ -309,9 +309,10 @@ export function MemberManagement({
       };
 
       // Guardar en Supabase
+      const { description: _memberDescription, ...memberInsert } = member;
       const { error: memberError } = await supabase
         .from("members")
-        .insert([member]);
+        .insert([memberInsert]);
 
       if (memberError) throw memberError;
 

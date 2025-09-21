@@ -198,7 +198,7 @@ export default function GymManagementSystem() {
       const { data: membersData, error: membersError } = await supabase
         .from("members")
         .select(
-          "id, gym_id, name, email, phone, join_date, plan, plan_price, description, last_payment, next_payment, next_installment_due, status, inactive_level, inactive_comment, followed_up, balance_due"
+          "id, gym_id, name, email, phone, join_date, plan, plan_price, last_payment, next_payment, next_installment_due, status, inactive_level, inactive_comment, followed_up, balance_due"
         )
         .eq("gym_id", gymId)
         .order("balance_due", { ascending: false })
