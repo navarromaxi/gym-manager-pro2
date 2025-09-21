@@ -297,6 +297,7 @@ export function MemberManagement({
         phone: newMember.phone,
         plan: newMember.plan,
         plan_price: newMember.planPrice,
+        description: newMember.description || null,
         join_date: newMember.paymentDate,
         last_payment: newMember.planStartDate,
         next_payment: nextPaymentISO,
@@ -416,6 +417,7 @@ export function MemberManagement({
           name: editingMember.name,
           email: editingMember.email,
           phone: editingMember.phone,
+          description: editingMember.description || null,
           next_payment: editingMember.next_payment,
           next_installment_due:
             editingMember.next_installment_due || editingMember.next_payment,
@@ -1192,6 +1194,20 @@ export function MemberManagement({
                 <p className="text-xs text-muted-foreground">
                   Actualiza cuándo debería pagarse la próxima cuota pendiente.
                 </p>
+              </div>
+               <div className="grid gap-2">
+                <Label htmlFor="edit-description">Descripción</Label>
+                <Input
+                  id="edit-description"
+                  value={editingMember.description || ""}
+                  onChange={(e) =>
+                    setEditingMember({
+                      ...editingMember,
+                      description: e.target.value,
+                    })
+                  }
+                  placeholder="Notas adicionales del socio"
+                />
               </div>
             </div>
           )}

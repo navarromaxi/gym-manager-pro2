@@ -27,6 +27,7 @@ export interface Member {
   join_date: string
   plan: string
   plan_price: number
+  description?: string | null
   balance_due?: number
   last_payment: string
   next_payment: string
