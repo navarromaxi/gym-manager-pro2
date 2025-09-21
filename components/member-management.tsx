@@ -418,7 +418,7 @@ export function MemberManagement({
           name: editingMember.name,
           email: editingMember.email,
           phone: editingMember.phone,
-          description: editingMember.description || null,
+          //description: editingMember.description || null,
           next_payment: editingMember.next_payment,
           next_installment_due:
             editingMember.next_installment_due || editingMember.next_payment,
