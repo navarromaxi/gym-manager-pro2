@@ -198,6 +198,10 @@ const pick = <T extends object>(obj: T, ...keys: string[]) => {
 const toLocalDateFromISO = (iso?: string | null) =>
   iso ? new Date(`${iso}T00:00:00`) : null;
 
+const memberIdOf = (payment: Payment): string | undefined =>
+  (pick(payment as any, "member_id", "memberId") as string | undefined) ||
+  undefined;
+
 const membersWithDerived: DerivedMember[] = members.map((m) => {
   // tomar status y next payment sin importar el formato
   const rawStatus = pick(m, "status"); // en tu tabla es "status"
@@ -249,88 +253,78 @@ const overdueMembers = membersWithDerived.filter((m) => m.derivedStatus === "exp
 
   /** =================== Filtro por período (ingresos/gastos) =================== */
   const getFilteredData = () => {
-    let filteredPayments = payments;
-    let filteredExpenses = expenses;
+    let periodStart: Date | null = null;
+    let periodEnd: Date | null = null;
+
+    const startOfMonth = (year: number, month: number) =>
+      toLocalMidnight(new Date(year, month, 1));
+    const endOfMonth = (year: number, month: number) =>
+      toLocalMidnight(new Date(year, month + 1, 0));
 
     switch (timeFilter) {
-      case "current_month":
-        filteredPayments = payments.filter((p) => {
-          const paymentDate = toLocalDate(p.date);
-          return (
-            paymentDate.getMonth() === currentDate.getMonth() &&
-            paymentDate.getFullYear() === currentDate.getFullYear()
-          );
-        });
-        filteredExpenses = expenses.filter((e) => {
-          const expenseDate = toLocalDate(e.date);
-          return (
-            expenseDate.getMonth() === currentDate.getMonth() &&
-            expenseDate.getFullYear() === currentDate.getFullYear()
-          );
-        });
+      case "current_month": {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        periodStart = startOfMonth(year, month);
+        periodEnd = endOfMonth(year, month);
         break;
+        }
 
       case "previous_month": {
-        const previousMonth =
-          currentDate.getMonth() === 0 ? 11 : currentDate.getMonth() - 1;
-        const previousYear =
+        const month = currentDate.getMonth() === 0 ? 11 : currentDate.getMonth() - 1;
+        const year =
           currentDate.getMonth() === 0
             ? currentDate.getFullYear() - 1
             : currentDate.getFullYear();
-        filteredPayments = payments.filter((p) => {
-          const paymentDate = toLocalDate(p.date);
-          return (
-            paymentDate.getMonth() === previousMonth &&
-            paymentDate.getFullYear() === previousYear
-          );
-        });
-        filteredExpenses = expenses.filter((e) => {
-          const expenseDate = toLocalDate(e.date);
-          return (
-            expenseDate.getMonth() === previousMonth &&
-            expenseDate.getFullYear() === previousYear
-          );
-        });
+       periodStart = startOfMonth(year, month);
+        periodEnd = endOfMonth(year, month);
         break;
       }
 
       case "last_6_months": {
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-        filteredPayments = payments.filter(
-          (p) => toLocalDate(p.date) >= sixMonthsAgo
-        );
-        filteredExpenses = expenses.filter(
-          (e) => toLocalDate(e.date) >= sixMonthsAgo
-        );
+         const start = new Date(currentDate);
+        start.setHours(0, 0, 0, 0);
+        start.setMonth(start.getMonth() - 6);
+        periodStart = start;
+        periodEnd = todayMid;
         break;
       }
 
-      case "current_year":
-        filteredPayments = payments.filter(
-          (p) => toLocalDate(p.date).getFullYear() === currentDate.getFullYear()
-        );
-        filteredExpenses = expenses.filter(
-          (e) => toLocalDate(e.date).getFullYear() === currentDate.getFullYear()
-        );
+       case "current_year": {
+        const year = currentDate.getFullYear();
+        periodStart = startOfMonth(year, 0);
+        periodEnd = endOfMonth(year, 11);
         break;
+        }
 
       case "last_year": {
-        const lastYear = currentDate.getFullYear() - 1;
-        filteredPayments = payments.filter(
-          (p) => toLocalDate(p.date).getFullYear() === lastYear
-        );
-        filteredExpenses = expenses.filter(
-          (e) => toLocalDate(e.date).getFullYear() === lastYear
-        );
+        const year = currentDate.getFullYear() - 1;
+        periodStart = startOfMonth(year, 0);
+        periodEnd = endOfMonth(year, 11);
         break;
       }
+       default:
+        periodStart = null;
+        periodEnd = null;
     }
+const isWithinPeriod = (date: Date) => {
+      if (periodStart && date < periodStart) return false;
+      if (periodEnd && date > periodEnd) return false;
+      return true;
+    };
 
-    return { filteredPayments, filteredExpenses };
+    const filteredPayments = payments.filter((payment) =>
+      isWithinPeriod(toLocalDate(payment.date))
+    );
+    const filteredExpenses = expenses.filter((expense) =>
+      isWithinPeriod(toLocalDate(expense.date))
+    );
+
+    return { filteredPayments, filteredExpenses, periodStart, periodEnd };
   };
 
-  const { filteredPayments, filteredExpenses } = getFilteredData();
+  const { filteredPayments, filteredExpenses, periodStart, periodEnd } =
+    getFilteredData();
 
   // Cálculos con datos filtrados
   const totalIncome = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -342,32 +336,52 @@ const overdueMembers = membersWithDerived.filter((m) => m.derivedStatus === "exp
 
   /** =================== Renovaciones (usando estado derivado) =================== */
   /** =================== Renovaciones ===================
- *  - Renovaron: socios con >1 pago (en todo el historial)
- *  - No renovaron: vencidos + inactivos
- *  - Elegibles: renovaron + no_renovaron
- */
-const getRenewalStats = () => {
-  // soporta camelCase y snake_case
-  const memberIdOf = (p: Payment) => (p as any).memberId ?? (p as any).member_id;
+ *  - Renovaron: socios con >1 pago histórico que pagaron en el período
+   *  - No renovaron: vencidos/inactivos con vencimiento en el período
+   *  - Elegibles: renovaron + no_renovaron
+   */
+  const filteredPlanPayments = filteredPayments.filter(
+    (payment) => (payment.type ?? "plan") === "plan"
+  );
 
-  // pagos por socio (historial completo)
-  const counts: Record<string, number> = {};
-  for (const p of payments) {
-    const id = memberIdOf(p);
-    if (!id) continue;
-    counts[id] = (counts[id] || 0) + 1;
-  }
+  const getRenewalStats = () => {
+    // Conteo histórico de pagos de planes por socio
+    const historicalCounts: Record<string, number> = {};
+    for (const payment of payments) {
+      if ((payment.type ?? "plan") !== "plan") continue;
+      const memberId = memberIdOf(payment);
+      if (!memberId) continue;
+      historicalCounts[memberId] = (historicalCounts[memberId] || 0) + 1;
+    }
 
-  const renewedCount = Object.values(counts).filter(c => c > 1).length;
+  const filteredMemberIds = new Set<string>();
+    for (const payment of filteredPlanPayments) {
+      const memberId = memberIdOf(payment);
+      if (!memberId) continue;
+      filteredMemberIds.add(memberId);
+    }
 
-  // No renovaron = vencidos + inactivos (según estado DERIVADO consistente)
-  const notRenewedCount = membersWithDerived.filter(m => m.derivedStatus !== "active").length;
+   const renewedCount = Array.from(filteredMemberIds).filter(
+      (memberId) => (historicalCounts[memberId] || 0) > 1
+    ).length;
 
-  const totalEligible = renewedCount + notRenewedCount;
-  const renewalRate = totalEligible > 0 ? Math.round((renewedCount / totalEligible) * 100) : 0;
+  const notRenewedMembers = membersWithDerived.filter((member) => {
+      if (member.derivedStatus === "active") return false;
+      if (periodStart || periodEnd) {
+        if (!member._next) return false;
+        if (periodStart && member._next < periodStart) return false;
+        if (periodEnd && member._next > periodEnd) return false;
+      }
+      return true;
+    });
 
-  return { renewedCount, notRenewedCount, renewalRate, totalEligible };
-};
+    const notRenewedCount = notRenewedMembers.length;
+    const totalEligible = renewedCount + notRenewedCount;
+    const renewalRate =
+      totalEligible > 0 ? Math.round((renewedCount / totalEligible) * 100) : 0;
+
+    return { renewedCount, notRenewedCount, renewalRate, totalEligible };
+  };
 
 
 
@@ -393,10 +407,40 @@ const getRenewalStats = () => {
   };
 
   /** =================== Distribuciones y series =================== */
-  const planDistribution = members.reduce((acc, member) => {
-    acc[member.plan] = (acc[member.plan] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const resolvePlanLabel = (payment: Payment) => {
+    const rawPlan = pick(payment as any, "plan", "plan_name");
+    if (typeof rawPlan === "string" && rawPlan.trim().length > 0) {
+      return rawPlan;
+    }
+
+    const memberId = memberIdOf(payment);
+    if (memberId) {
+      const memberPlan = members.find((member) => member.id === memberId)?.plan;
+      if (memberPlan) return memberPlan;
+    }
+
+    return "Plan no especificado";
+  };
+
+  const planDistributionMap = new Map<string, Set<string>>();
+  for (const payment of filteredPlanPayments) {
+    const planLabel = resolvePlanLabel(payment);
+    const memberId = memberIdOf(payment) ?? `${payment.id}-sin-socio`;
+    if (!planDistributionMap.has(planLabel)) {
+      planDistributionMap.set(planLabel, new Set());
+    }
+    planDistributionMap.get(planLabel)!.add(memberId);
+  }
+
+  const planDistributionEntries = Array.from(planDistributionMap.entries()).map(
+    ([plan, memberIds]) => ({ plan, count: memberIds.size })
+  );
+  planDistributionEntries.sort((a, b) => b.count - a.count);
+
+  const totalPlanMembers = planDistributionEntries.reduce(
+    (sum, entry) => sum + entry.count,
+    0
+  );
 
   const paymentMethodDistribution = filteredPayments.reduce((acc, payment) => {
     acc[payment.method] = (acc[payment.method] || 0) + 1;
@@ -888,22 +932,28 @@ const getRenewalStats = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {Object.entries(planDistribution).map(([plan, count]) => (
-                <div key={plan} className="flex items-center justify-between">
-                  <span className="font-medium">{plan}</span>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-muted-foreground">
-                      {count} socios
-                    </span>
-                    <Badge variant="outline">
-                      {members.length > 0
-                        ? Math.round((count / members.length) * 100)
-                        : 0}
-                      %
-                    </Badge>
+               {planDistributionEntries.length > 0 ? (
+                planDistributionEntries.map(({ plan, count }) => (
+                  <div key={plan} className="flex items-center justify-between">
+                    <span className="font-medium">{plan}</span>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-muted-foreground">
+                        {count} socios
+                      </span>
+                      <Badge variant="outline">
+                        {totalPlanMembers > 0
+                          ? Math.round((count / totalPlanMembers) * 100)
+                          : 0}
+                        %
+                      </Badge>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No hay pagos de planes en el período seleccionado.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
