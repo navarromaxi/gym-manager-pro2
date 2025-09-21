@@ -69,12 +69,14 @@ export function CustomPlanManagement({
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
+  const [isMemberSelectOpen, setIsMemberSelectOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [newPlan, setNewPlan] = useState({
     member_id: "",
     name: "",
     description: "",
     price: 0,
+    start_date: new Date().toLocaleDateString("en-CA"),
     end_date: "",
     payment_date: new Date().toLocaleDateString("en-CA"),
     payment_method: "",
@@ -86,7 +88,7 @@ export function CustomPlanManagement({
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const parseDate = (value: string) => {
+  const parseDate = (value?: string | null) => {
     if (!value) return null;
     const [year, month, day] = value.split("-").map(Number);
     if (!year || !month || !day) return null;
@@ -112,10 +114,10 @@ export function CustomPlanManagement({
     return days !== null && days >= 0 && days <= 7;
   };
 
-  const formatEndDate = (value: string) => {
-    const endDate = parseDate(value);
-    if (!endDate) return "Sin definir";
-    return endDate.toLocaleDateString("es-AR", {
+  const formatDate = (value?: string | null) => {
+    const parsedDate = parseDate(value);
+    if (!parsedDate) return "Sin definir";
+    return parsedDate.toLocaleDateString("es-AR", {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -176,6 +178,12 @@ export function CustomPlanManagement({
   const filteredMembers = members.filter((m) =>
     m.name.toLowerCase().includes(memberSearch.toLowerCase())
   );
+
+  const handleMemberSearchChange = (value: string) => {
+    setMemberSearch(value);
+    setIsMemberSelectOpen(value.trim().length > 0);
+  };
+
 
   const filterDescriptionMap: Record<StatusFilter, string> = {
     all: "Listado completo de planes personalizados.",
@@ -291,6 +299,7 @@ export function CustomPlanManagement({
       name: newPlan.name,
       description: newPlan.description,
       price: newPlan.price,
+      start_date: newPlan.start_date,
       end_date: newPlan.end_date,
       is_active: true,
     };
@@ -309,6 +318,7 @@ export function CustomPlanManagement({
       member_name: member.name,
       amount: newPlan.price,
       date: newPlan.payment_date,
+      start_date: newPlan.start_date,
       plan: newPlan.name,
       method: newPlan.payment_method || "Efectivo",
       card_brand:
@@ -341,6 +351,7 @@ export function CustomPlanManagement({
       name: "",
       description: "",
       price: 0,
+      start_date: new Date().toLocaleDateString("en-CA"),
       end_date: "",
       payment_date: new Date().toLocaleDateString("en-CA"),
       payment_method: "",
@@ -349,6 +360,7 @@ export function CustomPlanManagement({
       payment_description: "",
     });
     setMemberSearch("");
+    setIsMemberSelectOpen(false);
   };
 
   const handleDeletePlan = async (id: string) => {
@@ -394,22 +406,38 @@ export function CustomPlanManagement({
                     placeholder="Buscar socio..."
                     className="pl-8"
                     value={memberSearch}
-                    onChange={(e) => setMemberSearch(e.target.value)}
+                    onFocus={() => setIsMemberSelectOpen(true)}
+                    onChange={(e) => handleMemberSearchChange(e.target.value)}
                   />
                 </div>
                 <Select
+                 open={isMemberSelectOpen}
+                  onOpenChange={setIsMemberSelectOpen}
                   value={newPlan.member_id}
-                  onValueChange={(v) => setNewPlan({ ...newPlan, member_id: v })}
+                   onValueChange={(v) => {
+                    setNewPlan({ ...newPlan, member_id: v });
+                    const selectedMember = members.find((m) => m.id === v);
+                    if (selectedMember) {
+                      setMemberSearch(selectedMember.name);
+                    }
+                    setIsMemberSelectOpen(false);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar socio" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredMembers.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name}
+                     {filteredMembers.length === 0 ? (
+                      <SelectItem value="no-results" disabled>
+                        Sin resultados
                       </SelectItem>
-                    ))}
+                  ) : (
+                      filteredMembers.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -438,6 +466,16 @@ export function CustomPlanManagement({
                   value={newPlan.price}
                   onChange={(e) =>
                     setNewPlan({ ...newPlan, price: Number(e.target.value) })
+                  }
+                />
+              </div>
+               <div className="grid gap-2">
+                <Label>Fecha de inicio</Label>
+                <Input
+                  type="date"
+                  value={newPlan.start_date}
+                  onChange={(e) =>
+                    setNewPlan({ ...newPlan, start_date: e.target.value })
                   }
                 />
               </div>
@@ -694,7 +732,7 @@ export function CustomPlanManagement({
                     <TableHead className="hidden text-right md:table-cell">
                       Precio
                     </TableHead>
-                    <TableHead>Fin</TableHead>
+                    <TableHead>Vigencia</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -729,9 +767,22 @@ export function CustomPlanManagement({
                       </TableCell>
                       <TableCell className="align-top">
                         <div className="flex flex-col gap-1">
-                          <span className="text-sm font-medium">
-                            {formatEndDate(plan.end_date)}
-                          </span>
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-medium uppercase text-muted-foreground">
+                              Inicio
+                            </span>
+                            <span className="text-sm font-medium">
+                              {formatDate(plan.start_date)}
+                            </span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-medium uppercase text-muted-foreground">
+                              Fin
+                            </span>
+                            <span className="text-sm font-medium">
+                              {formatDate(plan.end_date)}
+                            </span>
+                          </div>
                           {renderTimeLeft(plan)}
                         </div>
                       </TableCell>

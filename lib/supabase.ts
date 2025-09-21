@@ -116,6 +116,7 @@ export interface CustomPlan {
   name: string
   description: string
   price: number
+  start_date?: string | null
   end_date: string
   is_active: boolean
 }
