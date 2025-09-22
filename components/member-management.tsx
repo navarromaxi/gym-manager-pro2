@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Search, CalendarClock } from "lucide-react";
+import { Plus, Edit, Trash2, Search, CalendarClock, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
 
@@ -160,6 +160,8 @@ export function MemberManagement({
   >(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [visibleCount, setVisibleCount] = useState(MEMBERS_PER_BATCH);
+  const [dismissedCustomPlanAlertIds, setDismissedCustomPlanAlertIds] =
+    useState<string[]>([]);
 
   const selectedPlanForNewMember = useMemo(() => {
     return plans.find((p) => p.name === newMember.plan) ?? null;
@@ -691,9 +693,18 @@ export function MemberManagement({
     return dueDate.getTime() < todayMidnight.getTime();
   });
   const expiringCustomPlansForAlert = getExpiringCustomPlans();
+   const visibleExpiringCustomPlansForAlert =
+    expiringCustomPlansForAlert.filter(
+      (plan) => !dismissedCustomPlanAlertIds.includes(plan.id)
+    );
   const expiringCustomPlanMembersCount = new Set(
     expiringCustomPlansForAlert.map((plan) => plan.member_id)
   ).size;
+   const handleDismissCustomPlanAlert = useCallback((planId: string) => {
+    setDismissedCustomPlanAlertIds((prev) =>
+      prev.includes(planId) ? prev : [...prev, planId]
+    );
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -1095,7 +1106,7 @@ export function MemberManagement({
               </Button>
             </div>
           )}
-          {expiringCustomPlansForAlert.map((plan) => {
+          {visibleExpiringCustomPlansForAlert.map((plan) => {
             const memberName =
               plan.member_name ||
               members.find((member) => member.id === plan.member_id)?.name ||
@@ -1105,13 +1116,25 @@ export function MemberManagement({
             return (
               <div
                 key={`custom-plan-expiring-alert-${plan.id}`}
-                className="mt-2 rounded border-l-4 border-amber-500 bg-amber-100 p-3 text-sm text-amber-800"
+                 className="mt-2 flex items-start justify-between gap-3 rounded border-l-4 border-amber-500 bg-amber-100 p-3 text-sm text-amber-800"
               >
-                ⚠️ Al socio "{memberName}" se le está por vencer el plan
-                personalizado en los próximos diez días
-                {formattedEndDate
-                  ? ` (vence el ${formattedEndDate}).`
-                  : "."}
+                <span>
+                  ⚠️ Al socio "{memberName}" se le está por vencer el plan
+                  personalizado en los próximos diez días
+                  {formattedEndDate
+                    ? ` (vence el ${formattedEndDate}).`
+                    : "."}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="text-amber-700 hover:text-amber-900 hover:bg-amber-200"
+                  onClick={() => handleDismissCustomPlanAlert(plan.id)}
+                  aria-label="Descartar alerta de plan personalizado"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             );
           })}
