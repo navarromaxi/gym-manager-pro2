@@ -56,6 +56,8 @@ interface MemberInstallmentState {
   installmentActive: boolean;
 }
 
+const PAYMENTS_PER_BATCH = 10;
+
 export function PaymentManagement({
   payments = [],
   setPayments,
@@ -98,6 +100,7 @@ export function PaymentManagement({
   const [contractTable, setContractTable] = useState<
     "plan_contracts" | "plan_contract" | null
   >(null);
+   const [visibleCount, setVisibleCount] = useState(PAYMENTS_PER_BATCH);
 
   useEffect(() => {
     const checkTable = async () => {
@@ -462,13 +465,12 @@ export function PaymentManagement({
     member.name.toLowerCase().includes(memberSearchTerm.toLowerCase())
   );
 
-  // Función para obtener pagos filtrados actualizada
-  const getFilteredPayments = () => {
+  // Pagos filtrados y ordenados según los controles actuales
+  const filteredPayments = useMemo(() => {
     let filtered = (payments || []).filter((payment) =>
       payment.member_name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Filtro por método de pago
     if (methodFilter !== "all") {
       filtered = filtered.filter((payment) => payment.method === methodFilter);
     }
@@ -512,9 +514,27 @@ export function PaymentManagement({
       (a, b) =>
         parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
     );
+      
+    }, [payments, searchTerm, methodFilter, periodFilter]);
+
+  useEffect(() => {
+    setVisibleCount(PAYMENTS_PER_BATCH);
+  }, [searchTerm, methodFilter, periodFilter, payments]);
+
+const visiblePayments = useMemo(() => {
+    if (!filteredPayments.length) return [];
+    const limit = Math.min(visibleCount, filteredPayments.length);
+    return filteredPayments.slice(0, limit);
+  }, [filteredPayments, visibleCount]);
+
+  const canLoadMore = visibleCount < filteredPayments.length;
+
+  const handleLoadMorePayments = () => {
+    setVisibleCount((prev) =>
+      Math.min(prev + PAYMENTS_PER_BATCH, filteredPayments.length)
+    );
   };
 
-  const filteredPayments = getFilteredPayments();
 
   const selectedMember = members.find((m) => m.id === newPayment.memberId);
   const selectedPlan =
@@ -1699,7 +1719,7 @@ export function PaymentManagement({
               </TableRow>
             </TableHeader>
             <TableBody>
-               {filteredPayments.map((payment) => {
+               {visiblePayments.map((payment) => {
                 const insight = paymentInsights.get(payment.id);
                 const member = membersById.get(payment.member_id);
                 const fallbackBalance =
@@ -1789,6 +1809,27 @@ export function PaymentManagement({
               })}
             </TableBody>
           </Table>
+           <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-muted-foreground">
+              {filteredPayments.length > 0 && (
+                <>
+                  Mostrando <strong>{visiblePayments.length}</strong> de{" "}
+                  <strong>{filteredPayments.length}</strong> pagos cargados
+                </>
+              )}
+            </div>
+            {canLoadMore && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLoadMorePayments}
+                >
+                  Cargar más pagos
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
        <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
