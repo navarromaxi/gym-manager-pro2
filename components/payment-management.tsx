@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, DollarSign } from "lucide-react";
+import { Plus, Search, DollarSign, Edit, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan, PlanContract } from "@/lib/supabase";
 
@@ -64,6 +64,17 @@ export function PaymentManagement({
   gymId,
 }: PaymentManagementProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [editPaymentData, setEditPaymentData] = useState({
+    amount: 0,
+    date: new Date().toLocaleDateString("en-CA"),
+    method: "",
+    cardBrand: "",
+    cardInstallments: 1,
+    description: "",
+    startDate: "",
+  });
   const [searchTerm, setSearchTerm] = useState("");
   const [periodFilter, setPeriodFilter] = useState("all");
   const [memberSearchTerm, setMemberSearchTerm] = useState("");
@@ -122,9 +133,175 @@ export function PaymentManagement({
 
   const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
 
+   const getPlanPrice = (payment: Payment) => {
+    if (payment.plan_id) {
+      const planById = plans.find((plan) => plan.id === payment.plan_id);
+      if (planById) return planById.price;
+    }
+    if (payment.plan) {
+      const planByName = plans.find((plan) => plan.name === payment.plan);
+      if (planByName) return planByName.price;
+    }
+    return 0;
+  };
+
+  const getEffectivePaymentDate = (payment: Payment) =>
+    payment.start_date && payment.start_date.trim() !== ""
+      ? payment.start_date
+      : payment.date;
+
+  const findLatestPlanPaymentDate = (list: Payment[], memberId: string) => {
+    const relevantPayments = list.filter(
+      (payment) => payment.member_id === memberId && payment.type === "plan"
+    );
+
+    if (relevantPayments.length === 0) {
+      return null;
+    }
+
+    const latestPayment = relevantPayments.reduce((latest, current) => {
+      const latestDate = parseLocalDate(getEffectivePaymentDate(latest));
+      const currentDate = parseLocalDate(getEffectivePaymentDate(current));
+      return currentDate > latestDate ? current : latest;
+    });
+
+    return getEffectivePaymentDate(latestPayment);
+  };
+
   const parseLocalDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split("-").map(Number);
     return new Date(year, month - 1, day);
+  };
+
+  const updateMemberAfterPlanEdit = async (
+    originalPayment: Payment,
+    updatedPaymentsList: Payment[],
+    newAmount: number
+  ) => {
+    const member = members.find((m) => m.id === originalPayment.member_id);
+    if (!member) return;
+
+    const delta = newAmount - originalPayment.amount;
+    const currentBalance = member.balance_due || 0;
+    const updatedBalance = Math.max(currentBalance - delta, 0);
+    const latestDate = findLatestPlanPaymentDate(
+      updatedPaymentsList,
+      member.id
+    );
+
+    const memberUpdate: Record<string, any> = {
+      balance_due: updatedBalance,
+      last_payment: latestDate ?? null,
+    };
+
+    const { error: memberError } = await supabase
+      .from("members")
+      .update(memberUpdate)
+      .eq("id", member.id);
+
+    if (memberError) throw memberError;
+
+    setMembers((prevMembers) =>
+      prevMembers.map((m) =>
+        m.id === member.id
+          ? {
+              ...m,
+              balance_due: updatedBalance,
+              last_payment: latestDate ?? "",
+            }
+          : m
+      )
+    );
+  };
+
+  const revertMemberAfterPlanDeletion = async (
+    removedPayment: Payment,
+    remainingPayments: Payment[]
+  ) => {
+    const member = members.find((m) => m.id === removedPayment.member_id);
+    if (!member) return;
+
+    const currentBalance = member.balance_due || 0;
+    let updatedBalance = currentBalance;
+
+    if (removedPayment.start_date) {
+      const planPrice = getPlanPrice(removedPayment);
+      updatedBalance = Math.max(
+        currentBalance - planPrice + removedPayment.amount,
+        0
+      );
+    } else {
+      updatedBalance = Math.max(currentBalance + removedPayment.amount, 0);
+    }
+
+    const latestDate = findLatestPlanPaymentDate(remainingPayments, member.id);
+
+    const memberUpdate: Record<string, any> = {
+      balance_due: updatedBalance,
+      last_payment: latestDate ?? null,
+    };
+
+    const { error: memberError } = await supabase
+      .from("members")
+      .update(memberUpdate)
+      .eq("id", member.id);
+
+    if (memberError) throw memberError;
+
+    setMembers((prevMembers) =>
+      prevMembers.map((m) =>
+        m.id === member.id
+          ? {
+              ...m,
+              balance_due: updatedBalance,
+              last_payment: latestDate ?? "",
+            }
+          : m
+      )
+    );
+  };
+
+  const adjustContractAfterPlanDeletion = async (payment: Payment) => {
+    if (!contractTable || !payment.plan_id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from(contractTable)
+        .select("*")
+        .eq("member_id", payment.member_id)
+        .eq("plan_id", payment.plan_id)
+        .maybeSingle();
+
+      if (error) {
+        console.warn("Error obteniendo contrato de plan:", error);
+        return;
+      }
+
+      if (!data) return;
+
+      const contract = data as PlanContract;
+      const newInstallmentsPaid = Math.max((contract.installments_paid || 0) - 1, 0);
+
+      if (newInstallmentsPaid <= 0) {
+        const { error: deleteError } = await supabase
+          .from(contractTable)
+          .delete()
+          .eq("id", contract.id);
+        if (deleteError) {
+          console.warn("Error eliminando contrato de plan:", deleteError);
+        }
+      } else {
+        const { error: updateError } = await supabase
+          .from(contractTable)
+          .update({ installments_paid: newInstallmentsPaid })
+          .eq("id", contract.id);
+        if (updateError) {
+          console.warn("Error actualizando contrato de plan:", updateError);
+        }
+      }
+    } catch (error) {
+      console.warn("Error ajustando contrato tras eliminar pago:", error);
+    }
   };
 
    const paymentInsights = useMemo(() => {
@@ -646,6 +823,133 @@ export function PaymentManagement({
       alert("Error al registrar el pago. Inténtalo de nuevo.");
     }
   };
+
+  const openEditDialog = (payment: Payment) => {
+    setEditingPayment(payment);
+    setEditPaymentData({
+      amount: payment.amount,
+      date: payment.date,
+      method: payment.method,
+      cardBrand: payment.card_brand || "",
+      cardInstallments: payment.card_installments || 1,
+      description: payment.description || "",
+      startDate: payment.start_date || "",
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const closeEditDialog = () => {
+    setIsEditDialogOpen(false);
+    setEditingPayment(null);
+  };
+
+  const handleUpdatePayment = async () => {
+    if (!editingPayment) return;
+
+    if (editPaymentData.amount <= 0) {
+      alert("El monto debe ser mayor a 0");
+      return;
+    }
+
+    if (!editPaymentData.method) {
+      alert("Selecciona un método de pago");
+      return;
+    }
+
+    try {
+      const paymentUpdate: Record<string, any> = {
+        amount: editPaymentData.amount,
+        date: editPaymentData.date,
+        method: editPaymentData.method,
+        card_brand:
+          editPaymentData.method === "Tarjeta de Crédito"
+            ? editPaymentData.cardBrand
+            : null,
+        card_installments:
+          editPaymentData.method === "Tarjeta de Crédito"
+            ? editPaymentData.cardInstallments
+            : null,
+        description: editPaymentData.description || null,
+      };
+
+      if (typeof editingPayment.start_date === "string") {
+        paymentUpdate.start_date = editPaymentData.startDate || null;
+      }
+
+      const { error: updateError } = await supabase
+        .from("payments")
+        .update(paymentUpdate)
+        .eq("id", editingPayment.id);
+
+      if (updateError) throw updateError;
+
+      const updatedPayment: Payment = {
+        ...editingPayment,
+        amount: editPaymentData.amount,
+        date: editPaymentData.date,
+        method: editPaymentData.method,
+        card_brand:
+          editPaymentData.method === "Tarjeta de Crédito"
+            ? editPaymentData.cardBrand
+            : undefined,
+        card_installments:
+          editPaymentData.method === "Tarjeta de Crédito"
+            ? editPaymentData.cardInstallments
+            : undefined,
+        description: editPaymentData.description || undefined,
+        ...(typeof editingPayment.start_date === "string"
+          ? { start_date: editPaymentData.startDate || undefined }
+          : {}),
+      };
+
+      const updatedPayments = payments.map((payment) =>
+        payment.id === editingPayment.id ? updatedPayment : payment
+      );
+
+      if (editingPayment.type === "plan") {
+        await updateMemberAfterPlanEdit(
+          editingPayment,
+          updatedPayments,
+          editPaymentData.amount
+        );
+      }
+
+      setPayments(updatedPayments);
+      closeEditDialog();
+    } catch (error) {
+      console.error("Error actualizando pago:", error);
+      alert("Error al actualizar el pago. Inténtalo de nuevo.");
+    }
+  };
+
+  const handleDeletePayment = async (payment: Payment) => {
+    const confirmed = window.confirm(
+      "¿Estás seguro de que deseas eliminar este pago?"
+    );
+    if (!confirmed) return;
+
+    try {
+      const { error: deleteError } = await supabase
+        .from("payments")
+        .delete()
+        .eq("id", payment.id);
+
+      if (deleteError) throw deleteError;
+
+      const remainingPayments = payments.filter((p) => p.id !== payment.id);
+
+      if (payment.type === "plan") {
+        await revertMemberAfterPlanDeletion(payment, remainingPayments);
+        await adjustContractAfterPlanDeletion(payment);
+      }
+
+      setPayments(remainingPayments);
+    } catch (error) {
+      console.error("Error eliminando pago:", error);
+      alert("Error al eliminar el pago. Inténtalo de nuevo.");
+    }
+  };
+
 
   const totalPayments = filteredPayments.reduce(
     (sum, payment) => sum + payment.amount,
@@ -1378,6 +1682,7 @@ export function PaymentManagement({
                 <TableHead>En cuotas</TableHead>
                 <TableHead>Saldo pendiente</TableHead>
                 <TableHead>Tipo</TableHead>
+                <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1448,6 +1753,24 @@ export function PaymentManagement({
                       )}
                     </TableCell>
                     <TableCell className="capitalize">{payment.type}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openEditDialog(payment)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeletePayment(payment)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -1455,6 +1778,160 @@ export function PaymentManagement({
           </Table>
         </CardContent>
       </Card>
+       <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) {
+          setEditingPayment(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Editar pago</DialogTitle>
+            <DialogDescription>
+              Actualiza la información del pago seleccionado.
+            </DialogDescription>
+          </DialogHeader>
+          {editingPayment && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-date">Fecha del Pago</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={editPaymentData.date}
+                  onChange={(e) =>
+                    setEditPaymentData({
+                      ...editPaymentData,
+                      date: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              {typeof editingPayment.start_date === "string" && (
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-start-date">Inicio del Plan</Label>
+                  <Input
+                    id="edit-start-date"
+                    type="date"
+                    value={editPaymentData.startDate}
+                    onChange={(e) =>
+                      setEditPaymentData({
+                        ...editPaymentData,
+                        startDate: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              )}
+              <div className="grid gap-2">
+                <Label htmlFor="edit-amount">Monto</Label>
+                <Input
+                  id="edit-amount"
+                  type="number"
+                  min={0}
+                  value={editPaymentData.amount}
+                  onChange={(e) =>
+                    setEditPaymentData({
+                      ...editPaymentData,
+                      amount: Number(e.target.value) || 0,
+                    })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-method">Método de Pago</Label>
+                <Select
+                  value={editPaymentData.method}
+                  onValueChange={(value) =>
+                    setEditPaymentData((prev) => ({
+                      ...prev,
+                      method: value,
+                      cardBrand:
+                        value === "Tarjeta de Crédito" ? prev.cardBrand : "",
+                      cardInstallments:
+                        value === "Tarjeta de Crédito" ? prev.cardInstallments : 1,
+                    }))
+                  }
+                >
+                  <SelectTrigger id="edit-method">
+                    <SelectValue placeholder="Selecciona método" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentMethods.map((method) => (
+                      <SelectItem key={method} value={method}>
+                        {method}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {editPaymentData.method === "Tarjeta de Crédito" && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-card-brand">Tipo de Tarjeta</Label>
+                    <Select
+                      value={editPaymentData.cardBrand}
+                      onValueChange={(value) =>
+                        setEditPaymentData((prev) => ({
+                          ...prev,
+                          cardBrand: value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger id="edit-card-brand">
+                        <SelectValue placeholder="Selecciona tarjeta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cardBrands.map((brand) => (
+                          <SelectItem key={brand} value={brand}>
+                            {brand}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-card-installments">
+                      Número de cuotas en la tarjeta
+                    </Label>
+                    <Input
+                      id="edit-card-installments"
+                      type="number"
+                      min={1}
+                      value={editPaymentData.cardInstallments}
+                      onChange={(e) =>
+                        setEditPaymentData({
+                          ...editPaymentData,
+                          cardInstallments: parseInt(e.target.value) || 1,
+                        })
+                      }
+                    />
+                  </div>
+                </>
+              )}
+              <div className="grid gap-2">
+                <Label htmlFor="edit-description">Descripción</Label>
+                <Input
+                  id="edit-description"
+                  value={editPaymentData.description}
+                  onChange={(e) =>
+                    setEditPaymentData({
+                      ...editPaymentData,
+                      description: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={closeEditDialog}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdatePayment}>Guardar cambios</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
