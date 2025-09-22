@@ -58,6 +58,8 @@ const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
   return baseDate.toISOString().split("T")[0];
 };
 
+const MEMBERS_PER_BATCH = 10;
+
 const getRealStatus = (member: Member): "active" | "expired" | "inactive" => {
   const today = new Date();
   //const next = new Date(member.next_payment);
@@ -141,6 +143,7 @@ export function MemberManagement({
     "plan_contracts" | "plan_contract" | null
   >(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(MEMBERS_PER_BATCH);
 
   const selectedPlanForNewMember = useMemo(() => {
     return plans.find((p) => p.name === newMember.plan) ?? null;
@@ -195,6 +198,21 @@ export function MemberManagement({
     });
   }, [customPlans]);
 
+  const sortedMembers = useMemo(() => {
+    const parseDate = (value?: string | null) => {
+      if (!value) return 0;
+      const direct = Date.parse(value);
+      if (!Number.isNaN(direct)) return direct;
+      return Date.parse(`${value}T00:00:00`);
+    };
+
+    return [...members].sort((a, b) => {
+      const aTime = Math.max(parseDate(a.last_payment), parseDate(a.join_date));
+      const bTime = Math.max(parseDate(b.last_payment), parseDate(b.join_date));
+      return bTime - aTime;
+    });
+  }, [members]);
+
   const filteredMembers = useMemo(() => {
     const today = new Date();
     const expiringCustomPlanMemberIds =
@@ -203,55 +221,75 @@ export function MemberManagement({
             getExpiringCustomPlans().map((plan) => plan.member_id)
           )
         : null;
-    return members
-      .filter((member) => {
-        // búsqueda (debounced)
-        const name = (member.name ?? "").toLowerCase();
-        const email = (member.email ?? "").toLowerCase();
-        const matchesSearch =
-          !debouncedSearch ||
-          name.includes(debouncedSearch) ||
-          email.includes(debouncedSearch);
+    const filtered = sortedMembers.filter((member) => {
+      // búsqueda (debounced)
+      const name = (member.name ?? "").toLowerCase();
+      const email = (member.email ?? "").toLowerCase();
+      const matchesSearch =
+        !debouncedSearch ||
+        name.includes(debouncedSearch) ||
+        email.includes(debouncedSearch);
 
         if (!matchesSearch) return false;
 
         const realStatus = getRealStatus(member);
 
         if (statusFilter === "expiring_soon") {
-          const nextPayment = toLocalDate(member.next_payment);
-          const diffDays = Math.ceil(
-            (nextPayment.getTime() - today.getTime()) / 86400000
-          );
-          return diffDays <= 10 && diffDays >= 0 && realStatus === "active";
-        }
+        const nextPayment = toLocalDate(member.next_payment);
+        const diffDays = Math.ceil(
+          (nextPayment.getTime() - today.getTime()) / 86400000
+        );
+        return diffDays <= 10 && diffDays >= 0 && realStatus === "active";
+      }
 
-        if (statusFilter === "follow_up") {
-          const joinDate = toLocalDate(member.join_date);
-          const diffDays = Math.floor(
-            (today.getTime() - joinDate.getTime()) / 86400000
-          );
-          // @ts-ignore posible campo no tipado
-          return !member.followed_up && diffDays >= 5 && diffDays <= 10;
-        }
+      if (statusFilter === "follow_up") {
+        const joinDate = toLocalDate(member.join_date);
+        const diffDays = Math.floor(
+          (today.getTime() - joinDate.getTime()) / 86400000
+        );
+        // @ts-ignore posible campo no tipado
+        return !member.followed_up && diffDays >= 5 && diffDays <= 10;
+      }
 
-        if (statusFilter === "balance_due") {
-          return (member.balance_due || 0) > 0;
-        }
+      if (statusFilter === "balance_due") {
+        return (member.balance_due || 0) > 0;
+      }
 
-        if (statusFilter === "custom_expiring") {
-          return expiringCustomPlanMemberIds?.has(member.id) ?? false;
-        }
+      if (statusFilter === "custom_expiring") {
+        return expiringCustomPlanMemberIds?.has(member.id) ?? false;
+      }
 
-        return statusFilter === "all" || realStatus === statusFilter;
-      })
-      .sort((a, b) => {
-        const balanceDiff = (b.balance_due || 0) - (a.balance_due || 0);
-        if (balanceDiff !== 0) return balanceDiff;
-        const nextA = toLocalDate(a.next_payment).getTime();
-        const nextB = toLocalDate(b.next_payment).getTime();
-        return nextA - nextB;
-      });
-      }, [members, debouncedSearch, statusFilter, getExpiringCustomPlans]);
+      return statusFilter === "all" || realStatus === statusFilter;
+    });
+
+    if (statusFilter === "balance_due") {
+      return filtered.sort(
+        (a, b) => (b.balance_due || 0) - (a.balance_due || 0)
+      );
+    }
+
+    return filtered;
+  }, [
+    sortedMembers,
+    debouncedSearch,
+    statusFilter,
+    getExpiringCustomPlans,
+  ]);
+
+  useEffect(() => {
+    setVisibleCount(MEMBERS_PER_BATCH);
+  }, [debouncedSearch, statusFilter]);
+
+  const totalFiltered = filteredMembers.length;
+  const currentVisibleCount = Math.min(visibleCount, totalFiltered);
+  const displayedMembers = filteredMembers.slice(0, currentVisibleCount);
+  const canLoadMore = currentVisibleCount < totalFiltered;
+
+  const handleLoadMore = () => {
+    setVisibleCount((prev) =>
+      Math.min(prev + MEMBERS_PER_BATCH, filteredMembers.length)
+    );
+  };
 
 
   const handleAddMember = async () => {
@@ -575,6 +613,12 @@ export function MemberManagement({
     });
   };
 
+  const getExpiredMembers = () =>
+    members.filter((member) => getRealStatus(member) === "expired");
+
+  const getMembersWithBalanceDue = () =>
+    members.filter((member) => (member.balance_due || 0) > 0);
+
   //Función para marcar como contactado
   const handleMarkAsFollowedUp = async (memberId: string) => {
     try {
@@ -599,14 +643,19 @@ export function MemberManagement({
   const getMembersToFollowUp = () => {
     const today = new Date();
     return members.filter((member) => {
-      const joinDate = new Date(member.join_date);
+      const joinDate = toLocalDate(member.join_date);
+      if (Number.isNaN(joinDate.getTime())) return false;
       const diffDays = Math.floor(
-        (today.getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24)
+        (today.getTime() - joinDate.getTime()) / 86400000
       );
       return !member.followed_up && diffDays >= 5 && diffDays <= 12;
     });
   };
 
+  const expiringMembers = getExpiringMembers();
+  const expiredMembers = getExpiredMembers();
+  const membersToFollowUp = getMembersToFollowUp();
+  const membersWithBalanceDue = getMembersWithBalanceDue();
   const expiringCustomPlansForAlert = getExpiringCustomPlans();
   const expiringCustomPlanMembersCount = new Set(
     expiringCustomPlansForAlert.map((plan) => plan.member_id)
@@ -986,9 +1035,9 @@ export function MemberManagement({
         <CardHeader>
           <CardTitle>Lista de Socios ({filteredMembers.length})</CardTitle>
 
-          {getExpiringMembers().length > 0 && (
+          {expiringMembers.length > 0 && (
             <div className="mt-2 text-sm text-orange-700 bg-orange-100 border-l-4 border-orange-500 p-3 rounded flex justify-between items-center">
-              ⚠️ Tienes {getExpiringMembers().length} socios con vencimiento
+               ⚠️ Tienes {expiringMembers.length} socios con vencimiento
               próximo (menos de 10 días).
               <Button
                 variant="ghost"
@@ -996,6 +1045,22 @@ export function MemberManagement({
                 onClick={() => setStatusFilter("expiring_soon")}
               >
                 Ver socios por vencer
+              </Button>
+            </div>
+          )}
+
+          {expiredMembers.length > 0 && (
+            <div className="mt-2 text-sm text-rose-700 bg-rose-100 border-l-4 border-rose-500 p-3 rounded flex items-center justify-between">
+              <span>
+                ⚠️ Tienes {expiredMembers.length} socio
+                {expiredMembers.length === 1 ? "" : "s"} con cuota vencida.
+              </span>
+              <Button
+                variant="ghost"
+                className="text-rose-700 hover:underline"
+                onClick={() => setStatusFilter("expired")}
+              >
+                Ver socios vencidos
               </Button>
             </div>
           )}
@@ -1030,7 +1095,7 @@ export function MemberManagement({
             </div>
           )}
 
-          {getMembersToFollowUp().length > 0 && (
+          {membersToFollowUp.length > 0 && (
             <div className="mt-2 text-sm text-yellow-700 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded flex items-center justify-between">
               <span>
                 ⚠️ Tienes socios que ingresaron hace entre 5 y 12 días y aún no
@@ -1043,6 +1108,22 @@ export function MemberManagement({
                 onClick={() => setStatusFilter("follow_up")}
               >
                 Ver socios pendientes
+              </Button>
+            </div>
+          )}
+          
+          {membersWithBalanceDue.length > 0 && (
+            <div className="mt-2 text-sm text-red-700 bg-red-100 border-l-4 border-red-500 p-3 rounded flex items-center justify-between">
+              <span>
+                ⚠️ Tienes {membersWithBalanceDue.length} socio
+                {membersWithBalanceDue.length === 1 ? "" : "s"} con saldo pendiente.
+              </span>
+              <Button
+                variant="ghost"
+                className="text-red-700 hover:underline"
+                onClick={() => setStatusFilter("balance_due")}
+              >
+                Ver socios con saldo
               </Button>
             </div>
           )}
@@ -1071,7 +1152,7 @@ export function MemberManagement({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredMembers.map((member) => {
+              {displayedMembers.map((member) => {
                 const daysUntilExpiration = getDaysUntilExpiration(
                   member.next_payment
                 );
@@ -1178,6 +1259,23 @@ export function MemberManagement({
               })}
             </TableBody>
           </Table>
+          <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-muted-foreground">
+              {filteredMembers.length > 0 && (
+                <>
+                  Mostrando <strong>{displayedMembers.length}</strong> de{" "}
+                  <strong>{filteredMembers.length}</strong> socios cargados
+                </>
+              )}
+            </div>
+            {canLoadMore && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleLoadMore}>
+                  Cargar más socios
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

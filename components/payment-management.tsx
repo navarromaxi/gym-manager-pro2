@@ -610,6 +610,9 @@ export function PaymentManagement({
           setPlanContract(currentContract);
         }
 
+        const paymentDescription =
+          newPayment.description.trim() || selectedPlan.name;
+
         const payment: Payment = {
           id: paymentId,
           gym_id: gymId,
@@ -629,7 +632,7 @@ export function PaymentManagement({
               ? newPayment.cardInstallments
               : undefined,
           type: "plan",
-          description: newPayment.description || undefined,
+          description: paymentDescription,
           plan_id: selectedPlan.id,
         };
 
@@ -721,6 +724,9 @@ export function PaymentManagement({
           }
         }
 
+         const paymentDescription =
+          newPayment.description.trim() || selectedPlan.name;
+
         const payment: Payment = {
           id: paymentId,
           gym_id: gymId,
@@ -739,7 +745,7 @@ export function PaymentManagement({
               ? newPayment.cardInstallments
               : undefined,
           type: "plan",
-          description: newPayment.description || undefined,
+          description: paymentDescription,
           plan_id: selectedPlan.id,
         };
 
@@ -858,6 +864,12 @@ export function PaymentManagement({
     }
 
     try {
+      const trimmedDescription = editPaymentData.description.trim();
+      const resolvedDescription =
+        trimmedDescription ||
+        editingPayment.description ||
+        editingPayment.plan ||
+        "Pago";
       const paymentUpdate: Record<string, any> = {
         amount: editPaymentData.amount,
         date: editPaymentData.date,
@@ -870,7 +882,7 @@ export function PaymentManagement({
           editPaymentData.method === "Tarjeta de Crédito"
             ? editPaymentData.cardInstallments
             : null,
-        description: editPaymentData.description || null,
+        description: resolvedDescription,
       };
 
       if (typeof editingPayment.start_date === "string") {
@@ -897,7 +909,7 @@ export function PaymentManagement({
           editPaymentData.method === "Tarjeta de Crédito"
             ? editPaymentData.cardInstallments
             : undefined,
-        description: editPaymentData.description || undefined,
+       description: resolvedDescription,
         ...(typeof editingPayment.start_date === "string"
           ? { start_date: editPaymentData.startDate || undefined }
           : {}),
