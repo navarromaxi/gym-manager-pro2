@@ -145,7 +145,8 @@ export function MemberManagement({
   }, [plans, newMember.plan]);
 
   const calculatedPlanEndDate = useMemo(
-    () => calculatePlanEndDate(newMember.planStartDate, selectedPlanForNewMember),
+    () =>
+      calculatePlanEndDate(newMember.planStartDate, selectedPlanForNewMember),
     [newMember.planStartDate, selectedPlanForNewMember]
   );
 
@@ -176,6 +177,10 @@ export function MemberManagement({
 
   const filteredMembers = useMemo(() => {
     const today = new Date();
+    const expiringCustomPlanMemberIds =
+      statusFilter === "custom_expiring"
+        ? new Set(getExpiringCustomPlans().map((plan) => plan.member_id))
+        : null;
 
     return members
       .filter((member) => {
@@ -212,6 +217,10 @@ export function MemberManagement({
           return (member.balance_due || 0) > 0;
         }
 
+        if (statusFilter === "custom_expiring") {
+          return expiringCustomPlanMemberIds?.has(member.id) ?? false;
+        }
+
         return statusFilter === "all" || realStatus === statusFilter;
       })
       .sort((a, b) => {
@@ -221,7 +230,8 @@ export function MemberManagement({
         const nextB = toLocalDate(b.next_payment).getTime();
         return nextA - nextB;
       });
-  }, [members, debouncedSearch, statusFilter]);
+      }, [members, debouncedSearch, statusFilter, getExpiringCustomPlans]);
+
 
   const handleAddMember = async () => {
     try {
@@ -239,9 +249,7 @@ export function MemberManagement({
       }
       const installments = newMember.installments || 1;
       const paymentAmount =
-        installments === 1
-          ? newMember.planPrice
-          : newMember.paymentAmount;
+        installments === 1 ? newMember.planPrice : newMember.paymentAmount;
       if (paymentAmount <= 0) {
         alert("Debes ingresar un monto válido");
         return;
@@ -266,7 +274,7 @@ export function MemberManagement({
         installments === 1
           ? nextPaymentISO
           : newMember.nextInstallmentDue || nextPaymentISO;
-          
+
       const today = new Date();
       const diffTime = today.getTime() - nextPayment.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -351,7 +359,7 @@ export function MemberManagement({
           newMember.paymentMethod === "Tarjeta de Crédito"
             ? newMember.cardBrand
             : undefined,
-         card_installments:
+        card_installments:
           newMember.paymentMethod === "Tarjeta de Crédito"
             ? newMember.cardInstallments
             : undefined,
@@ -546,6 +554,24 @@ export function MemberManagement({
     });
   };
 
+  const getExpiringCustomPlans = useCallback(() => {
+    const today = new Date();
+
+    return customPlans.filter((plan) => {
+      if (!plan.is_active) return false;
+      if (!plan.end_date) return false;
+
+      const endDate = toLocalDate(plan.end_date);
+      if (Number.isNaN(endDate.getTime())) return false;
+
+      const diffDays = Math.ceil(
+        (endDate.getTime() - today.getTime()) / 86400000
+      );
+
+      return diffDays <= 10 && diffDays >= 0;
+    });
+  }, [customPlans]);
+
   //Función para marcar como contactado
   const handleMarkAsFollowedUp = async (memberId: string) => {
     try {
@@ -577,7 +603,12 @@ export function MemberManagement({
       return !member.followed_up && diffDays >= 5 && diffDays <= 12;
     });
   };
-  
+
+  const expiringCustomPlansForAlert = getExpiringCustomPlans();
+  const expiringCustomPlanMembersCount = new Set(
+    expiringCustomPlansForAlert.map((plan) => plan.member_id)
+  ).size;
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -644,7 +675,7 @@ export function MemberManagement({
                   id="planStartDate"
                   type="date"
                   value={newMember.planStartDate}
-                   onChange={(e) => {
+                  onChange={(e) => {
                     const value = e.target.value;
                     const computedNext = calculatePlanEndDate(
                       value,
@@ -652,7 +683,7 @@ export function MemberManagement({
                     );
                     setNewMember({
                       ...newMember,
-                     planStartDate: value,
+                      planStartDate: value,
                       nextInstallmentDue:
                         newMember.installments === 1
                           ? computedNext
@@ -692,7 +723,7 @@ export function MemberManagement({
                       planPrice: selectedPlan?.price || 0,
                       installments: 1,
                       paymentAmount: selectedPlan?.price || 0,
-                       nextInstallmentDue: computedNext,
+                      nextInstallmentDue: computedNext,
                     });
                   }}
                 >
@@ -710,105 +741,105 @@ export function MemberManagement({
                   </SelectContent>
                 </Select>
               </div>
-               {newMember.plan && (
-                  <>
-                    <div className="grid gap-2">
-                       <Label htmlFor="planPrice">Precio total del plan</Label>
-                <Input
-                  id="planPrice"
-                  type="number"
-                  value={newMember.planPrice}
-                  onChange={(e) => {
-                    const price = parseFloat(e.target.value) || 0;
-                    setNewMember({
-                      ...newMember,
-                      planPrice: price,
-                      paymentAmount:
-                        newMember.installments === 1
-                          ? price
-                          : newMember.paymentAmount,
-                    });
-                  }}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="installments">Cantidad de cuotas</Label>
-                <Select
-                  value={newMember.installments.toString()}
-                  onValueChange={(value) => {
-                    const installments = parseInt(value);
-                     const computedNext = calculatePlanEndDate(
-                      newMember.planStartDate,
-                      selectedPlanForNewMember
-                    );
-                    setNewMember({
-                      ...newMember,
-                      installments,
-                      paymentAmount:
-                        installments === 1
-                          ? newMember.planPrice
-                          : 0,
+              {newMember.plan && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="planPrice">Precio total del plan</Label>
+                    <Input
+                      id="planPrice"
+                      type="number"
+                      value={newMember.planPrice}
+                      onChange={(e) => {
+                        const price = parseFloat(e.target.value) || 0;
+                        setNewMember({
+                          ...newMember,
+                          planPrice: price,
+                          paymentAmount:
+                            newMember.installments === 1
+                              ? price
+                              : newMember.paymentAmount,
+                        });
+                      }}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="installments">Cantidad de cuotas</Label>
+                    <Select
+                      value={newMember.installments.toString()}
+                      onValueChange={(value) => {
+                        const installments = parseInt(value);
+                        const computedNext = calculatePlanEndDate(
+                          newMember.planStartDate,
+                          selectedPlanForNewMember
+                        );
+                        setNewMember({
+                          ...newMember,
+                          installments,
+                          paymentAmount:
+                            installments === 1 ? newMember.planPrice : 0,
                           nextInstallmentDue:
-                        installments === 1
-                          ? computedNext
-                          : newMember.nextInstallmentDue || computedNext,
-                    });
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona cuotas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1</SelectItem>
-                    <SelectItem value="2">2</SelectItem>
-                    <SelectItem value="3">3</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {newMember.installments > 1 && (
-                <div className="grid gap-2">
-                  <Label htmlFor="paymentAmount">Monto a abonar</Label>
-                  <Input
-                    id="paymentAmount"
-                    type="number"
-                    value={newMember.paymentAmount}
-                    onChange={(e) =>
-                      setNewMember({
-                        ...newMember,
-                        paymentAmount: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Saldo pendiente: $
-                    {(newMember.planPrice - newMember.paymentAmount).toFixed(2)}
-                  </p>
-                </div>
+                            installments === 1
+                              ? computedNext
+                              : newMember.nextInstallmentDue || computedNext,
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona cuotas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1</SelectItem>
+                        <SelectItem value="2">2</SelectItem>
+                        <SelectItem value="3">3</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {newMember.installments > 1 && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="paymentAmount">Monto a abonar</Label>
+                      <Input
+                        id="paymentAmount"
+                        type="number"
+                        value={newMember.paymentAmount}
+                        onChange={(e) =>
+                          setNewMember({
+                            ...newMember,
+                            paymentAmount: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Saldo pendiente: $
+                        {(
+                          newMember.planPrice - newMember.paymentAmount
+                        ).toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+                  <div className="grid gap-2">
+                    <Label htmlFor="nextInstallmentDue">
+                      Vencimiento próxima cuota
+                    </Label>
+                    <Input
+                      id="nextInstallmentDue"
+                      type="date"
+                      value={nextInstallmentDueValue}
+                      onChange={(e) =>
+                        setNewMember({
+                          ...newMember,
+                          nextInstallmentDue: e.target.value,
+                        })
+                      }
+                      disabled={newMember.installments === 1}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {newMember.installments === 1
+                        ? "Se utilizará la misma fecha que el fin del plan."
+                        : "Registra cuándo debería abonarse la próxima cuota."}
+                    </p>
+                  </div>
+                </>
               )}
-              <div className="grid gap-2">
-                <Label htmlFor="nextInstallmentDue">
-                  Vencimiento próxima cuota
-                </Label>
-                <Input
-                  id="nextInstallmentDue"
-                  type="date"
-                  value={nextInstallmentDueValue}
-                  onChange={(e) =>
-                    setNewMember({
-                      ...newMember,
-                      nextInstallmentDue: e.target.value,
-                    })
-                  }
-                  disabled={newMember.installments === 1}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {newMember.installments === 1
-                    ? "Se utilizará la misma fecha que el fin del plan."
-                    : "Registra cuándo debería abonarse la próxima cuota."}
-                </p>
-              </div>
-            </>
-          )}
               <div className="grid gap-2">
                 <Label htmlFor="paymentMethod">Método de Pago</Label>
                 <Select
@@ -834,7 +865,7 @@ export function MemberManagement({
                 </Select>
               </div>
               {newMember.paymentMethod === "Tarjeta de Crédito" && (
-                 <>
+                <>
                   <div className="grid gap-2">
                     <Label>Tipo de Tarjeta</Label>
                     <Select
@@ -936,6 +967,9 @@ export function MemberManagement({
                 <SelectItem value="expiring_soon">
                   Próximo a vencerse (10 días)
                 </SelectItem>
+                <SelectItem value="custom_expiring">
+                  Personalizados por vencer (10 días)
+                </SelectItem>
                 <SelectItem value="balance_due">Saldo pendiente</SelectItem>
                 <SelectItem value="follow_up">Seguimiento pendiente</SelectItem>
               </SelectContent>
@@ -963,6 +997,20 @@ export function MemberManagement({
             </div>
           )}
 
+          {expiringCustomPlanMembersCount > 0 && (
+            <div className="mt-2 text-sm text-blue-700 bg-blue-100 border-l-4 border-blue-500 p-3 rounded flex justify-between items-center">
+              ⚠️ Tienes {expiringCustomPlanMembersCount} socios con plan
+              personalizado por vencer (menos de 10 días).
+              <Button
+                variant="ghost"
+                className="text-blue-700 hover:underline"
+                onClick={() => setStatusFilter("custom_expiring")}
+              >
+                Ver personalizados por vencer
+              </Button>
+            </div>
+          )}
+
           {getMembersToFollowUp().length > 0 && (
             <div className="mt-2 text-sm text-yellow-700 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded flex items-center justify-between">
               <span>
@@ -979,7 +1027,6 @@ export function MemberManagement({
               </Button>
             </div>
           )}
-          
         </CardHeader>
         {filteredMembers.length === 0 && (
           <div className="mt-2 text-sm text-muted-foreground">
@@ -1059,9 +1106,11 @@ export function MemberManagement({
                           : `${daysUntilExpiration} días`}
                       </span>
                     </TableCell>
-                     <TableCell>
+                    <TableCell>
                       {member.next_installment_due
-                        ? toLocalDate(member.next_installment_due).toLocaleDateString()
+                        ? toLocalDate(
+                            member.next_installment_due
+                          ).toLocaleDateString()
                         : member.next_payment
                         ? toLocalDate(member.next_payment).toLocaleDateString()
                         : "-"}
@@ -1196,7 +1245,7 @@ export function MemberManagement({
                   Actualiza cuándo debería pagarse la próxima cuota pendiente.
                 </p>
               </div>
-               <div className="grid gap-2">
+              <div className="grid gap-2">
                 <Label htmlFor="edit-description">Descripción</Label>
                 <Input
                   id="edit-description"
