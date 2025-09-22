@@ -62,6 +62,8 @@ interface LocalExpense extends SupabaseExpense {
   isRecurring: boolean;
 }
 
+const EXPENSES_PER_BATCH = 10;
+
 export function ExpenseManagement({
   expenses,
   setExpenses,
@@ -85,6 +87,7 @@ export function ExpenseManagement({
   const [selectedRecurringExpense, setSelectedRecurringExpense] = useState("");
   const [generatedExpenseAmount, setGeneratedExpenseAmount] = useState("");
   const [yearFilter, setYearFilter] = useState("all");
+  const [visibleCount, setVisibleCount] = useState(EXPENSES_PER_BATCH);
   
 
   const categories = [
@@ -167,6 +170,20 @@ export function ExpenseManagement({
       return matchesSearch && matchesCategory && matchesMonth && matchesYear;
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+     useEffect(() => {
+    setVisibleCount(EXPENSES_PER_BATCH);
+  }, [searchTerm, categoryFilter, monthFilter, yearFilter]);
+
+  const currentVisibleCount = Math.min(visibleCount, filteredExpenses.length);
+  const displayedExpenses = filteredExpenses.slice(0, currentVisibleCount);
+  const canLoadMore = currentVisibleCount < filteredExpenses.length;
+
+  const handleLoadMore = () => {
+    setVisibleCount((prev) =>
+      Math.min(prev + EXPENSES_PER_BATCH, filteredExpenses.length)
+    );
+  };
 
   //ACA ES QUE HAY QUE MODIFICAR PARA GUARDAR EL DATO EN SUPABASE:  versión async que lo guarde en Supabase:
   const handleAddExpense = async () => {
@@ -696,7 +713,7 @@ export function ExpenseManagement({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredExpenses.map((expense) => (
+              {displayedExpenses.map((expense) => (
                 <TableRow key={expense.id}>
                   <TableCell>
                     {new Date(expense.date).toLocaleDateString()}
@@ -733,6 +750,23 @@ export function ExpenseManagement({
               ))}
             </TableBody>
           </Table>
+          <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-muted-foreground">
+              {filteredExpenses.length > 0 && (
+                <>
+                  Mostrando <strong>{displayedExpenses.length}</strong> de{" "}
+                  <strong>{filteredExpenses.length}</strong> gastos
+                </>
+              )}
+            </div>
+            {canLoadMore && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleLoadMore}>
+                  Cargar más gastos
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
