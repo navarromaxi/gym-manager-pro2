@@ -60,6 +60,14 @@ const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
 
 const MEMBERS_PER_BATCH = 10;
 
+const formatDateForAlert = (isoDate: string) => {
+  if (!isoDate) return "";
+  const date = toLocalDate(isoDate);
+  return Number.isNaN(date.getTime())
+    ? isoDate
+    : date.toLocaleDateString();
+};
+
 const getRealStatus = (member: Member): "active" | "expired" | "inactive" => {
   const today = new Date();
   //const next = new Date(member.next_payment);
@@ -1077,6 +1085,26 @@ export function MemberManagement({
               </Button>
             </div>
           )}
+          {expiringCustomPlansForAlert.map((plan) => {
+            const memberName =
+              plan.member_name ||
+              members.find((member) => member.id === plan.member_id)?.name ||
+              "Socio";
+            const formattedEndDate = formatDateForAlert(plan.end_date);
+
+            return (
+              <div
+                key={`custom-plan-expiring-alert-${plan.id}`}
+                className="mt-2 rounded border-l-4 border-amber-500 bg-amber-100 p-3 text-sm text-amber-800"
+              >
+                ⚠️ Al socio "{memberName}" se le está por vencer el plan
+                personalizado en los próximos diez días
+                {formattedEndDate
+                  ? ` (vence el ${formattedEndDate}).`
+                  : "."}
+              </div>
+            );
+          })}
           {expiringMembers.length > 0 && (
             <div className="mt-2 text-sm text-orange-700 bg-orange-100 border-l-4 border-orange-500 p-3 rounded flex justify-between items-center">
                ⚠️ Tienes {expiringMembers.length} socios con vencimiento
