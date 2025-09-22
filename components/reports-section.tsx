@@ -451,7 +451,15 @@ const isWithinPeriod = (date: Date) => {
     (p) => p.method === "Tarjeta de Crédito"
   );
 
-  const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
+  const cardBrands = [
+    "VISA",
+    "OCA",
+    "MASTER",
+    "CABAL",
+    "AMEX",
+    "TARJETA D",
+    "MERCADO PAGO",
+  ];
 
   const creditCardStats = creditCardPayments.reduce(
     (acc, payment) => {

@@ -131,7 +131,15 @@ export function ProspectManagement({
     "Tarjeta de Débito",
     "Tarjeta de Crédito",
   ];
-  const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
+  const cardBrands = [
+    "VISA",
+    "OCA",
+    "MASTER",
+    "CABAL",
+    "AMEX",
+    "TARJETA D",
+    "MERCADO PAGO",
+  ];
   const getInitialConversionData = (): ConversionData => {
     const today = new Date().toISOString().split("T")[0];
     return {
@@ -321,7 +329,7 @@ export function ProspectManagement({
     );
   });
 
-   useEffect(() => {
+  useEffect(() => {
     setVisibleCount(PROSPECTS_PER_BATCH);
   }, [searchTerm, statusFilter, priorityFilter, scheduledDateFilter]);
 
@@ -331,7 +339,7 @@ export function ProspectManagement({
     return dateB - dateA;
   });
 
-   const totalFiltered = sortedProspects.length;
+  const totalFiltered = sortedProspects.length;
   const currentVisibleCount = Math.min(visibleCount, totalFiltered);
   const displayedProspects = sortedProspects.slice(0, currentVisibleCount);
   const canLoadMore = currentVisibleCount < totalFiltered;
@@ -590,10 +598,11 @@ export function ProspectManagement({
         start_date: conversionData.planStartDate,
         plan: newMember.plan,
         method: conversionData.paymentMethod,
-        card_brand:
-          conversionData.paymentMethod === "Tarjeta de Crédito"
-            ? conversionData.cardBrand
-            : undefined,
+        card_brand: ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+          conversionData.paymentMethod
+        )
+          ? conversionData.cardBrand
+          : undefined,
         card_installments:
           conversionData.paymentMethod === "Tarjeta de Crédito"
             ? conversionData.cardInstallments
@@ -951,7 +960,7 @@ export function ProspectManagement({
       {/* Prospects Table */}
       <Card>
         <CardHeader>
-           <CardTitle>Lista de Interesados ({totalFiltered})</CardTitle>
+          <CardTitle>Lista de Interesados ({totalFiltered})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="w-full overflow-x-auto">
@@ -971,7 +980,7 @@ export function ProspectManagement({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                 {displayedProspects.map((prospect) => {
+                {displayedProspects.map((prospect) => {
                   const scheduledDate = formatDate(prospect.scheduled_date);
                   return (
                     <TableRow key={prospect.id}>
@@ -1463,7 +1472,9 @@ export function ProspectManagement({
                     </SelectContent>
                   </Select>
                 </div>
-                {conversionData.paymentMethod === "Tarjeta de Crédito" && (
+                {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                  conversionData.paymentMethod
+                ) && (
                   <>
                     <div className="grid gap-2">
                       <Label>Tipo de Tarjeta</Label>
@@ -1532,7 +1543,9 @@ export function ProspectManagement({
                 onClick={handleConvertProspectToMember}
                 disabled={
                   !conversionData.plan ||
-                  (conversionData.paymentMethod === "Tarjeta de Crédito" &&
+                  (["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                    conversionData.paymentMethod
+                  ) &&
                     !conversionData.cardBrand)
                 }
               >

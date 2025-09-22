@@ -280,10 +280,13 @@ export function CustomPlanManagement({
   };
 
   const cardBrands = [
-    "Visa",
-    "Mastercard",
-    "American Express",
-    "Otra",
+    "VISA",
+    "OCA",
+    "MASTER",
+    "CABAL",
+    "AMEX",
+    "TARJETA D",
+    "MERCADO PAGO",
   ];
 
   const handleAddPlan = async () => {
@@ -321,10 +324,11 @@ export function CustomPlanManagement({
       start_date: newPlan.start_date,
       plan: newPlan.name,
       method: newPlan.payment_method || "Efectivo",
-      card_brand:
-        newPlan.payment_method === "Tarjeta de Crédito"
-          ? newPlan.card_brand
-          : undefined,
+      card_brand: ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+        newPlan.payment_method || ""
+      )
+        ? newPlan.card_brand
+        : undefined,
       card_installments:
         newPlan.payment_method === "Tarjeta de Crédito"
           ? newPlan.card_installments
@@ -513,7 +517,10 @@ export function CustomPlanManagement({
                 </Select>
               </div>
 
-              {newPlan.payment_method === "Tarjeta de Crédito" && (
+               {[
+                "Tarjeta de Crédito",
+                "Tarjeta de Débito",
+              ].includes(newPlan.payment_method || "") && (
                 <>
                   <div className="grid gap-2">
                     <Label>Tipo de Tarjeta</Label>

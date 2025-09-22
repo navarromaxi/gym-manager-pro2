@@ -146,7 +146,15 @@ export function MemberManagement({
     "Tarjeta de Crédito",
   ];
 
-  const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
+  const cardBrands = [
+    "VISA",
+    "OCA",
+    "MASTER",
+    "CABAL",
+    "AMEX",
+    "TARJETA D",
+    "MERCADO PAGO",
+  ];
   const [contractTable, setContractTable] = useState<
     "plan_contracts" | "plan_contract" | null
   >(null);
@@ -422,10 +430,11 @@ export function MemberManagement({
         start_date: newMember.planStartDate,
         plan: member.plan,
         method: newMember.paymentMethod,
-        card_brand:
-          newMember.paymentMethod === "Tarjeta de Crédito"
-            ? newMember.cardBrand
-            : undefined,
+         card_brand: ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+          newMember.paymentMethod
+        )
+          ? newMember.cardBrand
+          : undefined,
         card_installments:
           newMember.paymentMethod === "Tarjeta de Crédito"
             ? newMember.cardInstallments
@@ -1001,8 +1010,9 @@ export function MemberManagement({
                 type="submit"
                 onClick={handleAddMember}
                 disabled={
-                  newMember.paymentMethod === "Tarjeta de Crédito" &&
-                  !newMember.cardBrand
+                   ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                    newMember.paymentMethod
+                  ) && !newMember.cardBrand
                 }
               >
                 Agregar Socio

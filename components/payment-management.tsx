@@ -138,7 +138,16 @@ export function PaymentManagement({
     "Tarjeta de Crédito",
   ];
 
-  const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
+  const cardBrands = [
+    "VISA",
+    "OCA",
+    "MASTER",
+    "CABAL",
+    "AMEX",
+    "TARJETA D",
+    "MERCADO PAGO",
+  ];
+
 
   const getPlanPrice = (payment: Payment) => {
     if (payment.plan_id) {
@@ -735,10 +744,11 @@ export function PaymentManagement({
           start_date: newPayment.startDate,
           plan: selectedPlan.name,
           method: newPayment.method,
-          card_brand:
-            newPayment.method === "Tarjeta de Crédito"
-              ? newPayment.cardBrand
-              : undefined,
+          card_brand: ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+            newPayment.method
+          )
+            ? newPayment.cardBrand
+            : undefined,
           card_installments:
             newPayment.method === "Tarjeta de Crédito"
               ? newPayment.cardInstallments
@@ -848,10 +858,11 @@ export function PaymentManagement({
           date: newPayment.date,
           plan: selectedMember.plan,
           method: newPayment.method,
-          card_brand:
-            newPayment.method === "Tarjeta de Crédito"
-              ? newPayment.cardBrand
-              : undefined,
+          card_brand: ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+            newPayment.method
+          )
+            ? newPayment.cardBrand
+            : undefined,
           card_installments:
             newPayment.method === "Tarjeta de Crédito"
               ? newPayment.cardInstallments
@@ -898,10 +909,11 @@ export function PaymentManagement({
           amount: newPayment.amount,
           date: newPayment.date,
           method: newPayment.method,
-          card_brand:
-            newPayment.method === "Tarjeta de Crédito"
-              ? newPayment.cardBrand
-              : undefined,
+          card_brand: ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+            newPayment.method
+          )
+            ? newPayment.cardBrand
+            : undefined,
           card_installments:
             newPayment.method === "Tarjeta de Crédito"
               ? newPayment.cardInstallments
@@ -986,10 +998,11 @@ export function PaymentManagement({
         amount: editPaymentData.amount,
         date: editPaymentData.date,
         method: editPaymentData.method,
-        card_brand:
-          editPaymentData.method === "Tarjeta de Crédito"
-            ? editPaymentData.cardBrand
-            : null,
+         card_brand: ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+          editPaymentData.method
+        )
+          ? editPaymentData.cardBrand
+          : null,
         card_installments:
           editPaymentData.method === "Tarjeta de Crédito"
             ? editPaymentData.cardInstallments
@@ -1013,10 +1026,11 @@ export function PaymentManagement({
         amount: editPaymentData.amount,
         date: editPaymentData.date,
         method: editPaymentData.method,
-        card_brand:
-          editPaymentData.method === "Tarjeta de Crédito"
-            ? editPaymentData.cardBrand
-            : undefined,
+        card_brand: ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+          editPaymentData.method
+        )
+          ? editPaymentData.cardBrand
+          : undefined,
         card_installments:
           editPaymentData.method === "Tarjeta de Crédito"
             ? editPaymentData.cardInstallments
@@ -1445,7 +1459,10 @@ export function PaymentManagement({
                 </Select>
               </div>
 
-              {newPayment.method === "Tarjeta de Crédito" && (
+               {[
+                "Tarjeta de Crédito",
+                "Tarjeta de Débito",
+              ].includes(newPayment.method) && (
                 <>
                   <div className="grid gap-2">
                     <Label htmlFor="cardBrand">Tipo de Tarjeta</Label>
@@ -1643,8 +1660,9 @@ export function PaymentManagement({
                 disabled={
                   !newPayment.memberId ||
                   !newPayment.method ||
-                  (newPayment.method === "Tarjeta de Crédito" &&
-                    !newPayment.cardBrand) ||
+                   (["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                    newPayment.method
+                  ) && !newPayment.cardBrand) ||
                   (newPayment.type === "new_plan"
                     ? !newPayment.planId ||
                       !newPayment.startDate ||
@@ -2049,8 +2067,12 @@ export function PaymentManagement({
                     setEditPaymentData((prev) => ({
                       ...prev,
                       method: value,
-                      cardBrand:
-                        value === "Tarjeta de Crédito" ? prev.cardBrand : "",
+                      cardBrand: [
+                        "Tarjeta de Crédito",
+                        "Tarjeta de Débito",
+                      ].includes(value)
+                        ? prev.cardBrand
+                        : "",
                       cardInstallments:
                         value === "Tarjeta de Crédito"
                           ? prev.cardInstallments
@@ -2070,7 +2092,10 @@ export function PaymentManagement({
                   </SelectContent>
                 </Select>
               </div>
-              {editPaymentData.method === "Tarjeta de Crédito" && (
+               {[
+                "Tarjeta de Crédito",
+                "Tarjeta de Débito",
+              ].includes(editPaymentData.method) && (
                 <>
                   <div className="grid gap-2">
                     <Label htmlFor="edit-card-brand">Tipo de Tarjeta</Label>
