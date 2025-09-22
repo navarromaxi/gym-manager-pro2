@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -40,6 +41,17 @@ interface PaymentManagementProps {
   setMembers: (members: Member[]) => void;
   plans: Plan[];
   gymId: string;
+}
+
+interface PaymentInsight {
+  isInstallment: boolean;
+  balancePending: number | null;
+}
+
+interface MemberInstallmentState {
+  balance: number;
+  planPrice: number | null;
+  installmentActive: boolean;
 }
 
 export function PaymentManagement({
@@ -113,6 +125,108 @@ export function PaymentManagement({
     const [year, month, day] = dateStr.split("-").map(Number);
     return new Date(year, month - 1, day);
   };
+
+   const paymentInsights = useMemo(() => {
+    const planIdMap = new Map<string, Plan>();
+    const planNameMap = new Map<string, Plan>();
+    plans.forEach((plan) => {
+      planIdMap.set(plan.id, plan);
+      planNameMap.set(plan.name, plan);
+    });
+
+    const memberMap = new Map<string, Member>();
+    members.forEach((member) => {
+      memberMap.set(member.id, member);
+    });
+
+    const memberStates = new Map<string, MemberInstallmentState>();
+    const insights = new Map<string, PaymentInsight>();
+
+    const getTimeValue = (value: string) => {
+      const parsed = parseLocalDate(value);
+      const time = parsed.getTime();
+      return Number.isNaN(time) ? 0 : time;
+    };
+
+    const orderedPayments = [...payments].sort(
+      (a, b) => getTimeValue(a.date) - getTimeValue(b.date)
+    );
+
+    orderedPayments.forEach((payment) => {
+      const previousState =
+        memberStates.get(payment.member_id) ?? {
+          balance: 0,
+          planPrice: null,
+          installmentActive: false,
+        };
+
+      if (payment.type !== "plan") {
+        memberStates.set(payment.member_id, previousState);
+        insights.set(payment.id, {
+          isInstallment: false,
+          balancePending: null,
+        });
+        return;
+      }
+
+      const member = memberMap.get(payment.member_id);
+      const planFromId = payment.plan_id
+        ? planIdMap.get(payment.plan_id)
+        : undefined;
+      const planFromName =
+        !planFromId && payment.plan ? planNameMap.get(payment.plan) : undefined;
+      const effectivePlanPrice =
+        planFromId?.price ??
+        planFromName?.price ??
+        previousState.planPrice ??
+        member?.plan_price ??
+        null;
+
+      if (payment.start_date) {
+        const targetPrice = effectivePlanPrice ?? payment.amount;
+        const balanceAfter = Math.max(targetPrice - payment.amount, 0);
+        const isInstallment = balanceAfter > 0;
+
+        memberStates.set(payment.member_id, {
+          balance: balanceAfter,
+          planPrice: targetPrice,
+          installmentActive: isInstallment && balanceAfter > 0,
+        });
+
+        insights.set(payment.id, {
+          isInstallment,
+          balancePending: balanceAfter,
+        });
+        return;
+      }
+
+      const balanceBefore = previousState.balance ?? 0;
+      const newBalance = Math.max(balanceBefore - payment.amount, 0);
+      const wasInstallment =
+        previousState.installmentActive || balanceBefore > 0 || newBalance > 0;
+
+      memberStates.set(payment.member_id, {
+        balance: newBalance,
+        planPrice: effectivePlanPrice ?? previousState.planPrice,
+        installmentActive: newBalance > 0,
+      });
+
+      insights.set(payment.id, {
+        isInstallment: wasInstallment,
+        balancePending: newBalance,
+      });
+    });
+
+    return insights;
+  }, [members, payments, plans]);
+
+  const membersById = useMemo(() => {
+    const map = new Map<string, Member>();
+    members.forEach((member) => {
+      map.set(member.id, member);
+    });
+    return map;
+  }, [members]);
 
    const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
     if (!startDate) return "";
@@ -1256,33 +1370,72 @@ export function PaymentManagement({
                 <TableHead>Detalle</TableHead>
                 <TableHead>Monto</TableHead>
                 <TableHead>Método</TableHead>
+                <TableHead>En cuotas</TableHead>
+                <TableHead>Saldo pendiente</TableHead>
                 <TableHead>Tipo</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPayments.map((payment) => (
-                <TableRow key={payment.id}>
-                  <TableCell>
-                    {parseLocalDate(payment.date).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {payment.member_name}
-                  </TableCell>
-                  <TableCell>
-                    {payment.type === "plan"
-                      ? payment.plan
-                      : payment.description}
-                  </TableCell>
-                  <TableCell className="font-medium text-green-600">
-                    ${payment.amount.toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    {payment.method}
-                    {payment.card_brand ? ` - ${payment.card_brand}` : ""}
-                  </TableCell>
-                  <TableCell className="capitalize">{payment.type}</TableCell>
-                </TableRow>
-              ))}
+               {filteredPayments.map((payment) => {
+                const insight = paymentInsights.get(payment.id);
+                const member = membersById.get(payment.member_id);
+                const fallbackBalance =
+                  typeof member?.balance_due === "number"
+                    ? member.balance_due
+                    : null;
+                const balanceValue =
+                  insight?.balancePending ?? fallbackBalance ?? null;
+
+                return (
+                  <TableRow key={payment.id}>
+                    <TableCell>
+                      {parseLocalDate(payment.date).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {payment.member_name}
+                    </TableCell>
+                    <TableCell>
+                      {payment.type === "plan"
+                        ? payment.plan
+                        : payment.description}
+                    </TableCell>
+                    <TableCell className="font-medium text-green-600">
+                      ${payment.amount.toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      {payment.method}
+                      {payment.card_brand ? ` - ${payment.card_brand}` : ""}
+                    </TableCell>
+                    <TableCell>
+                      {payment.type === "plan" ? (
+                        insight?.isInstallment ? (
+                          <Badge variant="secondary">Sí</Badge>
+                        ) : (
+                          <Badge variant="outline">No</Badge>
+                        )
+                      ) : (
+                        <Badge variant="outline">N/A</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {payment.type === "plan" && balanceValue !== null ? (
+                        <span
+                          className={
+                            balanceValue > 0
+                              ? "font-semibold text-amber-600"
+                              : "text-muted-foreground"
+                          }
+                        >
+                          ${balanceValue.toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="capitalize">{payment.type}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>

@@ -212,7 +212,7 @@ export default function GymManagementSystem() {
       const { data: paymentsData, error: paymentsError } = await supabase
         .from("payments")
         .select(
-          "id, gym_id, member_id, member_name, amount, date, plan, method, card_brand, card_installments, type, description, plan_id"
+           "id, gym_id, member_id, member_name, amount, date, start_date, plan, method, card_brand, card_installments, type, description, plan_id"
         )
         .eq("gym_id", gymId)
         .order("date", { ascending: false });
