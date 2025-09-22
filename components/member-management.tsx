@@ -656,6 +656,23 @@ export function MemberManagement({
   const expiredMembers = getExpiredMembers();
   const membersToFollowUp = getMembersToFollowUp();
   const membersWithBalanceDue = getMembersWithBalanceDue();
+   const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+  const membersWithPartialDueSoon = membersWithBalanceDue.filter((member) => {
+    if (!member.next_installment_due) return false;
+    const dueDate = toLocalDate(member.next_installment_due);
+    if (Number.isNaN(dueDate.getTime())) return false;
+    const diffDays = Math.ceil(
+      (dueDate.getTime() - todayMidnight.getTime()) / 86400000
+    );
+    return diffDays <= 10 && diffDays >= 0;
+  });
+  const membersWithPartialOverdue = membersWithBalanceDue.filter((member) => {
+    if (!member.next_installment_due) return false;
+    const dueDate = toLocalDate(member.next_installment_due);
+    if (Number.isNaN(dueDate.getTime())) return false;
+    return dueDate.getTime() < todayMidnight.getTime();
+  });
   const expiringCustomPlansForAlert = getExpiringCustomPlans();
   const expiringCustomPlanMembersCount = new Set(
     expiringCustomPlansForAlert.map((plan) => plan.member_id)
@@ -1035,6 +1052,31 @@ export function MemberManagement({
         <CardHeader>
           <CardTitle>Lista de Socios ({filteredMembers.length})</CardTitle>
 
+           {membersWithPartialDueSoon.map((member) => (
+            <div
+              key={`partial-due-soon-${member.id}`}
+              className="mt-2 rounded text-sm border-l-4 border-sky-500 bg-sky-100 p-3 text-sky-700"
+            >
+              ⚠️ El socio "{member.name}" se le vence una cuota pronto.
+            </div>
+          ))}
+
+          {membersWithPartialOverdue.length > 0 && (
+            <div className="mt-2 text-sm text-rose-700 bg-rose-100 border-l-4 border-rose-500 p-3 rounded flex items-center justify-between">
+              <span>
+                ⚠️ Tienes {membersWithPartialOverdue.length} socio
+                {membersWithPartialOverdue.length === 1 ? "" : "s"} con cuota
+                parcial vencida.
+              </span>
+              <Button
+                variant="ghost"
+                className="text-rose-700 hover:underline"
+                onClick={() => setStatusFilter("balance_due")}
+              >
+                Ver cuotas parciales vencidas
+              </Button>
+            </div>
+          )}
           {expiringMembers.length > 0 && (
             <div className="mt-2 text-sm text-orange-700 bg-orange-100 border-l-4 border-orange-500 p-3 rounded flex justify-between items-center">
                ⚠️ Tienes {expiringMembers.length} socios con vencimiento
@@ -1112,21 +1154,7 @@ export function MemberManagement({
             </div>
           )}
           
-          {membersWithBalanceDue.length > 0 && (
-            <div className="mt-2 text-sm text-red-700 bg-red-100 border-l-4 border-red-500 p-3 rounded flex items-center justify-between">
-              <span>
-                ⚠️ Tienes {membersWithBalanceDue.length} socio
-                {membersWithBalanceDue.length === 1 ? "" : "s"} con saldo pendiente.
-              </span>
-              <Button
-                variant="ghost"
-                className="text-red-700 hover:underline"
-                onClick={() => setStatusFilter("balance_due")}
-              >
-                Ver socios con saldo
-              </Button>
-            </div>
-          )}
+          
         </CardHeader>
         {filteredMembers.length === 0 && (
           <div className="mt-2 text-sm text-muted-foreground">

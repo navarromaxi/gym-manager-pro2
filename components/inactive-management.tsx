@@ -302,6 +302,49 @@ export function InactiveManagement({
         </Card>
       </div>
 
+      {/* Información Adicional */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Información de Clasificación</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="p-4 bg-green-50 rounded-lg">
+              <div className="flex items-center mb-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                <span className="font-medium text-green-800">Recuperables</span>
+              </div>
+              <p className="text-sm text-green-700">
+                Socios que probablemente regresen con una buena estrategia de
+                retención.
+              </p>
+            </div>
+            <div className="p-4 bg-yellow-50 rounded-lg">
+              <div className="flex items-center mb-2">
+                <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
+                <span className="font-medium text-yellow-800">
+                  En Evaluación
+                </span>
+              </div>
+              <p className="text-sm text-yellow-700">
+                Socios que requieren análisis adicional para determinar su
+                potencial de retorno.
+              </p>
+            </div>
+            <div className="p-4 bg-red-50 rounded-lg">
+              <div className="flex items-center mb-2">
+                <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                <span className="font-medium text-red-800">Perdidos</span>
+              </div>
+              <p className="text-sm text-red-700">
+                Socios que probablemente no regresen. Considerar remover de
+                campañas activas.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Filtros */}
       <Card>
         <CardHeader>
@@ -371,140 +414,138 @@ export function InactiveManagement({
             </TableHeader>
             <TableBody>
               {displayedInactiveMembers.map((member) => {
-                  const daysSinceLastPayment = getDaysSinceLastPayment(
-                    member.last_payment
-                  );
-                  const paymentInfo = getMemberPaymentInfo(member.id);
+                const daysSinceLastPayment = getDaysSinceLastPayment(
+                  member.last_payment
+                );
+                const paymentInfo = getMemberPaymentInfo(member.id);
 
-                  return (
-                    <TableRow key={member.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{member.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Socio desde:{" "}
-                            {new Date(member.join_date).toLocaleDateString()}
-                          </div>
+                return (
+                  <TableRow key={member.id}>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{member.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Socio desde:{" "}
+                          {new Date(member.join_date).toLocaleDateString()}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center text-sm">
-                            <Mail className="h-3 w-3 mr-1" />
-                            {member.email}
-                          </div>
-                          <div className="flex items-center text-sm">
-                            <Phone className="h-3 w-3 mr-1" />
-                            {member.phone}
-                          </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="flex items-center text-sm">
+                          <Mail className="h-3 w-3 mr-1" />
+                          {member.email}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{member.plan}</div>
-                          <div className="text-sm text-muted-foreground">
-                            ${member.plan_price}
-                          </div>
+                        <div className="flex items-center text-sm">
+                          <Phone className="h-3 w-3 mr-1" />
+                          {member.phone}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">
-                            {new Date(member.last_payment).toLocaleDateString()}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            ${paymentInfo.lastPaymentAmount}
-                          </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{member.plan}</div>
+                        <div className="text-sm text-muted-foreground">
+                          ${member.plan_price}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <AlertTriangle className="h-4 w-4 mr-1 text-red-500" />
-                          <span className="font-medium text-red-600">
-                            {daysSinceLastPayment} días
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">
+                          {new Date(member.last_payment).toLocaleDateString()}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          ${paymentInfo.lastPaymentAmount}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        <AlertTriangle className="h-4 w-4 mr-1 text-red-500" />
+                        <span className="font-medium text-red-600">
+                          {daysSinceLastPayment} días
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">
+                          ${paymentInfo.totalPaid.toLocaleString()}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {paymentInfo.paymentCount} pagos
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {getColorBadge(member.inactive_level)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="w-[150px] overflow-hidden whitespace-nowrap text-ellipsis text-sm text-gray-300">
+                        {member.inactive_comment || (
+                          <span className="text-xs text-muted-foreground">
+                            Sin comentarios
                           </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">
-                            ${paymentInfo.totalPaid.toLocaleString()}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {paymentInfo.paymentCount} pagos
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {getColorBadge(member.inactive_level)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="w-[150px] overflow-hidden whitespace-nowrap text-ellipsis text-sm text-gray-300">
-                          {member.inactive_comment || (
-                            <span className="text-xs text-muted-foreground">
-                              Sin comentarios
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-green-50 hover:bg-green-100"
-                            onClick={() =>
-                              updateInactiveLevel(member.id, "green")
-                            }
-                          >
-                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-yellow-50 hover:bg-yellow-100"
-                            onClick={() =>
-                              updateInactiveLevel(member.id, "yellow")
-                            }
-                          >
-                            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-red-50 hover:bg-red-100"
-                            onClick={() =>
-                              updateInactiveLevel(member.id, "red")
-                            }
-                          >
-                            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setEditingComment({
-                                memberId: member.id,
-                                comment: member.inactive_comment || "",
-                              });
-                              setIsCommentDialogOpen(true);
-                            }}
-                          >
-                            💬
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-green-50 hover:bg-green-100"
+                          onClick={() =>
+                            updateInactiveLevel(member.id, "green")
+                          }
+                        >
+                          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-yellow-50 hover:bg-yellow-100"
+                          onClick={() =>
+                            updateInactiveLevel(member.id, "yellow")
+                          }
+                        >
+                          <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-red-50 hover:bg-red-100"
+                          onClick={() => updateInactiveLevel(member.id, "red")}
+                        >
+                          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingComment({
+                              memberId: member.id,
+                              comment: member.inactive_comment || "",
+                            });
+                            setIsCommentDialogOpen(true);
+                          }}
+                        >
+                          💬
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
           <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-muted-foreground">
               {filteredInactiveMembers.length > 0 && (
                 <>
-                  Mostrando <strong>{displayedInactiveMembers.length}</strong> de{" "}
-                  <strong>{filteredInactiveMembers.length}</strong> socios
+                  Mostrando <strong>{displayedInactiveMembers.length}</strong>{" "}
+                  de <strong>{filteredInactiveMembers.length}</strong> socios
                   inactivos
                 </>
               )}
@@ -516,49 +557,6 @@ export function InactiveManagement({
                 </Button>
               </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Información Adicional */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Información de Clasificación</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="p-4 bg-green-50 rounded-lg">
-              <div className="flex items-center mb-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                <span className="font-medium text-green-800">Recuperables</span>
-              </div>
-              <p className="text-sm text-green-700">
-                Socios que probablemente regresen con una buena estrategia de
-                retención.
-              </p>
-            </div>
-            <div className="p-4 bg-yellow-50 rounded-lg">
-              <div className="flex items-center mb-2">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
-                <span className="font-medium text-yellow-800">
-                  En Evaluación
-                </span>
-              </div>
-              <p className="text-sm text-yellow-700">
-                Socios que requieren análisis adicional para determinar su
-                potencial de retorno.
-              </p>
-            </div>
-            <div className="p-4 bg-red-50 rounded-lg">
-              <div className="flex items-center mb-2">
-                <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-                <span className="font-medium text-red-800">Perdidos</span>
-              </div>
-              <p className="text-sm text-red-700">
-                Socios que probablemente no regresen. Considerar remover de
-                campañas activas.
-              </p>
-            </div>
           </div>
         </CardContent>
       </Card>
