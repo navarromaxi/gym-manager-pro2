@@ -35,8 +35,25 @@ import { Plus, Edit, Trash2, Search, CalendarClock, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
 
-// Normaliza "YYYY-MM-DD" a medianoche local (evita desfase por UTC)
-const toLocalDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
+// Normaliza fechas a medianoche local admitiendo strings con o sin tiempo
+const toLocalDate = (isoDate: string) => {
+  if (!isoDate) return new Date(NaN);
+
+  const dateMatch = isoDate.match(/^(\d{4}-\d{2}-\d{2})/);
+  const dateOnly = dateMatch ? dateMatch[1] : null;
+
+  if (dateOnly) {
+    const [year, month, day] = dateOnly.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  const parsed = new Date(isoDate);
+  if (Number.isNaN(parsed.getTime())) {
+    return new Date(NaN);
+  }
+
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+};
 
 const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
   if (!startDate) return "";
