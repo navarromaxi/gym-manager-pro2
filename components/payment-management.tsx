@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,9 +37,9 @@ import type { Member, Payment, Plan, PlanContract } from "@/lib/supabase";
 
 interface PaymentManagementProps {
   payments: Payment[];
-  setPayments: (payments: Payment[]) => void;
+  setPayments: Dispatch<SetStateAction<Payment[]>>;
   members: Member[];
-  setMembers: (members: Member[]) => void;
+  setMembers: Dispatch<SetStateAction<Member[]>>;
   plans: Plan[];
   gymId: string;
 }
