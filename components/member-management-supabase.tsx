@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { getRealStatus } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,6 +55,8 @@ interface MemberManagementProps {
   serverPaging?: boolean; // si true, ignora "members" y trae por páginas
 }
 
+const MEMBERS_PER_BATCH = 10;
+
 export function MemberManagement({
   members,
   setMembers,
@@ -88,10 +90,11 @@ export function MemberManagement({
 
   // Estados de paginación (solo se usan si serverPaging=true)
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  //const [pageSize, setPageSize] = useState(50);
   const [totalRows, setTotalRows] = useState(0);
   const [loadingPage, setLoadingPage] = useState(false);
   const [pagedMembers, setPagedMembers] = useState<Member[]>([]);
+  const [visibleCount, setVisibleCount] = useState(MEMBERS_PER_BATCH);
 
   const paymentMethods = [
     "Efectivo",
@@ -111,7 +114,7 @@ export function MemberManagement({
     if (onFilterChange) onFilterChange(statusFilter);
   }, [statusFilter, onFilterChange]);
 
-   useEffect(() => {
+  useEffect(() => {
     if (!isEditDialogOpen) return;
     const textarea = editDescriptionRef.current;
     if (textarea) {
@@ -131,16 +134,21 @@ export function MemberManagement({
         const { rows, total } = await fetchMembersPage({
           gymId,
           page,
-          pageSize,
+          pageSize: MEMBERS_PER_BATCH,
           search: searchTerm,
           orderBy: "last_payment",
           ascending: false,
         });
         if (cancelled) return;
-        setPagedMembers(rows);
+        setPagedMembers((prev) => {
+          if (page === 1) {
+            return rows;
+          }
+          const existingIds = new Set(prev.map((m) => m.id));
+          const additional = rows.filter((row) => !existingIds.has(row.id));
+          return [...prev, ...additional];
+        });
         setTotalRows(total);
-        // opcional: reflejar la página en el estado externo
-        setMembers(rows);
       } catch (e) {
         console.error("Error trayendo página de miembros:", e);
       } finally {
@@ -151,39 +159,97 @@ export function MemberManagement({
     return () => {
       cancelled = true;
     };
-  }, [serverPaging, gymId, page, pageSize, searchTerm, setMembers]);
+  }, [serverPaging, gymId, page, searchTerm]);
 
   // cuando cambia el término de búsqueda, volvemos a la página 1
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, serverPaging]);
+  }, [searchTerm, serverPaging, gymId]);
 
-  // fuente base: si serverPaging=true uso la página; si no, lo que vino por props
-  const baseMembers = serverPaging ? pagedMembers : members;
+  useEffect(() => {
+    if (!serverPaging) return;
+    setPagedMembers([]);
+    setTotalRows(0);
+  }, [searchTerm, gymId, serverPaging]);
 
-  const filteredMembers = baseMembers.filter((member) => {
-    const matchesSearch =
-      member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchTerm.toLowerCase());
+  useEffect(() => {
+    setVisibleCount(MEMBERS_PER_BATCH);
+  }, [searchTerm, statusFilter, serverPaging, gymId]);
 
-    let matchesStatus = true;
+  const effectiveMembers =
+    serverPaging && pagedMembers.length > 0 ? pagedMembers : members;
 
-    if (statusFilter === "expiring_soon") {
-      const nextPayment = toLocalDate(member.next_payment);
-      const diffDays = Math.ceil(
-        (nextPayment.getTime() - Date.now()) / 86400000
-      );
-      matchesStatus =
-        diffDays <= 10 && diffDays >= 0 && getRealStatus(member) === "active";
-    } else if (statusFilter === "balance_due") {
-      matchesStatus = (member.balance_due || 0) > 0;
-    } else {
-      matchesStatus =
-        statusFilter === "all" || getRealStatus(member) === statusFilter;
+  const sortedMembers = useMemo(() => {
+    const parseDate = (value?: string | null) => {
+      if (!value) return 0;
+      const direct = Date.parse(value);
+      if (!Number.isNaN(direct)) return direct;
+      return Date.parse(`${value}T00:00:00`);
+    };
+
+    return [...effectiveMembers].sort((a, b) => {
+      const aTime = Math.max(parseDate(a.last_payment), parseDate(a.join_date));
+      const bTime = Math.max(parseDate(b.last_payment), parseDate(b.join_date));
+      return bTime - aTime;
+    });
+  }, [effectiveMembers]);
+
+  const filteredMembers = useMemo(() => {
+    const search = searchTerm.trim().toLowerCase();
+
+    return sortedMembers.filter((member) => {
+      const matchesSearch =
+        !search ||
+        member.name.toLowerCase().includes(search) ||
+        (member.email ?? "").toLowerCase().includes(search);
+
+      if (!matchesSearch) {
+        return false;
+      }
+
+      if (statusFilter === "expiring_soon") {
+        const nextPaymentValue = member.next_payment
+          ? new Date(`${member.next_payment}T00:00:00`).getTime()
+          : null;
+        if (!nextPaymentValue) {
+          return false;
+        }
+        const diffDays = Math.ceil((nextPaymentValue - Date.now()) / 86400000);
+        return (
+          diffDays <= 10 && diffDays >= 0 && getRealStatus(member) === "active"
+        );
+      }
+
+      if (statusFilter === "balance_due") {
+        return (member.balance_due || 0) > 0;
+      }
+
+      return statusFilter === "all" || getRealStatus(member) === statusFilter;
+    });
+  }, [sortedMembers, searchTerm, statusFilter]);
+
+  const totalFiltered = filteredMembers.length;
+  const currentVisibleCount = Math.min(visibleCount, totalFiltered);
+  const displayedMembers = filteredMembers.slice(0, currentVisibleCount);
+  const moreLoadedMembers = currentVisibleCount < totalFiltered;
+  const moreAvailableOnServer = serverPaging && pagedMembers.length < totalRows;
+  const canLoadMore = moreLoadedMembers || moreAvailableOnServer;
+  const totalKnown = serverPaging && totalRows > 0 ? totalRows : totalFiltered;
+
+  const handleLoadMore = () => {
+    if (!canLoadMore || loadingPage) {
+      return;
     }
 
-    return matchesSearch && matchesStatus;
-  });
+    setVisibleCount((prev) => {
+      const limit = totalKnown > 0 ? totalKnown : prev + MEMBERS_PER_BATCH;
+      return Math.min(prev + MEMBERS_PER_BATCH, limit);
+    });
+
+    if (!moreLoadedMembers && moreAvailableOnServer) {
+      setPage((prev) => prev + 1);
+    }
+  };
 
   const handleAddMember = async () => {
     try {
@@ -283,6 +349,16 @@ export function MemberManagement({
       // Actualizar estados locales
       setMembers([...members, member]);
       setPayments([...payments, payment]);
+      if (serverPaging) {
+        setPagedMembers((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          if (existingIds.has(member.id)) {
+            return prev;
+          }
+          return [member, ...prev];
+        });
+        setTotalRows((prev) => prev + 1);
+      }
 
       setNewMember({
         name: "",
@@ -337,18 +413,20 @@ export function MemberManagement({
         .eq("id", editingMember.id);
 
       if (error) throw error;
+      const updatedMember = {
+        ...editingMember,
+        status: newStatus,
+        inactive_level: newInactive,
+      };
 
       setMembers(
-        members.map((m) =>
-          m.id === editingMember.id
-            ? {
-                ...editingMember,
-                status: newStatus,
-                inactive_level: newInactive,
-              }
-            : m
-        )
+        members.map((m) => (m.id === editingMember.id ? updatedMember : m))
       );
+      if (serverPaging) {
+        setPagedMembers((prev) =>
+          prev.map((m) => (m.id === editingMember.id ? updatedMember : m))
+        );
+      }
       setIsEditDialogOpen(false);
       setEditingMember(null);
     } catch (error) {
@@ -380,12 +458,15 @@ export function MemberManagement({
       // Actualizar estados locales
       setMembers(members.filter((m) => m.id !== id));
       setPayments(payments.filter((p) => p.member_id !== id));
+      if (serverPaging) {
+        setPagedMembers((prev) => prev.filter((m) => m.id !== id));
+        setTotalRows((prev) => Math.max(0, prev - 1));
+      }
     } catch (error) {
       console.error("Error eliminando miembro:", error);
       alert("Error al eliminar el miembro. Inténtalo de nuevo.");
     }
   };
-
 
   const getStatusBadge = (
     status: "active" | "expired" | "inactive",
@@ -482,13 +563,14 @@ export function MemberManagement({
         .eq("id", memberId);
 
       if (error) throw error;
+      const markFollowed = (m: Member) =>
+        m.id === memberId ? { ...m, followed_up: true } : m;
 
       // @ts-ignore (si tu tipo Member aún no declara followed_up)
-      setMembers(
-        members.map((m) =>
-          m.id === memberId ? { ...m, followed_up: true } : m
-        )
-      );
+      setMembers(members.map(markFollowed));
+      if (serverPaging) {
+        setPagedMembers((prev) => prev.map(markFollowed));
+      }
       setRefreshKey((k) => k + 1);
     } catch (err) {
       console.error("Error al marcar como contactado:", err);
@@ -637,7 +719,7 @@ export function MemberManagement({
                 </Select>
               </div>
               {newMember.paymentMethod === "Tarjeta de Crédito" && (
-                 <>
+                <>
                   <div className="grid gap-2">
                     <Label>Tipo de Tarjeta</Label>
                     <Select
@@ -749,7 +831,13 @@ export function MemberManagement({
       {/* Members Table (Virtualizada) */}
       <Card key={refreshKey}>
         <CardHeader>
-          <CardTitle>Lista de Socios ({filteredMembers.length})</CardTitle>
+          <CardTitle>
+            Lista de Socios ({displayedMembers.length}
+            {filteredMembers.length > displayedMembers.length
+              ? ` de ${filteredMembers.length}`
+              : ""}
+            )
+          </CardTitle>
 
           {getExpiringMembers().length > 0 && (
             <div className="mt-2 text-sm text-orange-700 bg-orange-100 border-l-4 border-orange-500 p-3 rounded flex justify-between items-center">
@@ -785,7 +873,8 @@ export function MemberManagement({
           {getMembersWithBalanceDue().length > 0 && (
             <div className="mt-2 text-sm text-red-700 bg-red-100 border-l-4 border-red-500 p-3 rounded flex items-center justify-between">
               <span>
-                ⚠️ Tienes {getMembersWithBalanceDue().length} socios con saldo pendiente.
+                ⚠️ Tienes {getMembersWithBalanceDue().length} socios con saldo
+                pendiente.
               </span>
               <Button
                 variant="ghost"
@@ -805,7 +894,7 @@ export function MemberManagement({
             style={{ height: "60vh" }}
           >
             <TableVirtuoso
-              data={filteredMembers}
+              data={displayedMembers}
               fixedHeaderContent={() => (
                 <tr className="text-sm">
                   <th className="h-10 px-2 text-left align-middle font-medium">
@@ -879,7 +968,7 @@ export function MemberManagement({
                           : `${daysUntilExpiration} días`}
                       </span>
                     </td>
-                     <td className="p-2 align-middle">
+                    <td className="p-2 align-middle">
                       {(member.balance_due ?? 0) > 0 ? (
                         <span className="text-red-600 font-semibold">
                           {`$${(member.balance_due ?? 0).toFixed(2)}`}
@@ -935,89 +1024,56 @@ export function MemberManagement({
               }}
             />
           </div>
-          {/* Footer de paginación (solo visible con serverPaging) */}
-          {serverPaging && (
-            <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="text-sm text-muted-foreground">
-                {loadingPage ? (
-                  <>Cargando página…</>
+          <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-muted-foreground">
+              {filteredMembers.length === 0 ? (
+                loadingPage ? (
+                  <>Cargando socios…</>
+                ) : searchTerm.trim() || statusFilter !== "all" ? (
+                  <>No hay socios que coincidan con la búsqueda/estado.</>
                 ) : (
-                  <>
-                    Mostrando{" "}
-                    <strong>
-                      {Math.min((page - 1) * pageSize + 1, totalRows)}–
-                      {Math.min(page * pageSize, totalRows)}
-                    </strong>{" "}
-                    de <strong>{totalRows}</strong>
-                  </>
-                )}
-                {statusFilter !== "all" && (
-                  <>
-                    {" "}
-                    · Coinciden con el filtro:{" "}
-                    <strong>{filteredMembers.length}</strong>
-                  </>
-                )}
-              </div>
+                  <>Aún no hay socios para mostrar.</>
+                )
+              ) : (
+                <>
+                  Mostrando <strong>{displayedMembers.length}</strong> de{" "}
+                  <strong>{filteredMembers.length}</strong> socios cargados
+                  {serverPaging && totalRows > filteredMembers.length && (
+                    <>
+                      {" "}
+                      · Total registrados: <strong>{totalRows}</strong>
+                    </>
+                  )}
+                  {statusFilter !== "all" && (
+                    <>
+                      {" "}
+                      · Coinciden con el filtro:{" "}
+                      <strong>{filteredMembers.length}</strong>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
 
+            {canLoadMore && (
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={loadingPage || page === 1}
+                  onClick={handleLoadMore}
+                  disabled={loadingPage}
                 >
-                  ← Anterior
+                  {loadingPage ? "Cargando…" : "Cargar más socios"}
                 </Button>
-                <span className="text-sm">
-                  Página <strong>{page}</strong> /{" "}
-                  <strong>
-                    {Math.max(1, Math.ceil(totalRows / pageSize))}
-                  </strong>
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setPage((p) =>
-                      Math.min(
-                        p + 1,
-                        Math.max(1, Math.ceil(totalRows / pageSize))
-                      )
-                    )
-                  }
-                  disabled={
-                    loadingPage || page >= Math.ceil(totalRows / pageSize)
-                  }
-                >
-                  Siguiente →
-                </Button>
-
-                <Select
-                  value={String(pageSize)}
-                  onValueChange={(v) => {
-                    setPageSize(Number(v));
-                    setPage(1);
-                  }}
-                >
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="Tamaño" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="25">25 / pág.</SelectItem>
-                    <SelectItem value="50">50 / pág.</SelectItem>
-                    <SelectItem value="100">100 / pág.</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-         <DialogContent className="sm:max-w-5xl">
+        <DialogContent className="sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>Editar Socio</DialogTitle>
             <DialogDescription>Modifica los datos del socio.</DialogDescription>
@@ -1031,7 +1087,10 @@ export function MemberManagement({
                     id="edit-name"
                     value={editingMember.name}
                     onChange={(e) =>
-                      setEditingMember({ ...editingMember, name: e.target.value })
+                      setEditingMember({
+                        ...editingMember,
+                        name: e.target.value,
+                      })
                     }
                   />
                 </div>
