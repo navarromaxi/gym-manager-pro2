@@ -48,12 +48,14 @@ interface PaymentInsight {
   isInstallment: boolean;
   balancePending: number | null;
   planPrice: number | null;
+  nextInstallmentDue: string | null;
 }
 
 interface MemberInstallmentState {
   balance: number;
   planPrice: number | null;
   installmentActive: boolean;
+  nextInstallmentDue: string | null;
 }
 
 const PAYMENTS_PER_BATCH = 10;
@@ -97,10 +99,11 @@ export function PaymentManagement({
   });
   const [planContract, setPlanContract] = useState<PlanContract | null>(null);
   const [methodFilter, setMethodFilter] = useState("all");
+  const [installmentFilter, setInstallmentFilter] = useState("all");
   const [contractTable, setContractTable] = useState<
     "plan_contracts" | "plan_contract" | null
   >(null);
-   const [visibleCount, setVisibleCount] = useState(PAYMENTS_PER_BATCH);
+  const [visibleCount, setVisibleCount] = useState(PAYMENTS_PER_BATCH);
 
   useEffect(() => {
     const checkTable = async () => {
@@ -137,7 +140,7 @@ export function PaymentManagement({
 
   const cardBrands = ["Visa", "Mastercard", "American Express", "Otra"];
 
-   const getPlanPrice = (payment: Payment) => {
+  const getPlanPrice = (payment: Payment) => {
     if (payment.plan_id) {
       const planById = plans.find((plan) => plan.id === payment.plan_id);
       if (planById) return planById.price;
@@ -175,6 +178,43 @@ export function PaymentManagement({
   const parseLocalDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split("-").map(Number);
     return new Date(year, month - 1, day);
+  };
+
+  const parseDueDate = (value: string | null | undefined) => {
+    if (!value) return null;
+    const isoPattern = /^\d{4}-\d{2}-\d{2}$/;
+    const date = isoPattern.test(value)
+      ? parseLocalDate(value)
+      : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    date.setHours(0, 0, 0, 0);
+    return date;
+  };
+
+  const formatDueDate = (value: string | null | undefined) => {
+    if (!value) return null;
+    const parsed = parseDueDate(value);
+    if (!parsed) return value;
+    return parsed.toLocaleDateString();
+  };
+
+  const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
+    if (!startDate) return "";
+    const baseDate = new Date(`${startDate}T00:00:00`);
+    if (Number.isNaN(baseDate.getTime())) {
+      return startDate;
+    }
+    if (plan) {
+      if (plan.duration_type === "days") {
+        baseDate.setDate(baseDate.getDate() + plan.duration);
+      } else if (plan.duration_type === "months") {
+        baseDate.setMonth(baseDate.getMonth() + plan.duration);
+      } else if (plan.duration_type === "years") {
+        baseDate.setFullYear(baseDate.getFullYear() + plan.duration);
+      }
+    }
+
+    return baseDate.toISOString().split("T")[0];
   };
 
   const updateMemberAfterPlanEdit = async (
@@ -284,7 +324,10 @@ export function PaymentManagement({
       if (!data) return;
 
       const contract = data as PlanContract;
-      const newInstallmentsPaid = Math.max((contract.installments_paid || 0) - 1, 0);
+      const newInstallmentsPaid = Math.max(
+        (contract.installments_paid || 0) - 1,
+        0
+      );
 
       if (newInstallmentsPaid <= 0) {
         const { error: deleteError } = await supabase
@@ -308,7 +351,7 @@ export function PaymentManagement({
     }
   };
 
-   const paymentInsights = useMemo(() => {
+  const paymentInsights = useMemo(() => {
     const planIdMap = new Map<string, Plan>();
     const planNameMap = new Map<string, Plan>();
     plans.forEach((plan) => {
@@ -335,12 +378,13 @@ export function PaymentManagement({
     );
 
     orderedPayments.forEach((payment) => {
-      const previousState =
-        memberStates.get(payment.member_id) ?? {
-          balance: 0,
-          planPrice: null,
-          installmentActive: false,
-        };
+      const member = memberMap.get(payment.member_id);
+      const previousState = memberStates.get(payment.member_id) ?? {
+        balance: 0,
+        planPrice: null,
+        installmentActive: false,
+        nextInstallmentDue: member?.next_installment_due ?? null,
+      };
 
       if (payment.type !== "plan") {
         memberStates.set(payment.member_id, previousState);
@@ -348,11 +392,11 @@ export function PaymentManagement({
           isInstallment: false,
           balancePending: null,
           planPrice: null,
+          nextInstallmentDue: null,
         });
         return;
       }
 
-      const member = memberMap.get(payment.member_id);
       const planFromId = payment.plan_id
         ? planIdMap.get(payment.plan_id)
         : undefined;
@@ -369,17 +413,29 @@ export function PaymentManagement({
         const targetPrice = effectivePlanPrice ?? payment.amount;
         const balanceAfter = Math.max(targetPrice - payment.amount, 0);
         const isInstallment = balanceAfter > 0;
+        const inferredNextDue = isInstallment
+          ? member?.next_installment_due ??
+            previousState.nextInstallmentDue ??
+            (payment.start_date
+              ? calculatePlanEndDate(
+                  payment.start_date,
+                  planFromId ?? planFromName ?? null
+                )
+              : null)
+          : null;
 
         memberStates.set(payment.member_id, {
           balance: balanceAfter,
           planPrice: targetPrice,
-          installmentActive: isInstallment && balanceAfter > 0,
+          installmentActive: balanceAfter > 0,
+          nextInstallmentDue: inferredNextDue,
         });
 
         insights.set(payment.id, {
           isInstallment,
           balancePending: balanceAfter,
           planPrice: targetPrice,
+          nextInstallmentDue: inferredNextDue,
         });
         return;
       }
@@ -388,21 +444,31 @@ export function PaymentManagement({
       const newBalance = Math.max(balanceBefore - payment.amount, 0);
       const wasInstallment =
         previousState.installmentActive || balanceBefore > 0 || newBalance > 0;
+      const nextDue =
+        newBalance > 0
+          ? previousState.nextInstallmentDue ??
+            member?.next_installment_due ??
+            null
+          : null;
 
       memberStates.set(payment.member_id, {
         balance: newBalance,
         planPrice: effectivePlanPrice ?? previousState.planPrice,
         installmentActive: newBalance > 0,
+        nextInstallmentDue: nextDue,
       });
 
       insights.set(payment.id, {
         isInstallment: wasInstallment,
         balancePending: newBalance,
         planPrice:
-          effectivePlanPrice ?? previousState.planPrice ?? member?.plan_price ?? null,
+          effectivePlanPrice ??
+          previousState.planPrice ??
+          member?.plan_price ??
+          null,
+        nextInstallmentDue: nextDue,
       });
     });
-
     return insights;
   }, [members, payments, plans]);
 
@@ -413,25 +479,6 @@ export function PaymentManagement({
     });
     return map;
   }, [members]);
-
-   const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
-    if (!startDate) return "";
-    const baseDate = new Date(`${startDate}T00:00:00`);
-    if (Number.isNaN(baseDate.getTime())) {
-      return startDate;
-    }
-    if (plan) {
-      if (plan.duration_type === "days") {
-        baseDate.setDate(baseDate.getDate() + plan.duration);
-      } else if (plan.duration_type === "months") {
-        baseDate.setMonth(baseDate.getMonth() + plan.duration);
-      } else if (plan.duration_type === "years") {
-        baseDate.setFullYear(baseDate.getFullYear() + plan.duration);
-      }
-    }
-
-    return baseDate.toISOString().split("T")[0];
-  };
 
   useEffect(() => {
     const fetchExistingContract = async () => {
@@ -510,18 +557,64 @@ export function PaymentManagement({
       });
     }
 
+    if (installmentFilter !== "all") {
+      filtered = filtered.filter((payment) => {
+        if (payment.type !== "plan") {
+          return false;
+        }
+
+        const insight = paymentInsights.get(payment.id);
+        const member = membersById.get(payment.member_id);
+        const pending = insight?.balancePending;
+        const memberBalance =
+          typeof member?.balance_due === "number" ? member.balance_due : null;
+        const nextDueRaw =
+          insight?.nextInstallmentDue ?? member?.next_installment_due ?? null;
+        const dueDate = parseDueDate(nextDueRaw);
+
+        switch (installmentFilter) {
+          case "pending_balance":
+            if (typeof pending === "number") {
+              return pending > 0;
+            }
+            return (memberBalance ?? 0) > 0;
+          case "due_soon":
+            if (!dueDate) return false;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const limitDate = new Date(today);
+            limitDate.setDate(limitDate.getDate() + 10);
+            return dueDate >= today && dueDate <= limitDate;
+          case "overdue":
+            if (!dueDate) return false;
+            const reference = new Date();
+            reference.setHours(0, 0, 0, 0);
+            return dueDate < reference;
+          default:
+            return true;
+        }
+      });
+    }
+
     return filtered.sort(
       (a, b) =>
         parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
     );
-      
-    }, [payments, searchTerm, methodFilter, periodFilter]);
+  }, [
+    payments,
+    searchTerm,
+    methodFilter,
+    periodFilter,
+    installmentFilter,
+    paymentInsights,
+    membersById,
+  ]);
 
   useEffect(() => {
     setVisibleCount(PAYMENTS_PER_BATCH);
-  }, [searchTerm, methodFilter, periodFilter, payments]);
+  }, [searchTerm, methodFilter, periodFilter, installmentFilter, payments]);
 
-const visiblePayments = useMemo(() => {
+  const visiblePayments = useMemo(() => {
     if (!filteredPayments.length) return [];
     const limit = Math.min(visibleCount, filteredPayments.length);
     return filteredPayments.slice(0, limit);
@@ -534,7 +627,6 @@ const visiblePayments = useMemo(() => {
       Math.min(prev + PAYMENTS_PER_BATCH, filteredPayments.length)
     );
   };
-
 
   const selectedMember = members.find((m) => m.id === newPayment.memberId);
   const selectedPlan =
@@ -549,8 +641,7 @@ const visiblePayments = useMemo(() => {
         : Math.max(selectedPlan.price + balanceDueActual, 0)
       : 0;
 
-
-       const calculatedPlanEndDate = useMemo(() => {
+  const calculatedPlanEndDate = useMemo(() => {
     if (newPayment.type !== "new_plan") return "";
     return calculatePlanEndDate(newPayment.startDate, selectedPlan);
   }, [newPayment.type, newPayment.startDate, selectedPlan]);
@@ -581,9 +672,10 @@ const visiblePayments = useMemo(() => {
           );
           return;
         }
-         if (
+        if (
           newPayment.installments > 1 &&
-          (!newPayment.nextInstallmentDue || newPayment.nextInstallmentDue === "")
+          (!newPayment.nextInstallmentDue ||
+            newPayment.nextInstallmentDue === "")
         ) {
           alert("Debes ingresar el vencimiento de la próxima cuota");
           return;
@@ -744,7 +836,7 @@ const visiblePayments = useMemo(() => {
           }
         }
 
-         const paymentDescription =
+        const paymentDescription =
           newPayment.description.trim() || selectedPlan.name;
 
         const payment: Payment = {
@@ -929,7 +1021,7 @@ const visiblePayments = useMemo(() => {
           editPaymentData.method === "Tarjeta de Crédito"
             ? editPaymentData.cardInstallments
             : undefined,
-       description: resolvedDescription,
+        description: resolvedDescription,
         ...(typeof editingPayment.start_date === "string"
           ? { start_date: editPaymentData.startDate || undefined }
           : {}),
@@ -982,7 +1074,6 @@ const visiblePayments = useMemo(() => {
       alert("Error al eliminar el pago. Inténtalo de nuevo.");
     }
   };
-
 
   const totalPayments = filteredPayments.reduce(
     (sum, payment) => sum + payment.amount,
@@ -1057,7 +1148,7 @@ const visiblePayments = useMemo(() => {
                       filteredMembersForSearch.map((member) => (
                         <div
                           key={member.id}
-                           className={`p-2 cursor-pointer transition-colors border-b last:border-b-0 hover:bg-blue-500/10 dark:hover:bg-blue-500/30 ${
+                          className={`p-2 cursor-pointer transition-colors border-b last:border-b-0 hover:bg-blue-500/10 dark:hover:bg-blue-500/30 ${
                             newPayment.memberId === member.id
                               ? "bg-blue-500/20 dark:bg-blue-500/40"
                               : ""
@@ -1104,7 +1195,9 @@ const visiblePayments = useMemo(() => {
                       description: "",
                       amount: 0,
                       installments: 1,
-                      nextInstallmentDue: new Date().toLocaleDateString("en-CA"),
+                      nextInstallmentDue: new Date().toLocaleDateString(
+                        "en-CA"
+                      ),
                     });
                     setPlanContract(null);
                   }}
@@ -1141,7 +1234,7 @@ const visiblePayments = useMemo(() => {
                           ...newPayment,
                           planId: value,
                           installments: 1,
-                           nextInstallmentDue: computedNext,
+                          nextInstallmentDue: computedNext,
                         });
                         if (newPayment.memberId && contractTable) {
                           let { data, error } = await supabase
@@ -1164,7 +1257,7 @@ const visiblePayments = useMemo(() => {
                             setNewPayment((prev) => ({
                               ...prev,
                               installments: data.installments_total,
-                               nextInstallmentDue:
+                              nextInstallmentDue:
                                 prev.nextInstallmentDue ||
                                 selectedMember?.next_installment_due ||
                                 computedNext,
@@ -1193,24 +1286,22 @@ const visiblePayments = useMemo(() => {
                         <Label htmlFor="installments">Cantidad de cuotas</Label>
                         <Select
                           value={newPayment.installments.toString()}
-                          onValueChange={(value) =>
-                             {
-                              const installments = parseInt(value);
-                              const computedNext = calculatePlanEndDate(
-                                newPayment.startDate,
-                                selectedPlan
-                              );
-                              setNewPayment({
-                                ...newPayment,
-                                installments,
-                                nextInstallmentDue:
-                                  installments === 1
-                                    ? computedNext
-                                    : newPayment.nextInstallmentDue ||
-                                      computedNext,
-                              });
-                            }
-                          }
+                          onValueChange={(value) => {
+                            const installments = parseInt(value);
+                            const computedNext = calculatePlanEndDate(
+                              newPayment.startDate,
+                              selectedPlan
+                            );
+                            setNewPayment({
+                              ...newPayment,
+                              installments,
+                              nextInstallmentDue:
+                                installments === 1
+                                  ? computedNext
+                                  : newPayment.nextInstallmentDue ||
+                                    computedNext,
+                            });
+                          }}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Selecciona cuotas" />
@@ -1412,12 +1503,11 @@ const visiblePayments = useMemo(() => {
               {newPayment.type === "new_plan" && (
                 <div className="grid gap-2">
                   <Label htmlFor="startDate">Fecha de inicio del plan</Label>
-                   <Input
-                  id="startDate"
-                  type="date"
-                  value={newPayment.startDate}
-                  onChange={(e) =>
-                    {
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={newPayment.startDate}
+                    onChange={(e) => {
                       const value = e.target.value;
                       const computedNext = calculatePlanEndDate(
                         value,
@@ -1425,15 +1515,14 @@ const visiblePayments = useMemo(() => {
                       );
                       setNewPayment({
                         ...newPayment,
-                         startDate: value,
+                        startDate: value,
                         nextInstallmentDue:
                           newPayment.installments === 1
                             ? computedNext
                             : newPayment.nextInstallmentDue || computedNext,
                       });
-                    }
-                   }
-                />
+                    }}
+                  />
                   <p className="text-xs text-muted-foreground">
                     El plan se calculará desde esta fecha (útil si se registra
                     con atraso)
@@ -1441,7 +1530,7 @@ const visiblePayments = useMemo(() => {
                 </div>
               )}
 
-               {/* DESCRIPCIÓN */}
+              {/* DESCRIPCIÓN */}
               <div className="grid gap-2">
                 <Label htmlFor="description">Descripción</Label>
                 <Input
@@ -1694,6 +1783,24 @@ const visiblePayments = useMemo(() => {
                 <SelectItem value="current_year">Año actual</SelectItem>
               </SelectContent>
             </Select>
+            <Select
+              value={installmentFilter}
+              onValueChange={setInstallmentFilter}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Estado de cuotas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                <SelectItem value="pending_balance">
+                  Con saldo pendiente
+                </SelectItem>
+                <SelectItem value="due_soon">
+                  Próximos a vencer (10 días)
+                </SelectItem>
+                <SelectItem value="overdue">Cuotas vencidas</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -1714,21 +1821,55 @@ const visiblePayments = useMemo(() => {
                 <TableHead>Método</TableHead>
                 <TableHead>En cuotas</TableHead>
                 <TableHead>Saldo pendiente</TableHead>
+                <TableHead>Vencimiento próxima cuota</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-               {visiblePayments.map((payment) => {
+              {visiblePayments.map((payment) => {
                 const insight = paymentInsights.get(payment.id);
                 const member = membersById.get(payment.member_id);
                 const fallbackBalance =
                   typeof member?.balance_due === "number"
                     ? member.balance_due
                     : null;
-                const balanceValue =
-                  insight?.balancePending ?? fallbackBalance ?? null;
-                  const detailLabel =
+                const insightBalance =
+                  typeof insight?.balancePending === "number"
+                    ? insight.balancePending
+                    : null;
+                const balanceValue = insightBalance ?? fallbackBalance ?? null;
+                const hasPendingInstallment =
+                  payment.type === "plan" && (balanceValue ?? 0) > 0;
+                const nextInstallmentDueRaw =
+                  insight?.nextInstallmentDue ??
+                  member?.next_installment_due ??
+                  null;
+                const nextInstallmentDueDate = parseDueDate(
+                  nextInstallmentDueRaw
+                );
+                const formattedNextDue = formatDueDate(nextInstallmentDueRaw);
+                let dueStatusClass = "text-muted-foreground";
+                if (hasPendingInstallment && nextInstallmentDueDate) {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const limitDate = new Date(today);
+                  limitDate.setDate(limitDate.getDate() + 10);
+                  if (nextInstallmentDueDate < today) {
+                    dueStatusClass = "font-semibold text-red-600";
+                  } else if (nextInstallmentDueDate <= limitDate) {
+                    dueStatusClass = "font-semibold text-amber-600";
+                  } else {
+                    dueStatusClass = "text-green-600";
+                  }
+                }
+                if (hasPendingInstallment && !nextInstallmentDueDate) {
+                  dueStatusClass = "font-semibold text-amber-600";
+                }
+                const nextInstallmentDueDisplay = hasPendingInstallment
+                  ? formattedNextDue ?? "Sin definir"
+                  : "No corresponde";
+                const detailLabel =
                   payment.type === "plan" ? payment.plan : payment.description;
                 const rawDetailAmount =
                   payment.type === "plan"
@@ -1751,7 +1892,7 @@ const visiblePayments = useMemo(() => {
                     <TableCell className="font-medium">
                       {payment.member_name}
                     </TableCell>
-                     <TableCell>{detailDisplay}</TableCell>
+                    <TableCell>{detailDisplay}</TableCell>
                     <TableCell className="font-medium text-green-600">
                       ${payment.amount.toLocaleString()}
                     </TableCell>
@@ -1785,6 +1926,11 @@ const visiblePayments = useMemo(() => {
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
+                    <TableCell>
+                      <span className={dueStatusClass}>
+                        {nextInstallmentDueDisplay}
+                      </span>
+                    </TableCell>
                     <TableCell className="capitalize">{payment.type}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
@@ -1809,7 +1955,7 @@ const visiblePayments = useMemo(() => {
               })}
             </TableBody>
           </Table>
-           <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-muted-foreground">
               {filteredPayments.length > 0 && (
                 <>
@@ -1832,12 +1978,15 @@ const visiblePayments = useMemo(() => {
           </div>
         </CardContent>
       </Card>
-       <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
-        setIsEditDialogOpen(open);
-        if (!open) {
-          setEditingPayment(null);
-        }
-      }}>
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) {
+            setEditingPayment(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Editar pago</DialogTitle>
@@ -1903,7 +2052,9 @@ const visiblePayments = useMemo(() => {
                       cardBrand:
                         value === "Tarjeta de Crédito" ? prev.cardBrand : "",
                       cardInstallments:
-                        value === "Tarjeta de Crédito" ? prev.cardInstallments : 1,
+                        value === "Tarjeta de Crédito"
+                          ? prev.cardInstallments
+                          : 1,
                     }))
                   }
                 >

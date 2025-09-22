@@ -89,6 +89,8 @@ const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
   return baseDate.toISOString().split("T")[0];
 };
 
+const PROSPECTS_PER_BATCH = 10;
+
 export function ProspectManagement({
   prospects,
   setProspects,
@@ -174,6 +176,7 @@ export function ProspectManagement({
   const [dismissedReminders, setDismissedReminders] = useState<string[]>([]);
 
   const [isClient, setIsClient] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PROSPECTS_PER_BATCH);
 
   useEffect(() => {
     if (!isEditDialogOpen) return;
@@ -318,11 +321,26 @@ export function ProspectManagement({
     );
   });
 
+   useEffect(() => {
+    setVisibleCount(PROSPECTS_PER_BATCH);
+  }, [searchTerm, statusFilter, priorityFilter, scheduledDateFilter]);
+
   const sortedProspects = [...filteredProspects].sort((a, b) => {
     const dateA = new Date(`${a.contact_date}T00:00:00`).getTime();
     const dateB = new Date(`${b.contact_date}T00:00:00`).getTime();
     return dateB - dateA;
   });
+
+   const totalFiltered = sortedProspects.length;
+  const currentVisibleCount = Math.min(visibleCount, totalFiltered);
+  const displayedProspects = sortedProspects.slice(0, currentVisibleCount);
+  const canLoadMore = currentVisibleCount < totalFiltered;
+
+  const handleLoadMore = () => {
+    setVisibleCount((prev) =>
+      Math.min(prev + PROSPECTS_PER_BATCH, sortedProspects.length)
+    );
+  };
 
   const handleAddProspect = async () => {
     try {
@@ -933,7 +951,7 @@ export function ProspectManagement({
       {/* Prospects Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Interesados ({sortedProspects.length})</CardTitle>
+           <CardTitle>Lista de Interesados ({totalFiltered})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="w-full overflow-x-auto">
@@ -953,7 +971,7 @@ export function ProspectManagement({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedProspects.map((prospect) => {
+                 {displayedProspects.map((prospect) => {
                   const scheduledDate = formatDate(prospect.scheduled_date);
                   return (
                     <TableRow key={prospect.id}>
@@ -1021,6 +1039,23 @@ export function ProspectManagement({
                 })}
               </TableBody>
             </Table>
+          </div>
+          <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-muted-foreground">
+              {totalFiltered > 0 && (
+                <>
+                  Mostrando <strong>{displayedProspects.length}</strong> de{" "}
+                  <strong>{totalFiltered}</strong> interesados cargados
+                </>
+              )}
+            </div>
+            {canLoadMore && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleLoadMore}>
+                  Cargar más interesados
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

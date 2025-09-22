@@ -1,7 +1,7 @@
 "use client";
 
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-
+const MEMBERS_PER_BATCH = 10;
 interface InactiveManagementProps {
   members: Member[];
   setMembers: (members: Member[]) => void;
@@ -63,26 +63,49 @@ export function InactiveManagement({
     (m) => getRealStatus(m) === "inactive"
   );
 
-  const filteredInactiveMembers = inactiveMembers.filter((member) => {
-    const matchesSearch =
-      member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredInactiveMembers = useMemo(() => {
+    return inactiveMembers.filter((member) => {
+      const matchesSearch =
+        member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.email.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesColor =
-      colorFilter === "all" || member.inactive_level === colorFilter;
+      const matchesColor =
+        colorFilter === "all" || member.inactive_level === colorFilter;
 
-    let matchesDate = true;
-    if (dateFilter !== "all") {
-      const lastPaymentDate = new Date(member.last_payment);
-      const currentDate = new Date();
-      const monthsAgo = Number.parseInt(dateFilter);
-      const filterDate = new Date();
-      filterDate.setMonth(filterDate.getMonth() - monthsAgo);
-      matchesDate = lastPaymentDate >= filterDate;
-    }
+      let matchesDate = true;
+      if (dateFilter !== "all") {
+        const lastPaymentDate = new Date(member.last_payment);
+        const monthsAgo = Number.parseInt(dateFilter);
+        const filterDate = new Date();
+        filterDate.setMonth(filterDate.getMonth() - monthsAgo);
+        matchesDate = lastPaymentDate >= filterDate;
+      }
 
-    return matchesSearch && matchesColor && matchesDate;
-  });
+      return matchesSearch && matchesColor && matchesDate;
+    });
+  }, [inactiveMembers, searchTerm, colorFilter, dateFilter]);
+
+  const sortedInactiveMembers = useMemo(() => {
+    return [...filteredInactiveMembers].sort(
+      (a, b) =>
+        new Date(b.last_payment).getTime() - new Date(a.last_payment).getTime()
+    );
+  }, [filteredInactiveMembers]);
+
+  const [visibleCount, setVisibleCount] = useState(MEMBERS_PER_BATCH);
+
+  useEffect(() => {
+    setVisibleCount(MEMBERS_PER_BATCH);
+  }, [searchTerm, colorFilter, dateFilter, inactiveMembers.length]);
+
+  const displayedInactiveMembers = sortedInactiveMembers.slice(0, visibleCount);
+  const canLoadMore = visibleCount < sortedInactiveMembers.length;
+
+  const handleLoadMore = () => {
+    setVisibleCount((prev) =>
+      Math.min(prev + MEMBERS_PER_BATCH, sortedInactiveMembers.length)
+    );
+  };
 
   // Función para cambiar el color/nivel de un socio inactivo
   const updateInactiveLevel = async (
@@ -347,13 +370,7 @@ export function InactiveManagement({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInactiveMembers
-                .sort(
-                  (a, b) =>
-                    new Date(b.last_payment).getTime() -
-                    new Date(a.last_payment).getTime()
-                )
-                .map((member) => {
+              {displayedInactiveMembers.map((member) => {
                   const daysSinceLastPayment = getDaysSinceLastPayment(
                     member.last_payment
                   );
@@ -482,6 +499,24 @@ export function InactiveManagement({
                 })}
             </TableBody>
           </Table>
+          <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-muted-foreground">
+              {filteredInactiveMembers.length > 0 && (
+                <>
+                  Mostrando <strong>{displayedInactiveMembers.length}</strong> de{" "}
+                  <strong>{filteredInactiveMembers.length}</strong> socios
+                  inactivos
+                </>
+              )}
+            </div>
+            {canLoadMore && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleLoadMore}>
+                  Cargar más inactivos
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
