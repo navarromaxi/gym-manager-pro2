@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Search } from "lucide-react";
+import { Plus, Edit, Trash2, Search, CalendarClock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
 
@@ -155,7 +155,7 @@ export function MemberManagement({
       ? calculatedPlanEndDate
       : newMember.nextInstallmentDue || calculatedPlanEndDate;
 
-  useEffect(() => {
+   useEffect(() => {
     const checkTable = async () => {
       const { data } = await supabase
         .from("pg_tables")
@@ -175,13 +175,32 @@ export function MemberManagement({
     }
   }, [statusFilter, onFilterChange]);
 
+  const getExpiringCustomPlans = useCallback(() => {
+    const today = new Date();
+
+    return customPlans.filter((plan) => {
+      if (!plan.is_active) return false;
+      if (!plan.end_date) return false;
+
+      const endDate = toLocalDate(plan.end_date);
+      if (Number.isNaN(endDate.getTime())) return false;
+
+      const diffDays = Math.ceil(
+        (endDate.getTime() - today.getTime()) / 86400000
+      );
+
+      return diffDays <= 10 && diffDays >= 0;
+    });
+  }, [customPlans]);
+
   const filteredMembers = useMemo(() => {
     const today = new Date();
     const expiringCustomPlanMemberIds =
       statusFilter === "custom_expiring"
-        ? new Set(getExpiringCustomPlans().map((plan) => plan.member_id))
+        ? new Set(
+            getExpiringCustomPlans().map((plan) => plan.member_id)
+          )
         : null;
-
     return members
       .filter((member) => {
         // búsqueda (debounced)
@@ -553,24 +572,6 @@ export function MemberManagement({
       );
     });
   };
-
-  const getExpiringCustomPlans = useCallback(() => {
-    const today = new Date();
-
-    return customPlans.filter((plan) => {
-      if (!plan.is_active) return false;
-      if (!plan.end_date) return false;
-
-      const endDate = toLocalDate(plan.end_date);
-      if (Number.isNaN(endDate.getTime())) return false;
-
-      const diffDays = Math.ceil(
-        (endDate.getTime() - today.getTime()) / 86400000
-      );
-
-      return diffDays <= 10 && diffDays >= 0;
-    });
-  }, [customPlans]);
 
   //Función para marcar como contactado
   const handleMarkAsFollowedUp = async (memberId: string) => {
@@ -997,17 +998,33 @@ export function MemberManagement({
             </div>
           )}
 
-          {expiringCustomPlanMembersCount > 0 && (
-            <div className="mt-2 text-sm text-blue-700 bg-blue-100 border-l-4 border-blue-500 p-3 rounded flex justify-between items-center">
-              ⚠️ Tienes {expiringCustomPlanMembersCount} socios con plan
-              personalizado por vencer (menos de 10 días).
-              <Button
-                variant="ghost"
-                className="text-blue-700 hover:underline"
-                onClick={() => setStatusFilter("custom_expiring")}
-              >
-                Ver personalizados por vencer
-              </Button>
+           {expiringCustomPlanMembersCount > 0 && (
+            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/60 p-4 text-sm shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-3 text-amber-800">
+                  <CalendarClock className="mt-0.5 h-5 w-5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium">
+                      {expiringCustomPlanMembersCount} socio
+                      {expiringCustomPlanMembersCount === 1 ? "" : "s"} con
+                      plan personalizado próximo
+                      {expiringCustomPlanMembersCount === 1 ? "" : "s"} a
+                      vencer (10 días).
+                    </p>
+                    <p className="text-xs text-amber-700">
+                      Revisa estos planes para renovar o contactar a los socios.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-amber-700 hover:text-amber-800 hover:underline"
+                  onClick={() => setStatusFilter("custom_expiring")}
+                >
+                  Ver personalizados por vencer
+                </Button>
+              </div>
             </div>
           )}
 

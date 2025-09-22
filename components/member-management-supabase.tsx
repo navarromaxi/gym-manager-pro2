@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getRealStatus } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -68,6 +69,7 @@ export function MemberManagement({
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const editDescriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState(initialFilter);
   const [newMember, setNewMember] = useState({
@@ -108,6 +110,15 @@ export function MemberManagement({
   useEffect(() => {
     if (onFilterChange) onFilterChange(statusFilter);
   }, [statusFilter, onFilterChange]);
+
+   useEffect(() => {
+    if (!isEditDialogOpen) return;
+    const textarea = editDescriptionRef.current;
+    if (textarea) {
+      textarea.style.height = "auto";
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  }, [isEditDialogOpen, editingMember?.description]);
 
   // carga de página desde Supabase cuando está activo server paging
   useEffect(() => {
@@ -319,6 +330,7 @@ export function MemberManagement({
           email: editingMember.email,
           phone: editingMember.phone,
           next_payment: editingMember.next_payment,
+          description: editingMember.description ?? null,
           status: newStatus,
           inactive_level: newInactive,
         })
@@ -1005,63 +1017,84 @@ export function MemberManagement({
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+         <DialogContent className="sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>Editar Socio</DialogTitle>
             <DialogDescription>Modifica los datos del socio.</DialogDescription>
           </DialogHeader>
           {editingMember && (
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-name">Nombre completo</Label>
-                <Input
-                  id="edit-name"
-                  value={editingMember.name}
-                  onChange={(e) =>
-                    setEditingMember({ ...editingMember, name: e.target.value })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-email">Email</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={editingMember.email}
-                  onChange={(e) =>
-                    setEditingMember({
-                      ...editingMember,
-                      email: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-phone">Teléfono</Label>
-                <Input
-                  id="edit-phone"
-                  value={editingMember.phone}
-                  onChange={(e) =>
-                    setEditingMember({
-                      ...editingMember,
-                      phone: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-next-payment">Fin del plan</Label>
-                <Input
-                  id="edit-next-payment"
-                  type="date"
-                  value={editingMember.next_payment}
-                  onChange={(e) =>
-                    setEditingMember({
-                      ...editingMember,
-                      next_payment: e.target.value,
-                    })
-                  }
-                />
+            <div className="grid gap-6 py-4 max-h-[80vh] overflow-y-auto pr-2">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-name">Nombre completo</Label>
+                  <Input
+                    id="edit-name"
+                    value={editingMember.name}
+                    onChange={(e) =>
+                      setEditingMember({ ...editingMember, name: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={editingMember.email}
+                    onChange={(e) =>
+                      setEditingMember({
+                        ...editingMember,
+                        email: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-phone">Teléfono</Label>
+                  <Input
+                    id="edit-phone"
+                    value={editingMember.phone}
+                    onChange={(e) =>
+                      setEditingMember({
+                        ...editingMember,
+                        phone: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-next-payment">Fin del plan</Label>
+                  <Input
+                    id="edit-next-payment"
+                    type="date"
+                    value={editingMember.next_payment}
+                    onChange={(e) =>
+                      setEditingMember({
+                        ...editingMember,
+                        next_payment: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="edit-description">Descripción</Label>
+                  <Textarea
+                    id="edit-description"
+                    ref={editDescriptionRef}
+                    value={editingMember.description ?? ""}
+                    onChange={(e) => {
+                      const value = e.currentTarget.value;
+                      setEditingMember({
+                        ...editingMember,
+                        description: value,
+                      });
+                      const textarea = e.currentTarget;
+                      textarea.style.height = "auto";
+                      textarea.style.height = `${textarea.scrollHeight}px`;
+                    }}
+                    className="min-h-[220px] resize-none overflow-hidden"
+                  />
+                </div>
               </div>
             </div>
           )}
