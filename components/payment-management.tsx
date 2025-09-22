@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +66,7 @@ export function PaymentManagement({
     description: "",
     amount: 0,
     installments: 1,
+    nextInstallmentDue: new Date().toLocaleDateString("en-CA"),
   });
   const [planContract, setPlanContract] = useState<PlanContract | null>(null);
   const [methodFilter, setMethodFilter] = useState("all");
@@ -111,6 +112,25 @@ export function PaymentManagement({
   const parseLocalDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split("-").map(Number);
     return new Date(year, month - 1, day);
+  };
+
+   const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
+    if (!startDate) return "";
+    const baseDate = new Date(`${startDate}T00:00:00`);
+    if (Number.isNaN(baseDate.getTime())) {
+      return startDate;
+    }
+    if (plan) {
+      if (plan.duration_type === "days") {
+        baseDate.setDate(baseDate.getDate() + plan.duration);
+      } else if (plan.duration_type === "months") {
+        baseDate.setMonth(baseDate.getMonth() + plan.duration);
+      } else if (plan.duration_type === "years") {
+        baseDate.setFullYear(baseDate.getFullYear() + plan.duration);
+      }
+    }
+
+    return baseDate.toISOString().split("T")[0];
   };
 
   useEffect(() => {
@@ -212,6 +232,19 @@ export function PaymentManagement({
         : Math.max(selectedPlan.price + balanceDueActual, 0)
       : 0;
 
+
+       const calculatedPlanEndDate = useMemo(() => {
+    if (newPayment.type !== "new_plan") return "";
+    return calculatePlanEndDate(newPayment.startDate, selectedPlan);
+  }, [newPayment.type, newPayment.startDate, selectedPlan]);
+
+  const nextInstallmentDueValue =
+    newPayment.type === "new_plan"
+      ? newPayment.installments === 1
+        ? calculatedPlanEndDate
+        : newPayment.nextInstallmentDue || calculatedPlanEndDate
+      : "";
+
   // FUNCIÓN ACTUALIZADA PARA REGISTRAR PAGO Y RENOVAR SOCIO
   const handleAddPayment = async () => {
     try {
@@ -229,6 +262,13 @@ export function PaymentManagement({
           alert(
             `El monto no puede ser mayor a ${maxPlanAmount.toLocaleString()}`
           );
+          return;
+        }
+         if (
+          newPayment.installments > 1 &&
+          (!newPayment.nextInstallmentDue || newPayment.nextInstallmentDue === "")
+        ) {
+          alert("Debes ingresar el vencimiento de la próxima cuota");
           return;
         }
 
@@ -316,7 +356,10 @@ export function PaymentManagement({
         }
 
         const nextPaymentISO = nextPayment.toISOString().split("T")[0];
-        const nextInstallmentDue = nextPaymentISO;
+        const nextInstallmentDue =
+          newPayment.installments === 1
+            ? nextPaymentISO
+            : newPayment.nextInstallmentDue || nextPaymentISO;
 
         const newBalance = isFirstInstallment
           ? balanceDueActual + selectedPlan.price - newPayment.amount
@@ -474,6 +517,7 @@ export function PaymentManagement({
         description: "",
         amount: 0,
         installments: 1,
+        nextInstallmentDue: new Date().toLocaleDateString("en-CA"),
       });
       setMemberSearchTerm("");
       setPlanContract(null);
@@ -567,6 +611,10 @@ export function PaymentManagement({
                               ...newPayment,
                               memberId: member.id,
                               planId: "",
+                              installments: 1,
+                              nextInstallmentDue:
+                                member.next_installment_due ||
+                                new Date().toLocaleDateString("en-CA"),
                             });
                             setMemberSearchTerm(member.name);
                             setPlanContract(null);
@@ -599,6 +647,8 @@ export function PaymentManagement({
                       planId: "",
                       description: "",
                       amount: 0,
+                      installments: 1,
+                      nextInstallmentDue: new Date().toLocaleDateString("en-CA"),
                     });
                     setPlanContract(null);
                   }}
@@ -624,10 +674,18 @@ export function PaymentManagement({
                     <Select
                       value={newPayment.planId}
                       onValueChange={async (value) => {
+                        const selectedPlanOption = plans.find(
+                          (plan) => plan.id === value
+                        );
+                        const computedNext = calculatePlanEndDate(
+                          newPayment.startDate,
+                          selectedPlanOption
+                        );
                         setNewPayment({
                           ...newPayment,
                           planId: value,
                           installments: 1,
+                           nextInstallmentDue: computedNext,
                         });
                         if (newPayment.memberId && contractTable) {
                           let { data, error } = await supabase
@@ -650,6 +708,10 @@ export function PaymentManagement({
                             setNewPayment((prev) => ({
                               ...prev,
                               installments: data.installments_total,
+                               nextInstallmentDue:
+                                prev.nextInstallmentDue ||
+                                selectedMember?.next_installment_due ||
+                                computedNext,
                             }));
                           }
                         } else {
@@ -676,10 +738,22 @@ export function PaymentManagement({
                         <Select
                           value={newPayment.installments.toString()}
                           onValueChange={(value) =>
-                            setNewPayment({
-                              ...newPayment,
-                              installments: parseInt(value),
-                            })
+                             {
+                              const installments = parseInt(value);
+                              const computedNext = calculatePlanEndDate(
+                                newPayment.startDate,
+                                selectedPlan
+                              );
+                              setNewPayment({
+                                ...newPayment,
+                                installments,
+                                nextInstallmentDue:
+                                  installments === 1
+                                    ? computedNext
+                                    : newPayment.nextInstallmentDue ||
+                                      computedNext,
+                              });
+                            }
                           }
                         >
                           <SelectTrigger>
@@ -717,6 +791,30 @@ export function PaymentManagement({
                       />
                       <p className="text-xs text-muted-foreground">
                         Monto máximo: ${maxPlanAmount.toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                  {newPayment.planId && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="nextInstallmentDue">
+                        Vencimiento próxima cuota
+                      </Label>
+                      <Input
+                        id="nextInstallmentDue"
+                        type="date"
+                        value={nextInstallmentDueValue}
+                        onChange={(e) =>
+                          setNewPayment({
+                            ...newPayment,
+                            nextInstallmentDue: e.target.value,
+                          })
+                        }
+                        disabled={newPayment.installments === 1}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {newPayment.installments === 1
+                          ? "Se utilizará la misma fecha que el fin del plan."
+                          : "Registra cuándo debería abonarse la próxima cuota."}
                       </p>
                     </div>
                   )}
@@ -858,17 +956,28 @@ export function PaymentManagement({
               {newPayment.type === "new_plan" && (
                 <div className="grid gap-2">
                   <Label htmlFor="startDate">Fecha de inicio del plan</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={newPayment.startDate}
-                    onChange={(e) =>
+                   <Input
+                  id="startDate"
+                  type="date"
+                  value={newPayment.startDate}
+                  onChange={(e) =>
+                    {
+                      const value = e.target.value;
+                      const computedNext = calculatePlanEndDate(
+                        value,
+                        selectedPlan
+                      );
                       setNewPayment({
                         ...newPayment,
-                        startDate: e.target.value,
-                      })
+                         startDate: value,
+                        nextInstallmentDue:
+                          newPayment.installments === 1
+                            ? computedNext
+                            : newPayment.nextInstallmentDue || computedNext,
+                      });
                     }
-                  />
+                   }
+                />
                   <p className="text-xs text-muted-foreground">
                     El plan se calculará desde esta fecha (útil si se registra
                     con atraso)
