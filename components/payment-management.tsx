@@ -1368,7 +1368,7 @@ export function PaymentManagement({
                 <TableHead>Fecha</TableHead>
                 <TableHead>Socio</TableHead>
                 <TableHead>Detalle</TableHead>
-                <TableHead>Monto</TableHead>
+                <TableHead>Monto pagado</TableHead>
                 <TableHead>Método</TableHead>
                 <TableHead>En cuotas</TableHead>
                 <TableHead>Saldo pendiente</TableHead>
@@ -1385,6 +1385,16 @@ export function PaymentManagement({
                     : null;
                 const balanceValue =
                   insight?.balancePending ?? fallbackBalance ?? null;
+                   const detailLabel =
+                  payment.type === "plan" ? payment.plan : payment.description;
+                const formattedDetailAmount = new Intl.NumberFormat("es-AR", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 2,
+                  useGrouping: false,
+                }).format(payment.amount);
+                const detailDisplay = detailLabel?.trim()
+                  ? `${detailLabel} - ${formattedDetailAmount}`
+                  : `Sin detalle - ${formattedDetailAmount}`;
 
                 return (
                   <TableRow key={payment.id}>
@@ -1394,11 +1404,7 @@ export function PaymentManagement({
                     <TableCell className="font-medium">
                       {payment.member_name}
                     </TableCell>
-                    <TableCell>
-                      {payment.type === "plan"
-                        ? payment.plan
-                        : payment.description}
-                    </TableCell>
+                     <TableCell>{detailDisplay}</TableCell>
                     <TableCell className="font-medium text-green-600">
                       ${payment.amount.toLocaleString()}
                     </TableCell>
