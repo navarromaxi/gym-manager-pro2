@@ -3,7 +3,7 @@
 
 "use client";
 //import { LoginSystem } from "@/components/login-system";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -195,78 +195,98 @@ export default function GymManagementSystem() {
       console.log("Cargando datos para gym:", gymId);
 
       // Cargar miembros
-      const { data: membersData, error: membersError } = await supabase
-        .from("members")
-        .select(
-          "id, gym_id, name, email, phone, join_date, plan, plan_price, last_payment, next_payment, next_installment_due, status, inactive_level, inactive_comment, followed_up, balance_due"
-        )
-        .eq("gym_id", gymId)
-        .order("balance_due", { ascending: false })
-        .order("last_payment", { ascending: false });
+      const [
+        { data: membersData, error: membersError },
+        { data: paymentsData, error: paymentsError },
+        { data: expensesData, error: expensesError },
+        { data: prospectsData, error: prospectsError },
+        { data: plansData, error: plansError },
+        { data: activitiesData, error: activitiesError },
+        { data: customPlansData, error: customPlansError },
+      ] = await Promise.all([
+        supabase
+          .from("members")
+          .select(
+            "id, gym_id, name, email, phone, join_date, plan, plan_price, last_payment, next_payment, next_installment_due, status, inactive_level, inactive_comment, followed_up, balance_due"
+          )
+          .eq("gym_id", gymId)
+          .order("balance_due", { ascending: false })
+          .order("last_payment", { ascending: false }),
+        supabase
+          .from("payments")
+          .select(
+            "id, gym_id, member_id, member_name, amount, date, start_date, plan, method, card_brand, card_installments, type, description, plan_id"
+          )
+          .eq("gym_id", gymId)
+          .order("date", { ascending: false }),
+        supabase
+          .from("expenses")
+          .select(
+            "id, gym_id, description, amount, date, category, is_recurring"
+          )
+          .eq("gym_id", gymId)
+          .order("date", { ascending: false }),
+        supabase
+          .from("prospects")
+          .select(
+            "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, created_at"
+          )
+          .eq("gym_id", gymId),
+        supabase
+          .from("plans")
+          .select(
+            "id, gym_id, name, description, price, duration, duration_type, activities, is_active"
+          )
+          .eq("gym_id", gymId),
+        supabase
+          .from("activities")
+          .select(
+            "id, gym_id, name, description, instructor, capacity, duration, schedule, is_active, created_at"
+          )
+          .eq("gym_id", gymId),
+        supabase
+          .from("custom_plans")
+          .select(
+            "id, gym_id, member_id, member_name, name, description, price, start_date, end_date, is_active"
+          )
+          .eq("gym_id", gymId),
+      ]);
 
       if (membersError) {
         console.error("Error cargando miembros:", membersError);
       }
 
-      // Cargar pagos
-      const { data: paymentsData, error: paymentsError } = await supabase
-        .from("payments")
-        .select(
-           "id, gym_id, member_id, member_name, amount, date, start_date, plan, method, card_brand, card_installments, type, description, plan_id"
-        )
-        .eq("gym_id", gymId)
-        .order("date", { ascending: false });
+      
 
       if (paymentsError) {
         console.error("Error cargando pagos:", paymentsError);
       }
 
-      // Cargar gastos
-      const { data: expensesData, error: expensesError } = await supabase
-        .from("expenses")
-        .select("*")
-        .eq("gym_id", gymId)
-        .order("date", { ascending: false });
+     
 
       if (expensesError) {
         console.error("Error cargando gastos:", expensesError);
       }
 
-      // Cargar interesados
-      const { data: prospectsData, error: prospectsError } = await supabase
-        .from("prospects")
-        .select("*")
-        .eq("gym_id", gymId);
+     
 
       if (prospectsError) {
         console.error("Error cargando interesados:", prospectsError);
       }
 
-      // Cargar planes
-      const { data: plansData, error: plansError } = await supabase
-        .from("plans")
-        .select("*")
-        .eq("gym_id", gymId);
+      
 
       if (plansError) {
         console.error("Error cargando planes:", plansError);
       }
 
-      // Cargar actividades
-      const { data: activitiesData, error: activitiesError } = await supabase
-        .from("activities")
-        .select("*")
-        .eq("gym_id", gymId);
+     
 
       if (activitiesError) {
         console.error("Error cargando actividades:", activitiesError);
       }
 
-      // Cargar planes personalizados
-      const { data: customPlansData, error: customPlansError } = await supabase
-        .from("custom_plans")
-        .select("*")
-        .eq("gym_id", gymId);
+     
 
       if (customPlansError) {
         console.error(
@@ -275,7 +295,6 @@ export default function GymManagementSystem() {
         );
       }
 
-      // Actualizar estados
       setMembers(membersData || []);
       setPayments(paymentsData || []);
       setExpenses(expensesData || []);
@@ -296,7 +315,6 @@ export default function GymManagementSystem() {
         customPlans: customPlansData?.length || 0,
       });
 
-      // Si no hay datos, crear datos de ejemplo
       if (
         !membersData?.length &&
         !plansData?.length &&
@@ -478,101 +496,144 @@ export default function GymManagementSystem() {
   // Función para actualizar estados de miembros
   const updateMemberStatuses = (members: Member[]) => {
     const today = new Date();
-    return members.map((member) => {
+    let hasChanges = false;
+
+    const updatedMembers = members.map((member) => {
       const nextPayment = toLocalDate(member.next_payment);
       const diffTime = today.getTime() - nextPayment.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
+     let status: "active" | "expired" | "inactive" = member.status;
+      let inactiveLevel = member.inactive_level;
+
       if (nextPayment > today) {
-        return { ...member, status: "active" as const };
-      }
-
-      if (diffDays > 0) {
+        status = "active";
+      } else if (diffDays > 0) {
         if (diffDays > 30) {
-          return {
-            ...member,
-            status: "inactive" as const,
-            inactive_level: member.inactive_level || ("yellow" as const),
-          };
+          status = "inactive";
+          inactiveLevel = member.inactive_level || "yellow";
         } else {
-          return { ...member, status: "expired" as const };
+          status = "expired";
         }
+      } else {
+        status = "expired";
       }
 
-      return { ...member, status: "expired" as const };
+      if (status !== member.status || inactiveLevel !== member.inactive_level) {
+        hasChanges = true;
+        return { ...member, status, inactive_level: inactiveLevel };
+      }
+      return member;
     });
+     return { members: updatedMembers, hasChanges };
   };
 
   // Aplicar actualización de estados
   useEffect(() => {
-    if (members.length > 0) {
-      const updatedMembers = updateMemberStatuses(members);
-      if (JSON.stringify(updatedMembers) !== JSON.stringify(members)) {
-        setMembers(updatedMembers);
-      }
+    if (members.length === 0) {
+      return;
     }
-  }, [gymData]);
+
+    const { members: normalizedMembers, hasChanges } =
+      updateMemberStatuses(members);
+
+    if (hasChanges) {
+      setMembers(normalizedMembers);
+    }
+  }, [members, setMembers]);
 
   // Calculate dashboard metrics
   /* const activeMembers = members.filter((m) => m.status === "active").length;
   const expiredMembers = members.filter((m) => m.status === "expired").length;
   const inactiveMembers = members.filter((m) => m.status === "inactive").length; */
-  const activeMembers = members.filter(
-    (m) => getRealStatus(m) === "active"
-  ).length;
-  const expiredMembers = members.filter(
-    (m) => getRealStatus(m) === "expired"
-  ).length;
-  const inactiveMembers = members.filter(
-    (m) => getRealStatus(m) === "inactive"
-  ).length;
+  const {
+    activeMembers,
+    expiredMembers,
+    inactiveMembers,
+    upcomingExpirations,
+    followUpCount,
+  } = useMemo(() => {
+    const now = new Date();
+    const todayMs = now.getTime();
+    let active = 0;
+    let expired = 0;
+    let inactive = 0;
+    let upcoming = 0;
+    let followUp = 0;
 
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
+    members.forEach((member) => {
+      const status = getRealStatus(member);
+      if (status === "active") active += 1;
+      else if (status === "expired") expired += 1;
+      else inactive += 1;
 
-  const monthlyIncome = payments
-    .filter((p) => {
-      const paymentDate = toLocalDate(p.date);
-      return (
-        paymentDate.getMonth() === currentMonth &&
-        paymentDate.getFullYear() === currentYear
+      const next = toLocalDate(member.next_payment);
+      const diffDaysToNext = Math.ceil(
+        (next.getTime() - todayMs) / 86400000
       );
-    })
-    .reduce((sum, p) => sum + p.amount, 0);
+    if (diffDaysToNext <= 7 && diffDaysToNext >= 0) {
+        upcoming += 1;
+      }
 
-  const monthlyExpenses = expenses
-    .filter((e) => {
-      const expenseDate = toLocalDate(e.date);
-      return (
-        expenseDate.getMonth() === currentMonth &&
-        expenseDate.getFullYear() === currentYear
+  const join = toLocalDate(member.join_date);
+      const diffDaysFromJoin = Math.floor(
+        (todayMs - join.getTime()) / 86400000
       );
-    })
-    .reduce((sum, e) => sum + e.amount, 0);
+       if (!member.followed_up && diffDaysFromJoin >= 5 && diffDaysFromJoin <= 12) {
+        followUp += 1;
+      }
+    });
 
-  const monthlyProfit = monthlyIncome - monthlyExpenses;
+    return {
+      activeMembers: active,
+      expiredMembers: expired,
+      inactiveMembers: inactive,
+      upcomingExpirations: upcoming,
+      followUpCount: followUp,
+    };
+  }, [members]);
 
-  const upcomingExpirations = members.filter((m) => {
-    const next = toLocalDate(m.next_payment);
-    const diffDays = Math.ceil((next.getTime() - Date.now()) / 86400000);
-    return diffDays <= 7 && diffDays >= 0;
-  }).length;
+  const { monthlyIncome, monthlyExpenses, monthlyProfit } = useMemo(() => {
+    const reference = new Date();
+    const month = reference.getMonth();
+    const year = reference.getFullYear();
 
-  // Socios que ingresaron hace 5–12 días y aún no fueron contactados
-  const followUpCount = (() => {
-    const today = new Date();
-    return members.filter((m) => {
-      const join = toLocalDate(m.join_date);
-      const diffDays = Math.floor(
-        (today.getTime() - join.getTime()) / 86400000
-      );
-      return !m.followed_up && diffDays >= 5 && diffDays <= 12;
-    }).length;
-  })();
+    const income = payments.reduce((sum, payment) => {
+      const paymentDate = toLocalDate(payment.date);
+      if (
+        paymentDate.getMonth() === month &&
+        paymentDate.getFullYear() === year
+      ) {
+        return sum + payment.amount;
+      }
+      return sum;
+    }, 0);
 
-  const newProspectsCount = prospects.filter((prospect) =>
-    NEW_PROSPECT_STATUSES.includes(prospect.status)
-  ).length;
+  const expensesTotal = expenses.reduce((sum, expense) => {
+      const expenseDate = toLocalDate(expense.date);
+      if (
+        expenseDate.getMonth() === month &&
+        expenseDate.getFullYear() === year
+      ) {
+        return sum + expense.amount;
+      }
+      return sum;
+    }, 0);
+
+    return {
+      monthlyIncome: income,
+      monthlyExpenses: expensesTotal,
+      monthlyProfit: income - expensesTotal,
+    };
+  }, [payments, expenses]);
+
+  const newProspectsCount = useMemo(
+    () =>
+      prospects.filter((prospect) =>
+        NEW_PROSPECT_STATUSES.includes(prospect.status)
+      ).length,
+    [prospects]
+  );
 
   const goToMembersWithFilter = (filter: string) => {
     setMemberFilter(filter);
