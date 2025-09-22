@@ -46,6 +46,7 @@ interface PaymentManagementProps {
 interface PaymentInsight {
   isInstallment: boolean;
   balancePending: number | null;
+  planPrice: number | null;
 }
 
 interface MemberInstallmentState {
@@ -165,6 +166,7 @@ export function PaymentManagement({
         insights.set(payment.id, {
           isInstallment: false,
           balancePending: null,
+          planPrice: null,
         });
         return;
       }
@@ -196,6 +198,7 @@ export function PaymentManagement({
         insights.set(payment.id, {
           isInstallment,
           balancePending: balanceAfter,
+          planPrice: targetPrice,
         });
         return;
       }
@@ -214,6 +217,8 @@ export function PaymentManagement({
       insights.set(payment.id, {
         isInstallment: wasInstallment,
         balancePending: newBalance,
+        planPrice:
+          effectivePlanPrice ?? previousState.planPrice ?? member?.plan_price ?? null,
       });
     });
 
@@ -1385,16 +1390,20 @@ export function PaymentManagement({
                     : null;
                 const balanceValue =
                   insight?.balancePending ?? fallbackBalance ?? null;
-                   const detailLabel =
+                  const detailLabel =
                   payment.type === "plan" ? payment.plan : payment.description;
+                const rawDetailAmount =
+                  payment.type === "plan"
+                    ? insight?.planPrice ?? member?.plan_price ?? payment.amount
+                    : payment.amount;
                 const formattedDetailAmount = new Intl.NumberFormat("es-AR", {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 2,
                   useGrouping: false,
-                }).format(payment.amount);
+                }).format(rawDetailAmount ?? payment.amount);
                 const detailDisplay = detailLabel?.trim()
-                  ? `${detailLabel} - ${formattedDetailAmount}`
-                  : `Sin detalle - ${formattedDetailAmount}`;
+                  ? `${detailLabel} - $${formattedDetailAmount}`
+                  : `Sin detalle - $${formattedDetailAmount}`;
 
                 return (
                   <TableRow key={payment.id}>
