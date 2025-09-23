@@ -46,15 +46,31 @@ import {
 interface Member {
   id: string;
   name: string;
-  email: string;
-  phone: string;
-  joinDate: string;
-  plan: string;
-  planPrice: number;
-  lastPayment: string;
-  nextPayment: string;
-  status: "active" | "expired" | "inactive";
+  email?: string;
+  phone?: string;
+  joinDate?: string;
+  join_date?: string;
+  plan?: string;
+  planPrice?: number;
+  plan_price?: number;
+  lastPayment?: string;
+  last_payment?: string;
+  nextPayment?: string;
+  next_payment?: string;
+  nextInstallmentDue?: string | null;
+  next_installment_due?: string | null;
+  status?: "active" | "expired" | "inactive";
   inactiveLevel?: "green" | "yellow" | "red";
+  inactive_level?: "green" | "yellow" | "red";
+  inactiveComment?: string | null;
+  inactive_comment?: string | null;
+  description?: string | null;
+  balanceDue?: number | null;
+  balance_due?: number | null;
+  followedUp?: boolean | null;
+  followed_up?: boolean | null;
+  planEndDate?: string | null;
+  plan_end_date?: string | null;
 }
 
 interface Payment {
@@ -66,11 +82,14 @@ interface Payment {
   amount: number;
   date: string;
   plan?: string;
+  plan_name?: string;
   method: string;
   cardBrand?: string;
   card_brand?: string;
   cardInstallments?: number;
   card_installments?: number;
+  start_date?: string;
+  startDate?: string;
   type: "plan" | "product";
   description?: string;
   plan_id?: string;
@@ -83,6 +102,7 @@ interface Expense {
   amount: number;
   date: string;
   category: string;
+  is_recurring?: boolean;
 }
 
 interface ReportsSectionProps {
@@ -155,16 +175,6 @@ const toLocalDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
 
 const todayMid = toLocalMidnight(new Date());
 
-// <=0 días: activo; 1..30: vencido; >30: inactivo
-function getRealStatusByNext(nextPayment: string): DerivedStatus {
-  const today = new Date();
-  const next = toLocalDate(nextPayment);
-  const diffDays = Math.ceil((today.getTime() - next.getTime()) / 86400000);
-  if (diffDays <= 0) return "active";
-  if (diffDays <= 30) return "expired";
-  return "inactive";
-}
-
 /** === helpers de fecha consistentes con MemberManagement === */
 function toLocalDateISO(s?: string | null) {
   if (!s) return null;
@@ -175,7 +185,13 @@ function toLocalDateISO(s?: string | null) {
 
 function getRealStatusReport(m: Member): DerivedStatus {
   const todayMid = toLocalMidnight(new Date());
-  const next = toLocalDateISO(m.nextPayment);
+  const rawNext =
+    (m as any).nextPayment ??
+    (m as any).next_payment ??
+    m.nextPayment ??
+    m.next_payment ??
+    null;
+  const next = toLocalDateISO(typeof rawNext === "string" ? rawNext : null);
   if (!next) return "expired"; // sin fecha lo tratamos como vencido
   const nextMid = toLocalMidnight(next);
   const diffDays = Math.ceil((todayMid.getTime() - nextMid.getTime()) / 86400000);
@@ -544,6 +560,44 @@ const isWithinPeriod = (date: Date) => {
     }
   };
 
+  const statusLabels: Record<DerivedStatus, string> = {
+    active: "Activo",
+    expired: "Vencido",
+    inactive: "Inactivo",
+  };
+
+  const inactivityLevelLabels: Record<
+    NonNullable<Member["inactiveLevel"]>,
+    string
+  > = {
+    green: "Verde",
+    yellow: "Amarillo",
+    red: "Rojo",
+  };
+
+  const formatDateCell = (value?: string | Date | null) => {
+    if (!value) return "";
+    if (value instanceof Date) {
+      return toLocalMidnight(value).toLocaleDateString();
+    }
+    const parsed = toLocalDateFromISO(value);
+    return parsed ? parsed.toLocaleDateString() : "";
+  };
+
+  const formatBooleanCell = (value: unknown) => {
+    if (value === undefined || value === null) return "";
+    return value ? "Sí" : "No";
+  };
+
+  const getOverdueDays = (iso?: string | null) => {
+    if (!iso) return "";
+    const nextDate = toLocalDateFromISO(iso);
+    if (!nextDate) return "";
+    const diffDays = Math.ceil(
+      (todayMid.getTime() - toLocalMidnight(nextDate).getTime()) / 86400000
+    );
+    return diffDays > 0 ? diffDays : 0;
+  };
   // === Construye las "hojas" a exportar a partir de lo ya calculado ===
   function buildSheets() {
     const resumen = [
@@ -573,18 +627,39 @@ const isWithinPeriod = (date: Date) => {
         members.find((m) => m.id === memberId)?.name ||
         "";
 
+        const startDate = pick(p as any, "start_date", "startDate") as
+        | string
+        | undefined;
+      const planId = pick(p as any, "plan_id", "planId") as
+        | string
+        | undefined;
+      const productId = pick(p as any, "product_id", "productId") as
+        | string
+        | undefined;
+      const description = pick(p as any, "description") as
+        | string
+        | undefined;
+      const resolvedPlan = resolvePlanLabel(p);
+
       return {
         PagoId: p.id,
-        SocioId: memberId,
+        SocioId: memberId || "",
         Socio: memberName,
         Monto: p.amount,
-        Fecha: toLocalDate(p.date).toLocaleDateString(),
-        Concepto: p.type === "plan" ? p.plan : p.description,
+        Fecha: formatDateCell(p.date),
+        FechaPago: formatDateCell(p.date),
+        FechaInicioPlan: formatDateCell(startDate),
+        Plan: resolvedPlan,
+        Concepto:
+          p.type === "plan" ? resolvedPlan : description || resolvedPlan,
         Metodo: p.method,
         Tarjeta: pick(p as any, "card_brand", "cardBrand") || "",
         Cuotas:
           pick(p as any, "card_installments", "cardInstallments") ?? "",
         Tipo: p.type,
+        Descripcion: description || "",
+        PlanId: planId || "",
+        ProductoId: productId || "",
       };
     });
 
@@ -592,41 +667,118 @@ const isWithinPeriod = (date: Date) => {
       GastoId: e.id,
       Descripcion: e.description,
       Monto: e.amount,
-      Fecha: new Date(e.date).toLocaleDateString(),
+      Fecha: formatDateCell(e.date),
       Categoria: e.category,
+      EsRecurrente: formatBooleanCell(e.is_recurring),
     }));
 
-    const socios = membersWithDerived.map((m) => ({
-      SocioId: m.id,
-      Nombre: m.name,
-      Email: m.email,
-      Telefono: m.phone,
-      Plan: m.plan,
-      PrecioPlan: m.planPrice,
-      Alta: m.joinDate ? toLocalDate(m.joinDate).toLocaleDateString() : "",
-      UltimoPago: m.lastPayment
-        ? toLocalDate(m.lastPayment).toLocaleDateString()
-        : "",
-      ProximoPago: m.nextPayment
-        ? toLocalDate(m.nextPayment).toLocaleDateString()
-        : "",
-      EstadoDerivado: m.derivedStatus,
-    }));
+    const socios = membersWithDerived.map((m) => {
+      const joinISO = pick(m as any, "joinDate", "join_date") as
+        | string
+        | undefined;
+      const lastISO = pick(m as any, "lastPayment", "last_payment") as
+        | string
+        | undefined;
+      const planEndISO = pick(
+        m as any,
+        "planEndDate",
+        "plan_end_date",
+        "nextPayment",
+        "next_payment"
+      ) as string | undefined;
+      const nextInstallmentISO = pick(
+        m as any,
+        "nextInstallmentDue",
+        "next_installment_due"
+      ) as string | undefined;
+      const nextPaymentISO = nextInstallmentISO ?? planEndISO;
+      const rawStatus = pick(m as any, "status") as
+        | DerivedStatus
+        | undefined;
+      const inactivityLevel = pick(
+        m as any,
+        "inactiveLevel",
+        "inactive_level"
+      ) as Member["inactiveLevel"];
+      const inactivityComment = pick(
+        m as any,
+        "inactiveComment",
+        "inactive_comment"
+      ) as string | null | undefined;
+      const balanceDue = pick(m as any, "balanceDue", "balance_due") as
+        | number
+        | null
+        | undefined;
+      const memberDescription = pick(m as any, "description") as
+        | string
+        | null
+        | undefined;
+      const followedUp = pick(m as any, "followedUp", "followed_up") as
+        | boolean
+        | null
+        | undefined;
+      const planPrice = pick(m as any, "planPrice", "plan_price") ??
+        m.planPrice;
+      const planName = pick(m as any, "plan") ?? m.plan;
+
+      const formattedJoin = formatDateCell(joinISO);
+      const formattedNextInstallment = formatDateCell(nextInstallmentISO);
+
+      return {
+        SocioId: m.id,
+        Nombre: pick(m as any, "name") ?? m.name,
+        Email: pick(m as any, "email") ?? m.email ?? "",
+        Telefono: pick(m as any, "phone") ?? m.phone ?? "",
+        Plan: planName ?? "",
+        PrecioPlan: planPrice ?? "",
+        Descripcion: memberDescription ?? "",
+        Alta: formattedJoin,
+        FechaAlta: formattedJoin,
+        UltimoPago: formatDateCell(lastISO),
+        FechaFinPlan: formatDateCell(planEndISO),
+        ProximoPago: formatDateCell(nextPaymentISO),
+        ProximaCuota: formattedNextInstallment,
+        Estado: statusLabels[m.derivedStatus],
+        EstadoDerivado: m.derivedStatus,
+        EstadoSistema: rawStatus
+          ? statusLabels[rawStatus as DerivedStatus] ?? rawStatus
+          : "",
+        EstadoSistemaCodigo: rawStatus ?? "",
+        DiasAtraso: getOverdueDays(planEndISO),
+        SaldoPendiente: balanceDue ?? "",
+        NivelInactividad: inactivityLevel
+          ? inactivityLevelLabels[
+              inactivityLevel as NonNullable<Member["inactiveLevel"]>
+            ] ?? inactivityLevel
+          : "",
+        ComentarioInactividad: inactivityComment ?? "",
+        SeguimientoRealizado: formatBooleanCell(followedUp),
+      };
+    });
 
     const proximos = upcomingExpirations.map((m) => {
-      const baseDate =
-        m._next ?? (m.nextPayment ? toLocalDate(m.nextPayment) : null);
-      const next = baseDate ? new Date(baseDate) : null;
-      const days = next
+      const planEndISO = pick(
+        m as any,
+        "planEndDate",
+        "plan_end_date",
+        "nextPayment",
+        "next_payment"
+      ) as string | undefined;
+      const nextDate =
+        m._next ?? (planEndISO ? toLocalDateFromISO(planEndISO) : null);
+      const days = nextDate
         ? Math.ceil(
-            (toLocalMidnight(next).getTime() - todayMid.getTime()) / 86400000
+             (toLocalMidnight(nextDate).getTime() - todayMid.getTime()) /
+              86400000
           )
         : "";
       return {
         SocioId: m.id,
-        Socio: m.name,
-        Plan: m.plan,
-        Vence: next ? next.toLocaleDateString() : "",
+        Socio: pick(m as any, "name") ?? m.name,
+        Plan: pick(m as any, "plan") ?? m.plan,
+        Vence: nextDate ? formatDateCell(nextDate) : "",
+        EstadoActual: statusLabels[m.derivedStatus],
+        EstadoCodigo: m.derivedStatus,
         DiasRestantes: days,
       };
     });
@@ -1115,7 +1267,7 @@ const isWithinPeriod = (date: Date) => {
               <TableBody>
                 {upcomingExpirations.map((member) => {
                   const baseDate =
-                    member._next ?? parseDateSafe(member.nextPayment)!;
+                    member._next ?? parseDateSafe(member.next_payment)!;
                   const nextMid = toLocalMidnight(baseDate);
                   const daysUntilExpiration = Math.ceil(
                     (nextMid.getTime() - todayMid.getTime()) / 86400000
