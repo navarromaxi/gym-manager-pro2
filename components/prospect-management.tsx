@@ -91,6 +91,52 @@ const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
 
 const PROSPECTS_PER_BATCH = 10;
 
+const normalizeDateString = (value?: string | null) => {
+  if (!value) return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return `${year}-${month}-${day}`;
+  }
+
+  const slashMatch = trimmed.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/
+  );
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, "0");
+    const day = String(parsed.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  return null;
+};
+
+const areDatesEquivalent = (
+  candidate?: string | null,
+  filterValue?: string | null
+) => {
+  if (!filterValue) return true;
+
+  const normalizedFilter = normalizeDateString(filterValue);
+  if (!normalizedFilter) return true;
+
+  const normalizedCandidate = normalizeDateString(candidate);
+  if (!normalizedCandidate) return false;
+
+  return normalizedCandidate === normalizedFilter;
+};
+
 export function ProspectManagement({
   prospects,
   setProspects,
@@ -323,10 +369,15 @@ export function ProspectManagement({
       statusFilter === "all" || prospect.status === statusFilter;
     const matchesPriority =
       priorityFilter === "all" || prospect.priority_level === priorityFilter; // Nuevo filtro
-    const matchesScheduledDate =
-      !scheduledDateFilter || prospect.scheduled_date === scheduledDateFilter;
-    const matchesContactDate =
-      !contactDateFilter || prospect.contact_date === contactDateFilter;
+    const matchesContactDate = areDatesEquivalent(
+      prospect.contact_date,
+      contactDateFilter
+    );
+    const matchesScheduledDate = areDatesEquivalent(
+      prospect.scheduled_date,
+      scheduledDateFilter
+    );
+    
     return (
       matchesSearch &&
       matchesStatus &&
