@@ -489,6 +489,34 @@ export function PaymentManagement({
     return map;
   }, [members]);
 
+  const latestPlanPaymentByMember = useMemo(() => {
+    const map = new Map<string, string>();
+    (payments || []).forEach((payment) => {
+      if (payment.type !== "plan") {
+        return;
+      }
+
+      const effectiveDate = getEffectivePaymentDate(payment);
+      if (!effectiveDate) {
+        return;
+      }
+
+      const previousDate = map.get(payment.member_id);
+      if (!previousDate) {
+        map.set(payment.member_id, effectiveDate);
+        return;
+      }
+
+      const current = parseLocalDate(effectiveDate).getTime();
+      const previous = parseLocalDate(previousDate).getTime();
+
+      if (current > previous) {
+        map.set(payment.member_id, effectiveDate);
+      }
+    });
+    return map;
+  }, [payments]);
+
   useEffect(() => {
     const fetchExistingContract = async () => {
       if (
@@ -580,6 +608,21 @@ export function PaymentManagement({
         const nextDueRaw =
           insight?.nextInstallmentDue ?? member?.next_installment_due ?? null;
         const dueDate = parseDueDate(nextDueRaw);
+         const latestEffectiveDate = latestPlanPaymentByMember.get(
+          payment.member_id
+        );
+        const isLatestPlanPayment =
+          !!latestEffectiveDate &&
+          getEffectivePaymentDate(payment) === latestEffectiveDate;
+        const planEndDate = member?.next_payment
+          ? parseDueDate(member.next_payment)
+          : null;
+        const pendingAmount =
+          typeof pending === "number"
+            ? pending
+            : typeof memberBalance === "number"
+            ? memberBalance
+            : 0;
 
         switch (installmentFilter) {
           case "pending_balance":
@@ -587,18 +630,42 @@ export function PaymentManagement({
               return pending > 0;
             }
             return (memberBalance ?? 0) > 0;
-          case "due_soon":
-            if (!dueDate) return false;
+          case "due_soon": {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const limitDate = new Date(today);
             limitDate.setDate(limitDate.getDate() + 10);
-            return dueDate >= today && dueDate <= limitDate;
-          case "overdue":
-            if (!dueDate) return false;
+           const planEndingSoon =
+              isLatestPlanPayment &&
+              !!planEndDate &&
+              planEndDate >= today &&
+              planEndDate <= limitDate;
+
+            const installmentDueSoon =
+              isLatestPlanPayment &&
+              pendingAmount > 0 &&
+              !!dueDate &&
+              dueDate >= today &&
+              dueDate <= limitDate;
+
+            return planEndingSoon || installmentDueSoon;
+          }
+          case "overdue": {
             const reference = new Date();
             reference.setHours(0, 0, 0, 0);
-            return dueDate < reference;
+             const planExpired =
+              isLatestPlanPayment &&
+              !!planEndDate &&
+              planEndDate < reference;
+
+            const installmentOverdue =
+              isLatestPlanPayment &&
+              pendingAmount > 0 &&
+              !!dueDate &&
+              dueDate < reference;
+
+            return planExpired || installmentOverdue;
+          }
           default:
             return true;
         }
@@ -617,6 +684,7 @@ export function PaymentManagement({
     installmentFilter,
     paymentInsights,
     membersById,
+    latestPlanPaymentByMember,
   ]);
 
   useEffect(() => {

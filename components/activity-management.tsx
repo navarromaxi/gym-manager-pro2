@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,8 @@ interface ActivityManagementProps {
   gymId: string; // 👈 agregalo acá
 }
 
+const ACTIVITIES_PER_BATCH = 10;
+
 export function ActivityManagement({
   activities,
   setActivities,
@@ -50,6 +52,7 @@ export function ActivityManagement({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [visibleCount, setVisibleCount] = useState(ACTIVITIES_PER_BATCH);
   const [newActivity, setNewActivity] = useState({
     name: "",
     description: "",
@@ -69,11 +72,42 @@ export function ActivityManagement({
     "Domingo",
   ];
 
-  const filteredActivities = activities.filter(
-    (activity) =>
-      activity.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.instructor.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredActivities = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    const sortedActivities = [...activities].sort((a, b) => {
+      const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bDate - aDate;
+    });
+
+    if (!normalizedSearch) {
+      return sortedActivities;
+    }
+
+    return sortedActivities.filter((activity) => {
+      const nameMatch = activity.name
+        .toLowerCase()
+        .includes(normalizedSearch);
+      const instructorMatch = activity.instructor
+        ?.toLowerCase()
+        .includes(normalizedSearch);
+      return nameMatch || instructorMatch;
+    });
+  }, [activities, searchTerm]);
+
+  useEffect(() => {
+    setVisibleCount(ACTIVITIES_PER_BATCH);
+  }, [searchTerm, activities]);
+
+  const displayedActivities = filteredActivities.slice(0, visibleCount);
+  const canLoadMore = visibleCount < filteredActivities.length;
+
+  const handleLoadMore = () => {
+    setVisibleCount((prev) =>
+      Math.min(prev + ACTIVITIES_PER_BATCH, filteredActivities.length)
+    );
+  };
 
   const handleAddActivity = async () => {
     const activity: Activity = {
@@ -93,7 +127,7 @@ export function ActivityManagement({
     }
 
     // Si se guarda bien, actualizá la UI
-    setActivities([...activities, activity]);
+    setActivities([activity, ...activities]);
     setNewActivity({
       name: "",
       description: "",
@@ -415,7 +449,14 @@ export function ActivityManagement({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredActivities.map((activity) => (
+              {displayedActivities.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    No se encontraron actividades.
+                  </TableCell>
+                </TableRow>
+              )}
+              {displayedActivities.map((activity) => (
                 <TableRow key={activity.id}>
                   <TableCell>
                     <div>
@@ -493,6 +534,13 @@ export function ActivityManagement({
               ))}
             </TableBody>
           </Table>
+           {canLoadMore && (
+            <div className="flex justify-center mt-4">
+              <Button variant="outline" onClick={handleLoadMore}>
+                Cargar más
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
