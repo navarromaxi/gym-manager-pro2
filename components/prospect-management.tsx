@@ -113,6 +113,7 @@ export function ProspectManagement({
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all"); // Nuevo estado para el filtro de prioridad
   const [scheduledDateFilter, setScheduledDateFilter] = useState(""); // estado para el filtro de fecha
+  const [contactDateFilter, setContactDateFilter] = useState("");
   const [newProspect, setNewProspect] = useState({
     name: "",
     email: "",
@@ -324,14 +325,26 @@ export function ProspectManagement({
       priorityFilter === "all" || prospect.priority_level === priorityFilter; // Nuevo filtro
     const matchesScheduledDate =
       !scheduledDateFilter || prospect.scheduled_date === scheduledDateFilter;
+    const matchesContactDate =
+      !contactDateFilter || prospect.contact_date === contactDateFilter;
     return (
-      matchesSearch && matchesStatus && matchesPriority && matchesScheduledDate
+      matchesSearch &&
+      matchesStatus &&
+      matchesPriority &&
+      matchesScheduledDate &&
+      matchesContactDate
     );
   });
 
   useEffect(() => {
     setVisibleCount(PROSPECTS_PER_BATCH);
-  }, [searchTerm, statusFilter, priorityFilter, scheduledDateFilter]);
+  }, [
+    searchTerm,
+    statusFilter,
+    priorityFilter,
+    scheduledDateFilter,
+    contactDateFilter,
+  ]);
 
   const sortedProspects = [...filteredProspects].sort((a, b) => {
     const dateA = new Date(`${a.contact_date}T00:00:00`).getTime();
@@ -877,51 +890,73 @@ export function ProspectManagement({
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="min-w-[200px] flex-1 sm:flex-[1.5]">
+          <div className="flex w-full flex-wrap items-end gap-4">
+            <div className="space-y-2 md:col-span-2 xl:col-span-2">
+              <Label
+                htmlFor="prospect-search"
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Buscar
+              </Label>
               <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
+                  id="prospect-search"
                   placeholder="Buscar por nombre, email o notas..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
+                  className="pl-9"
                 />
               </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="averiguador">Averiguador</SelectItem>
-                <SelectItem value="trial_scheduled">
-                  Coordinamos clase de prueba
-                </SelectItem>
-                <SelectItem value="reagendado">Re/Agendado</SelectItem>
-                <SelectItem value="asistio">Asistio</SelectItem>
-                <SelectItem value="no_asistio">No asistio</SelectItem>
-                <SelectItem value="inactivo">Inactivo</SelectItem>
-                <SelectItem value="otro">Otro</SelectItem>
-              </SelectContent>
-            </Select>
-            {/* Nuevo filtro por prioridad */}
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Prioridad" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tipo Prioridad</SelectItem>
-                <SelectItem value="red">Alta</SelectItem>
-                <SelectItem value="yellow">Media</SelectItem>
-                <SelectItem value="green">Baja</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="flex w-full min-w-[200px] flex-col gap-2 sm:w-[220px]">
+            <div className="space-y-2">
+              <Label
+                htmlFor="status-filter"
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Estado
+              </Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger id="status-filter" className="w-full">
+                  <SelectValue placeholder="Todos los estados" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="averiguador">Averiguador</SelectItem>
+                  <SelectItem value="trial_scheduled">
+                    Coordinamos clase de prueba
+                  </SelectItem>
+                  <SelectItem value="reagendado">Re/Agendado</SelectItem>
+                  <SelectItem value="asistio">Asistio</SelectItem>
+                  <SelectItem value="no_asistio">No asistio</SelectItem>
+                  <SelectItem value="inactivo">Inactivo</SelectItem>
+                  <SelectItem value="otro">Otro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label
+                htmlFor="priority-filter"
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Prioridad
+              </Label>
+              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                <SelectTrigger id="priority-filter" className="w-full">
+                  <SelectValue placeholder="Tipo prioridad" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tipo prioridad</SelectItem>
+                  <SelectItem value="red">Alta</SelectItem>
+                  <SelectItem value="yellow">Media</SelectItem>
+                  <SelectItem value="green">Baja</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label
                 htmlFor="scheduled-date-filter"
-                className="text-sm font-medium"
+                className="text-sm font-medium text-muted-foreground"
               >
                 Fecha agendada
               </Label>
@@ -934,6 +969,7 @@ export function ProspectManagement({
               <div className="flex gap-2">
                 <Button
                   type="button"
+                  size="sm"
                   variant="outline"
                   className="flex-1"
                   onClick={() =>
@@ -946,9 +982,46 @@ export function ProspectManagement({
                 </Button>
                 <Button
                   type="button"
+                  size="sm"
                   variant="ghost"
                   className="flex-1"
                   onClick={() => setScheduledDateFilter("")}
+                >
+                  Limpiar
+                </Button>
+              </div>
+            </div>
+             <div className="space-y-2">
+              <Label
+                htmlFor="contact-date-filter"
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Fecha de contacto
+              </Label>
+              <Input
+                id="contact-date-filter"
+                type="date"
+                value={contactDateFilter}
+                onChange={(event) => setContactDateFilter(event.target.value)}
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() =>
+                    setContactDateFilter(new Date().toISOString().split("T")[0])
+                  }
+                >
+                  Hoy
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={() => setContactDateFilter("")}
                 >
                   Limpiar
                 </Button>

@@ -118,7 +118,8 @@ function toLocalMidnight(d: Date) {
   x.setHours(0, 0, 0, 0);
   return x;
 }
-function parseDateSafe(s: string) {
+function parseDateSafe(s?: string | null) {
+  if (!s) return null;
   const d = new Date(`${s}T00:00:00`);
   return isNaN(d.getTime()) ? null : d;
 }
