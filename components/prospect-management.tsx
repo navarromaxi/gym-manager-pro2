@@ -91,32 +91,130 @@ const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
 
 const PROSPECTS_PER_BATCH = 10;
 
-const normalizeDateString = (value?: string | null) => {
+type ParsedDateParts = {
+  day: number;
+  month: number;
+  year?: number;
+};
+
+const isValidDayMonth = (day: number, month: number) => {
+  if (!Number.isInteger(day) || !Number.isInteger(month)) {
+    return false;
+  }
+
+  return day >= 1 && day <= 31 && month >= 1 && month <= 12;
+};
+
+const normalizeTwoDigitYear = (year: number) => {
+  const currentYear = new Date().getFullYear();
+  const currentCentury = Math.floor(currentYear / 100) * 100;
+  const pivot = (currentYear % 100) + 20;
+
+  if (year >= pivot % 100) {
+    return currentCentury - 100 + year;
+  }
+
+  return currentCentury + year;
+};
+
+const parseDateParts = (value?: string | null): ParsedDateParts | null => {
   if (!value) return null;
 
   const trimmed = value.trim();
   if (!trimmed) return null;
 
-  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const primaryPart = trimmed.replace("T", " ").split(" ")[0];
+
+  const isoMatch = primaryPart.match(/^([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})$/);
   if (isoMatch) {
     const [, year, month, day] = isoMatch;
-    return `${year}-${month}-${day}`;
+    const dayNumber = Number(day);
+    const monthNumber = Number(month);
+    if (!isValidDayMonth(dayNumber, monthNumber)) return null;
+    return {
+      year: Number(year),
+      month: monthNumber,
+      day: dayNumber,
+    };
   }
 
-  const slashMatch = trimmed.match(
-    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/
+  const isoSlashMatch = primaryPart.match(
+    /^([0-9]{4})\/([0-9]{1,2})\/([0-9]{1,2})$/
   );
-  if (slashMatch) {
-    const [, day, month, year] = slashMatch;
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  if (isoSlashMatch) {
+    const [, year, month, day] = isoSlashMatch;
+    const dayNumber = Number(day);
+    const monthNumber = Number(month);
+    if (!isValidDayMonth(dayNumber, monthNumber)) return null;
+    return {
+      year: Number(year),
+      month: monthNumber,
+      day: dayNumber,
+    };
   }
 
-  const parsed = new Date(trimmed);
-  if (!Number.isNaN(parsed.getTime())) {
-    const year = parsed.getFullYear();
-    const month = String(parsed.getMonth() + 1).padStart(2, "0");
-    const day = String(parsed.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+  const dayFirstSlashMatch = primaryPart.match(
+    /^([0-9]{1,2})\/([0-9]{1,2})(?:\/([0-9]{2,4}))?$/
+  );
+  if (dayFirstSlashMatch) {
+    const [, day, month, year] = dayFirstSlashMatch;
+    const dayNumber = Number(day);
+    const monthNumber = Number(month);
+    if (!isValidDayMonth(dayNumber, monthNumber)) return null;
+    const parsedYear =
+      year && year.length === 2
+        ? normalizeTwoDigitYear(Number(year))
+        : year
+        ? Number(year)
+        : undefined;
+    return {
+      year: parsedYear,
+      month: monthNumber,
+      day: dayNumber,
+    };
+  }
+
+  const dayFirstDashMatch = primaryPart.match(
+    /^([0-9]{1,2})-([0-9]{1,2})(?:-([0-9]{2,4}))?$/
+  );
+   if (dayFirstDashMatch) {
+    const [, day, month, year] = dayFirstDashMatch;
+    const dayNumber = Number(day);
+    const monthNumber = Number(month);
+    if (!isValidDayMonth(dayNumber, monthNumber)) return null;
+    const parsedYear =
+      year && year.length === 2
+        ? normalizeTwoDigitYear(Number(year))
+        : year
+        ? Number(year)
+        : undefined;
+    return {
+      year: parsedYear,
+      month: monthNumber,
+      day: dayNumber,
+    };
+  }
+
+  const compactIsoMatch = primaryPart.match(/^([0-9]{4})([0-9]{2})([0-9]{2})$/);
+  if (compactIsoMatch) {
+    const [, year, month, day] = compactIsoMatch;
+    const dayNumber = Number(day);
+    const monthNumber = Number(month);
+    if (!isValidDayMonth(dayNumber, monthNumber)) return null;
+    return {
+      year: Number(year),
+      month: monthNumber,
+      day: dayNumber,
+    };
+  }
+
+  const parsedDate = new Date(primaryPart);
+  if (!Number.isNaN(parsedDate.getTime())) {
+    return {
+      year: parsedDate.getFullYear(),
+      month: parsedDate.getMonth() + 1,
+      day: parsedDate.getDate(),
+    };
   }
 
   return null;
@@ -128,13 +226,35 @@ const areDatesEquivalent = (
 ) => {
   if (!filterValue) return true;
 
-  const normalizedFilter = normalizeDateString(filterValue);
-  if (!normalizedFilter) return true;
+ const filterParts = parseDateParts(filterValue);
+  if (!filterParts) return true;
 
-  const normalizedCandidate = normalizeDateString(candidate);
-  if (!normalizedCandidate) return false;
+  const candidateParts = parseDateParts(candidate);
+  if (!candidateParts) return false;
 
-  return normalizedCandidate === normalizedFilter;
+  const sameDay = candidateParts.day === filterParts.day;
+  const sameMonth = candidateParts.month === filterParts.month;
+
+   if (!sameDay || !sameMonth) {
+    return false;
+  }
+
+  if (typeof filterParts.year !== "number") {
+    return true;
+  }
+
+  if (typeof candidateParts.year !== "number") {
+    return true;
+  }
+
+  return candidateParts.year === filterParts.year;
+};
+
+const formatFilterDate = (date: Date) => {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
 };
 
 export function ProspectManagement({
@@ -1042,7 +1162,7 @@ export function ProspectManagement({
                 </Button>
               </div>
             </div>
-             <div className="space-y-2">
+            <div className="space-y-2">
               <Label
                 htmlFor="contact-date-filter"
                 className="text-sm font-medium text-muted-foreground"
@@ -1051,9 +1171,16 @@ export function ProspectManagement({
               </Label>
               <Input
                 id="contact-date-filter"
-                type="date"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="dd/mm o dd/mm/aaaa"
                 value={contactDateFilter}
-                onChange={(event) => setContactDateFilter(event.target.value)}
+                 onChange={(event) =>
+                  setContactDateFilter(
+                    event.target.value.replace(/[^0-9/\-: ]/g, "")
+                  )
+                }
               />
               <div className="flex gap-2">
                 <Button
@@ -1062,7 +1189,7 @@ export function ProspectManagement({
                   variant="outline"
                   className="flex-1"
                   onClick={() =>
-                    setContactDateFilter(new Date().toISOString().split("T")[0])
+                    setContactDateFilter(formatFilterDate(new Date()))
                   }
                 >
                   Hoy
