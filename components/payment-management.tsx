@@ -710,6 +710,12 @@ export function PaymentManagement({
       ? plans.find((p) => p.name === selectedMember?.plan)
       : plans.find((p) => p.id === newPayment.planId);
   const balanceDueActual = selectedMember?.balance_due || 0;
+  const remainingBalance = Math.max(balanceDueActual - newPayment.amount, 0);
+  const shouldAskNextInstallmentDue =
+    newPayment.type === "existing_plan" &&
+    balanceDueActual > 0 &&
+    newPayment.amount > 0 &&
+    remainingBalance > 0;
   const maxPlanAmount =
     newPayment.type === "new_plan" && selectedPlan
       ? planContract
@@ -727,6 +733,10 @@ export function PaymentManagement({
       ? newPayment.installments === 1
         ? calculatedPlanEndDate
         : newPayment.nextInstallmentDue || calculatedPlanEndDate
+        : newPayment.type === "existing_plan"
+      ? newPayment.nextInstallmentDue ||
+        selectedMember?.next_installment_due ||
+        ""
       : "";
 
   useEffect(() => {
@@ -926,6 +936,16 @@ export function PaymentManagement({
           return;
         }
 
+        const newBalance = balanceDueActual - newPayment.amount;
+        if (
+          newBalance > 0 &&
+          (!newPayment.nextInstallmentDue ||
+            newPayment.nextInstallmentDue.trim() === "")
+        ) {
+          alert("Debes ingresar el vencimiento de la próxima cuota");
+          return;
+        }
+
         if (planContract && contractTable) {
           const { error: contractError } = await supabase
             .from(contractTable)
@@ -974,13 +994,13 @@ export function PaymentManagement({
           .insert([payment]);
         if (paymentError) throw paymentError;
 
-        const newBalance = balanceDueActual - newPayment.amount;
-
         const { error: memberError } = await supabase
           .from("members")
           .update({
             balance_due: Math.max(newBalance, 0),
             last_payment: newPayment.date,
+            next_installment_due:
+              newBalance > 0 ? newPayment.nextInstallmentDue : null,
             status: "active",
           })
           .eq("id", selectedMember.id);
@@ -990,6 +1010,8 @@ export function PaymentManagement({
           ...selectedMember,
           balance_due: Math.max(newBalance, 0),
           last_payment: newPayment.date,
+          next_installment_due:
+            newBalance > 0 ? newPayment.nextInstallmentDue : null,
           status: "active" as const,
         };
 
@@ -1509,13 +1531,36 @@ export function PaymentManagement({
                       {newPayment.amount > 0 && (
                         <p className="text-xs text-muted-foreground">
                           Saldo restante: $
-                          {Math.max(
-                            balanceDueActual - newPayment.amount,
-                            0
-                          ).toLocaleString()}
+                           {remainingBalance.toLocaleString()}
                         </p>
                       )}
                     </div>
+                    {shouldAskNextInstallmentDue && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="existingNextInstallmentDue">
+                          Vencimiento próxima cuota
+                        </Label>
+                        <Input
+                          id="existingNextInstallmentDue"
+                          type="date"
+                          value={
+                            newPayment.nextInstallmentDue ||
+                            selectedMember.next_installment_due ||
+                            ""
+                          }
+                          onChange={(e) =>
+                            setNewPayment({
+                              ...newPayment,
+                              nextInstallmentDue: e.target.value,
+                            })
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Define el nuevo vencimiento para la próxima cuota
+                          pendiente.
+                        </p>
+                      </div>
+                    )}
                   </>
                 )}
 
@@ -1716,11 +1761,16 @@ export function PaymentManagement({
                         </p>
                         <p className="mt-1 text-xs">
                           Saldo restante: $
-                          {Math.max(
-                            balanceDueActual - newPayment.amount,
-                            0
-                          ).toLocaleString()}
+                          {remainingBalance.toLocaleString()}
                         </p>
+                         {shouldAskNextInstallmentDue &&
+                          newPayment.nextInstallmentDue && (
+                            <p className="text-xs text-muted-foreground">
+                              Próximo vencimiento:
+                              {" "}
+                              {newPayment.nextInstallmentDue}
+                            </p>
+                          )}
                       </div>
                     </div>
                   )}
@@ -1768,7 +1818,9 @@ export function PaymentManagement({
                       !newPayment.startDate ||
                       !newPayment.amount
                     : newPayment.type === "existing_plan"
-                    ? newPayment.amount <= 0
+                    ? newPayment.amount <= 0 ||
+                      (shouldAskNextInstallmentDue &&
+                        !newPayment.nextInstallmentDue)
                     : !newPayment.description || !newPayment.amount)
                 }
               >
