@@ -177,7 +177,7 @@ const parseDateParts = (value?: string | null): ParsedDateParts | null => {
   const dayFirstDashMatch = primaryPart.match(
     /^([0-9]{1,2})-([0-9]{1,2})(?:-([0-9]{2,4}))?$/
   );
-   if (dayFirstDashMatch) {
+  if (dayFirstDashMatch) {
     const [, day, month, year] = dayFirstDashMatch;
     const dayNumber = Number(day);
     const monthNumber = Number(month);
@@ -226,7 +226,7 @@ const areDatesEquivalent = (
 ) => {
   if (!filterValue) return true;
 
- const filterParts = parseDateParts(filterValue);
+  const filterParts = parseDateParts(filterValue);
   if (!filterParts) return true;
 
   const candidateParts = parseDateParts(candidate);
@@ -235,7 +235,7 @@ const areDatesEquivalent = (
   const sameDay = candidateParts.day === filterParts.day;
   const sameMonth = candidateParts.month === filterParts.month;
 
-   if (!sameDay || !sameMonth) {
+  if (!sameDay || !sameMonth) {
     return false;
   }
 
@@ -248,6 +248,76 @@ const areDatesEquivalent = (
   }
 
   return candidateParts.year === filterParts.year;
+};
+
+const createDateFromParts = (parts?: ParsedDateParts | null) => {
+  if (!parts) return null;
+  if (typeof parts.year !== "number") return null;
+
+  const date = new Date(parts.year, parts.month - 1, parts.day);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const isWithinContactDateRange = (
+  candidate?: string | null,
+  range?: string | null
+) => {
+  if (!range || range === "all-history") {
+    return true;
+  }
+
+  const candidateDate = createDateFromParts(parseDateParts(candidate));
+  if (!candidateDate) {
+    return false;
+  }
+
+  const today = new Date();
+  const startOfToday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate()
+  );
+
+  switch (range) {
+    case "current-month": {
+      return (
+        candidateDate.getFullYear() === today.getFullYear() &&
+        candidateDate.getMonth() === today.getMonth()
+      );
+    }
+    case "previous-month": {
+      const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      return (
+        candidateDate.getFullYear() === previousMonth.getFullYear() &&
+        candidateDate.getMonth() === previousMonth.getMonth()
+      );
+    }
+    case "last-3-months": {
+      const startDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+      return candidateDate >= startDate && candidateDate <= startOfToday;
+    }
+    case "last-6-months": {
+      const startDate = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+      return candidateDate >= startDate && candidateDate <= startOfToday;
+    }
+    case "current-year": {
+      const startDate = new Date(today.getFullYear(), 0, 1);
+      return candidateDate >= startDate && candidateDate <= startOfToday;
+    }
+    case "previous-year": {
+      const startDate = new Date(today.getFullYear() - 1, 0, 1);
+      const endDate = new Date(today.getFullYear() - 1, 11, 31);
+      endDate.setHours(23, 59, 59, 999);
+      return candidateDate >= startDate && candidateDate <= endDate;
+    }
+    default:
+      return true;
+  }
 };
 
 export function ProspectManagement({
@@ -273,6 +343,8 @@ export function ProspectManagement({
   const [priorityFilter, setPriorityFilter] = useState("all"); // Nuevo estado para el filtro de prioridad
   const [scheduledDateFilter, setScheduledDateFilter] = useState(""); // estado para el filtro de fecha
   const [contactDateFilter, setContactDateFilter] = useState("");
+  const [contactDateRangeFilter, setContactDateRangeFilter] =
+    useState("all-history");
   const [newProspect, setNewProspect] = useState({
     name: "",
     email: "",
@@ -486,17 +558,22 @@ export function ProspectManagement({
       prospect.contact_date,
       contactDateFilter
     );
+    const matchesContactDateRange = isWithinContactDateRange(
+      prospect.contact_date,
+      contactDateRangeFilter
+    );
     const matchesScheduledDate = areDatesEquivalent(
       prospect.scheduled_date,
       scheduledDateFilter
     );
-    
+
     return (
       matchesSearch &&
       matchesStatus &&
       matchesPriority &&
       matchesScheduledDate &&
-      matchesContactDate
+      matchesContactDate &&
+      matchesContactDateRange
     );
   });
 
@@ -508,6 +585,7 @@ export function ProspectManagement({
     priorityFilter,
     scheduledDateFilter,
     contactDateFilter,
+    contactDateRangeFilter,
   ]);
 
   const sortedProspects = [...filteredProspects].sort((a, b) => {
@@ -1063,7 +1141,7 @@ export function ProspectManagement({
                 Buscar
               </Label>
               <div className="relative">
-                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="prospect-search"
                   placeholder="Buscar por nombre, email o notas..."
@@ -1166,9 +1244,7 @@ export function ProspectManagement({
                 id="contact-date-filter"
                 type="date"
                 value={contactDateFilter}
-                  onChange={(event) =>
-                  setContactDateFilter(event.target.value)
-                }
+                onChange={(event) => setContactDateFilter(event.target.value)}
               />
               <div className="flex gap-2">
                 <Button
@@ -1177,9 +1253,7 @@ export function ProspectManagement({
                   variant="outline"
                   className="flex-1"
                   onClick={() =>
-                    setContactDateFilter(
-                      new Date().toISOString().split("T")[0]
-                    )
+                    setContactDateFilter(new Date().toISOString().split("T")[0])
                   }
                 >
                   Hoy
@@ -1194,6 +1268,34 @@ export function ProspectManagement({
                   Limpiar
                 </Button>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label
+                htmlFor="contact-date-range-filter"
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Rango temporal
+              </Label>
+              <Select
+                value={contactDateRangeFilter}
+                onValueChange={setContactDateRangeFilter}
+              >
+                <SelectTrigger
+                  id="contact-date-range-filter"
+                  className="w-full"
+                >
+                  <SelectValue placeholder="Rango temporal" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="current-month">Este mes</SelectItem>
+                  <SelectItem value="previous-month">Mes anterior</SelectItem>
+                  <SelectItem value="last-3-months">Últimos 3 meses</SelectItem>
+                  <SelectItem value="last-6-months">Últimos 6 meses</SelectItem>
+                  <SelectItem value="current-year">Todo el año</SelectItem>
+                  <SelectItem value="previous-year">Año anterior</SelectItem>
+                  <SelectItem value="all-history">Todo el historial</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
@@ -1231,7 +1333,11 @@ export function ProspectManagement({
                       <TableCell>{prospect.email}</TableCell>
                       <TableCell>{prospect.phone}</TableCell>
                       <TableCell>
-                        {new Date(prospect.contact_date).toLocaleDateString()}
+                         {prospect.contact_date
+                          ? new Date(
+                              `${prospect.contact_date}T00:00:00`
+                            ).toLocaleDateString()
+                          : "-"}
                       </TableCell>
                       <TableCell className="max-w-xs truncate">
                         {prospect.interest}
