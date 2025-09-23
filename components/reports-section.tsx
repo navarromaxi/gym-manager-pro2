@@ -450,6 +450,9 @@ const isWithinPeriod = (date: Date) => {
   const creditCardPayments = filteredPayments.filter(
     (p) => p.method === "Tarjeta de Crédito"
   );
+  const debitCardPayments = filteredPayments.filter(
+    (p) => p.method === "Tarjeta de Débito"
+  );
 
   const cardBrands = [
     "VISA",
@@ -461,31 +464,46 @@ const isWithinPeriod = (date: Date) => {
     "MERCADO PAGO",
   ];
 
-  const creditCardStats = creditCardPayments.reduce(
-    (acc, payment) => {
-      const brand =
-        pick(payment as any, "card_brand", "cardBrand") || "Otra";
-      if (!acc[brand]) acc[brand] = { count: 0, amount: 0 };
-      acc[brand].count += 1;
-      acc[brand].amount += payment.amount;
-      return acc;
-    },
-    {} as Record<string, { count: number; amount: number }>
-  );
+   const buildCardStats = (paymentsList: Payment[]) =>
+    paymentsList.reduce(
+      (acc, payment) => {
+        const brand =
+          pick(payment as any, "card_brand", "cardBrand") || "Otra";
+        if (!acc[brand]) acc[brand] = { count: 0, amount: 0 };
+        acc[brand].count += 1;
+        acc[brand].amount += payment.amount;
+        return acc;
+      },
+      {} as Record<string, { count: number; amount: number }>
+    );
 
-  const creditCardDistribution = cardBrands.map((brand) => ({
-    brand,
-    count: creditCardStats[brand]?.count || 0,
-    amount: creditCardStats[brand]?.amount || 0,
-    percentage:
-      creditCardPayments.length > 0
-        ? Math.round(
-            ((creditCardStats[brand]?.count || 0) /
-              creditCardPayments.length) *
-              100
-          )
-        : 0,
-  }));
+  const buildCardDistribution = (
+    stats: Record<string, { count: number; amount: number }>,
+    totalPayments: number
+  ) =>
+    cardBrands.map((brand) => ({
+      brand,
+      count: stats[brand]?.count || 0,
+      amount: stats[brand]?.amount || 0,
+      percentage:
+        totalPayments > 0
+          ? Math.round(
+              ((stats[brand]?.count || 0) / totalPayments) * 100
+            )
+          : 0,
+    }));
+
+  const creditCardStats = buildCardStats(creditCardPayments);
+  const debitCardStats = buildCardStats(debitCardPayments);
+
+  const creditCardDistribution = buildCardDistribution(
+    creditCardStats,
+    creditCardPayments.length
+  );
+  const debitCardDistribution = buildCardDistribution(
+    debitCardStats,
+    debitCardPayments.length
+  );
 
   const last6MonthsIncome = Array.from({ length: 6 }, (_, i) => {
     const date = new Date();
@@ -933,7 +951,7 @@ const isWithinPeriod = (date: Date) => {
       </Card>
 
       {/* Plan Distribution */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader>
             <CardTitle>Distribución por Planes</CardTitle>
@@ -993,6 +1011,32 @@ const isWithinPeriod = (date: Date) => {
                   </div>
                 )
               )}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Pagos con Débito - {getTimeFilterLabel()}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {debitCardDistribution.map((item) => (
+                <div
+                  key={item.brand}
+                  className="flex items-center justify-between"
+                >
+                  <span className="font-medium">{item.brand}</span>
+                  <div className="flex items-center space-x-4">
+                    <span className="text-sm text-muted-foreground">
+                      {item.count} pagos
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      ${item.amount.toLocaleString()}
+                    </span>
+                    <Badge variant="outline">{item.percentage}%</Badge>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
