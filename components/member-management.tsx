@@ -679,10 +679,30 @@ export function MemberManagement({
   const getMembersToFollowUp = () => {
     const today = new Date();
     return members.filter((member) => {
-      const joinDate = toLocalDate(member.join_date);
-      if (Number.isNaN(joinDate.getTime())) return false;
+      let referenceDate: Date | null = null;
+
+      for (const payment of payments) {
+        if (
+          payment.member_id === member.id &&
+          payment.type === "plan" &&
+          payment.start_date
+        ) {
+          const startDate = toLocalDate(payment.start_date);
+          if (Number.isNaN(startDate.getTime())) continue;
+          if (!referenceDate || startDate.getTime() > referenceDate.getTime()) {
+            referenceDate = startDate;
+          }
+        }
+      }
+
+      if (!referenceDate) {
+        const joinDate = toLocalDate(member.join_date);
+        if (Number.isNaN(joinDate.getTime())) return false;
+        referenceDate = joinDate;
+      }
+
       const diffDays = Math.floor(
-        (today.getTime() - joinDate.getTime()) / 86400000
+        (today.getTime() - referenceDate.getTime()) / 86400000
       );
       return !member.followed_up && diffDays >= 5 && diffDays <= 12;
     });
