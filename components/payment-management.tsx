@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,8 @@ export function PaymentManagement({
     installments: 1,
     nextInstallmentDue: new Date().toLocaleDateString("en-CA"),
   });
+  const previousInstallmentsRef = useRef(newPayment.installments);
+  const previousPlanIdRef = useRef(newPayment.planId);
   const [planContract, setPlanContract] = useState<PlanContract | null>(null);
   const [methodFilter, setMethodFilter] = useState("all");
   const [installmentFilter, setInstallmentFilter] = useState("all");
@@ -147,7 +149,6 @@ export function PaymentManagement({
     "TARJETA D",
     "MERCADO PAGO",
   ];
-
 
   const getPlanPrice = (payment: Payment) => {
     if (payment.plan_id) {
@@ -608,7 +609,7 @@ export function PaymentManagement({
         const nextDueRaw =
           insight?.nextInstallmentDue ?? member?.next_installment_due ?? null;
         const dueDate = parseDueDate(nextDueRaw);
-         const latestEffectiveDate = latestPlanPaymentByMember.get(
+        const latestEffectiveDate = latestPlanPaymentByMember.get(
           payment.member_id
         );
         const isLatestPlanPayment =
@@ -635,7 +636,7 @@ export function PaymentManagement({
             today.setHours(0, 0, 0, 0);
             const limitDate = new Date(today);
             limitDate.setDate(limitDate.getDate() + 10);
-           const planEndingSoon =
+            const planEndingSoon =
               isLatestPlanPayment &&
               !!planEndDate &&
               planEndDate >= today &&
@@ -653,10 +654,8 @@ export function PaymentManagement({
           case "overdue": {
             const reference = new Date();
             reference.setHours(0, 0, 0, 0);
-             const planExpired =
-              isLatestPlanPayment &&
-              !!planEndDate &&
-              planEndDate < reference;
+            const planExpired =
+              isLatestPlanPayment && !!planEndDate && planEndDate < reference;
 
             const installmentOverdue =
               isLatestPlanPayment &&
@@ -729,6 +728,36 @@ export function PaymentManagement({
         ? calculatedPlanEndDate
         : newPayment.nextInstallmentDue || calculatedPlanEndDate
       : "";
+
+  useEffect(() => {
+    const prevInstallments = previousInstallmentsRef.current;
+    const prevPlanId = previousPlanIdRef.current;
+    const planChanged =
+      newPayment.type === "new_plan" &&
+      newPayment.planId &&
+      newPayment.planId !== prevPlanId;
+
+    if (
+      newPayment.type === "new_plan" &&
+      selectedPlan &&
+      newPayment.installments === 1 &&
+      (newPayment.amount === 0 || prevInstallments !== 1 || planChanged)
+    ) {
+      setNewPayment((prev) => ({
+        ...prev,
+        amount: selectedPlan.price,
+      }));
+    }
+
+    previousInstallmentsRef.current = newPayment.installments;
+    previousPlanIdRef.current = newPayment.planId;
+  }, [
+    newPayment.amount,
+    newPayment.installments,
+    newPayment.planId,
+    newPayment.type,
+    selectedPlan,
+  ]);
 
   // FUNCIÓN ACTUALIZADA PARA REGISTRAR PAGO Y RENOVAR SOCIO
   const handleAddPayment = async () => {
@@ -1066,7 +1095,7 @@ export function PaymentManagement({
         amount: editPaymentData.amount,
         date: editPaymentData.date,
         method: editPaymentData.method,
-         card_brand: ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+        card_brand: ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
           editPaymentData.method
         )
           ? editPaymentData.cardBrand
@@ -1202,7 +1231,7 @@ export function PaymentManagement({
               Registrar Pago
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[900px]">
             <DialogHeader>
               <DialogTitle>Registrar Pago de Socio</DialogTitle>
               <DialogDescription>
@@ -1210,159 +1239,162 @@ export function PaymentManagement({
                 renovará automáticamente.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
-              {/* BUSCADOR DE SOCIOS */}
-              <div className="grid gap-2">
-                <Label htmlFor="member-search">Buscar Socio</Label>
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="member-search"
-                    placeholder="Buscar por nombre..."
-                    value={memberSearchTerm}
-                    onChange={(e) => setMemberSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
-                </div>
-                {memberSearchTerm && (
-                  <div className="max-h-32 overflow-y-auto border rounded-md">
-                    {filteredMembersForSearch.length > 0 ? (
-                      filteredMembersForSearch.map((member) => (
-                        <div
-                          key={member.id}
-                          className={`p-2 cursor-pointer transition-colors border-b last:border-b-0 hover:bg-blue-500/10 dark:hover:bg-blue-500/30 ${
-                            newPayment.memberId === member.id
-                              ? "bg-blue-500/20 dark:bg-blue-500/40"
-                              : ""
-                          }`}
-                          onClick={() => {
-                            setNewPayment({
-                              ...newPayment,
-                              memberId: member.id,
-                              planId: "",
-                              installments: 1,
-                              nextInstallmentDue:
-                                member.next_installment_due ||
-                                new Date().toLocaleDateString("en-CA"),
-                            });
-                            setMemberSearchTerm(member.name);
-                            setPlanContract(null);
-                          }}
-                        >
-                          <div className="font-medium">{member.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Plan actual: {member.plan} - Estado: {member.status}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-2 text-sm text-muted-foreground">
-                        No se encontraron socios
-                      </div>
-                    )}
+            <div className="max-h-[80vh] overflow-y-auto pr-2">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {/* BUSCADOR DE SOCIOS */}
+                <div className="grid gap-2 md:col-span-2 xl:col-span-3">
+                  <Label htmlFor="member-search">Buscar Socio</Label>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="member-search"
+                      placeholder="Buscar por nombre..."
+                      value={memberSearchTerm}
+                      onChange={(e) => setMemberSearchTerm(e.target.value)}
+                      className="pl-8"
+                    />
                   </div>
-                )}
-              </div>
+                  {memberSearchTerm && (
+                    <div className="max-h-32 overflow-y-auto border rounded-md">
+                      {filteredMembersForSearch.length > 0 ? (
+                        filteredMembersForSearch.map((member) => (
+                          <div
+                            key={member.id}
+                            className={`p-2 cursor-pointer transition-colors border-b last:border-b-0 hover:bg-blue-500/10 dark:hover:bg-blue-500/30 ${
+                              newPayment.memberId === member.id
+                                ? "bg-blue-500/20 dark:bg-blue-500/40"
+                                : ""
+                            }`}
+                            onClick={() => {
+                              setNewPayment({
+                                ...newPayment,
+                                memberId: member.id,
+                                planId: "",
+                                installments: 1,
+                                nextInstallmentDue:
+                                  member.next_installment_due ||
+                                  new Date().toLocaleDateString("en-CA"),
+                              });
+                              setMemberSearchTerm(member.name);
+                              setPlanContract(null);
+                            }}
+                          >
+                            <div className="font-medium">{member.name}</div>
+                            <div className="text-sm text-muted-foreground">
+                              Plan actual: {member.plan} - Estado:{" "}
+                              {member.status}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-2 text-sm text-muted-foreground">
+                          No se encontraron socios
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-              {/* TIPO DE PAGO */}
-              <div className="grid gap-2">
-                <Label htmlFor="plan">Pago de:</Label>
-                <Select
-                  value={newPayment.type}
-                  onValueChange={(value) => {
-                    setNewPayment({
-                      ...newPayment,
-                      type: value as "new_plan" | "existing_plan" | "product",
-                      planId: "",
-                      description: "",
-                      amount: 0,
-                      installments: 1,
-                      nextInstallmentDue: new Date().toLocaleDateString(
-                        "en-CA"
-                      ),
-                    });
-                    setPlanContract(null);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="new_plan">Nuevo plan</SelectItem>
-                    <SelectItem value="existing_plan">
-                      Plan existente
-                    </SelectItem>
-                    <SelectItem value="product">Producto</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                {/* TIPO DE PAGO */}
+                <div className="grid gap-2">
+                  <Label htmlFor="plan">Pago de:</Label>
+                  <Select
+                    value={newPayment.type}
+                    onValueChange={(value) => {
+                      setNewPayment({
+                        ...newPayment,
+                        type: value as "new_plan" | "existing_plan" | "product",
+                        planId: "",
+                        description: "",
+                        amount: 0,
+                        installments: 1,
+                        nextInstallmentDue: new Date().toLocaleDateString(
+                          "en-CA"
+                        ),
+                      });
+                      setPlanContract(null);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new_plan">Nuevo plan</SelectItem>
+                      <SelectItem value="existing_plan">
+                        Plan existente
+                      </SelectItem>
+                      <SelectItem value="product">Producto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              {/* SELECCIÓN DE PLAN */}
-              {newPayment.type === "new_plan" && (
-                <>
-                  <div className="grid gap-2">
-                    <Label htmlFor="plan">Nuevo Plan</Label>
-                    <Select
-                      value={newPayment.planId}
-                      onValueChange={async (value) => {
-                        const selectedPlanOption = plans.find(
-                          (plan) => plan.id === value
-                        );
-                        const computedNext = calculatePlanEndDate(
-                          newPayment.startDate,
-                          selectedPlanOption
-                        );
-                        setNewPayment({
-                          ...newPayment,
-                          planId: value,
-                          installments: 1,
-                          nextInstallmentDue: computedNext,
-                        });
-                        if (newPayment.memberId && contractTable) {
-                          let { data, error } = await supabase
-                            .from(contractTable)
-                            .select("*")
-                            .eq("member_id", newPayment.memberId)
-                            .eq("plan_id", value)
-                            .single();
-                          if (error) {
-                            const fallback = await supabase
-                              .from("plan_contract")
+                {/* SELECCIÓN DE PLAN */}
+                {newPayment.type === "new_plan" && (
+                  <>
+                    <div className="grid gap-2 md:col-span-2 xl:col-span-3">
+                      <Label htmlFor="plan">Nuevo Plan</Label>
+                      <Select
+                        value={newPayment.planId}
+                        onValueChange={async (value) => {
+                          const selectedPlanOption = plans.find(
+                            (plan) => plan.id === value
+                          );
+                          const computedNext = calculatePlanEndDate(
+                            newPayment.startDate,
+                            selectedPlanOption
+                          );
+                          setNewPayment({
+                            ...newPayment,
+                            planId: value,
+                            installments: 1,
+                            nextInstallmentDue: computedNext,
+                          });
+                          if (newPayment.memberId && contractTable) {
+                            let { data, error } = await supabase
+                              .from(contractTable)
                               .select("*")
                               .eq("member_id", newPayment.memberId)
                               .eq("plan_id", value)
                               .single();
-                            data = fallback.data;
+                            if (error) {
+                              const fallback = await supabase
+                                .from("plan_contract")
+                                .select("*")
+                                .eq("member_id", newPayment.memberId)
+                                .eq("plan_id", value)
+                                .single();
+                              data = fallback.data;
+                            }
+                            setPlanContract(data ?? null);
+                            if (data) {
+                              setNewPayment((prev) => ({
+                                ...prev,
+                                installments: data.installments_total,
+                                nextInstallmentDue:
+                                  prev.nextInstallmentDue ||
+                                  selectedMember?.next_installment_due ||
+                                  computedNext,
+                              }));
+                            }
+                          } else {
+                            setPlanContract(null);
                           }
-                          setPlanContract(data ?? null);
-                          if (data) {
-                            setNewPayment((prev) => ({
-                              ...prev,
-                              installments: data.installments_total,
-                              nextInstallmentDue:
-                                prev.nextInstallmentDue ||
-                                selectedMember?.next_installment_due ||
-                                computedNext,
-                            }));
-                          }
-                        } else {
-                          setPlanContract(null);
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona el plan a renovar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {plans
-                          .filter((plan) => plan.is_active)
-                          .map((plan) => (
-                            <SelectItem key={plan.id} value={plan.id}>
-                              {plan.name} - ${plan.price.toLocaleString()}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona el plan a renovar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {plans
+                            .filter((plan) => plan.is_active)
+                            .map((plan) => (
+                              <SelectItem key={plan.id} value={plan.id}>
+                                {plan.name} - ${plan.price.toLocaleString()}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     {newPayment.planId && !planContract && (
                       <div className="grid gap-2">
                         <Label htmlFor="installments">Cantidad de cuotas</Label>
@@ -1397,20 +1429,76 @@ export function PaymentManagement({
                       </div>
                     )}
                     {newPayment.planId && planContract && (
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
                         Cuotas pagadas: {planContract.installments_paid} /{" "}
                         {planContract.installments_total}
                       </div>
                     )}
-                  </div>
-                  {newPayment.planId && (
+                    {newPayment.planId && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="amount">Monto</Label>
+                        <Input
+                          id="amount"
+                          type="number"
+                          value={newPayment.amount}
+                          max={maxPlanAmount}
+                          onChange={(e) =>
+                            setNewPayment({
+                              ...newPayment,
+                              amount: Number(e.target.value),
+                            })
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Monto máximo: ${maxPlanAmount.toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                    {newPayment.planId && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="nextInstallmentDue">
+                          Vencimiento próxima cuota
+                        </Label>
+                        <Input
+                          id="nextInstallmentDue"
+                          type="date"
+                          value={nextInstallmentDueValue}
+                          onChange={(e) =>
+                            setNewPayment({
+                              ...newPayment,
+                              nextInstallmentDue: e.target.value,
+                            })
+                          }
+                          disabled={newPayment.installments === 1}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {newPayment.installments === 1
+                            ? "Se utilizará la misma fecha que el fin del plan."
+                            : "Registra cuándo debería abonarse la próxima cuota."}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* PAGO DE PLAN EXISTENTE */}
+                {newPayment.type === "existing_plan" && selectedMember && (
+                  <>
                     <div className="grid gap-2">
-                      <Label htmlFor="amount">Monto</Label>
+                      <Label>Plan actual</Label>
+                      <Input value={selectedMember.plan} disabled />
+                      <p className="text-xs text-muted-foreground">
+                        Saldo actual: ${balanceDueActual.toLocaleString()}
+                      </p>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="amount">Monto a abonar</Label>
                       <Input
                         id="amount"
                         type="number"
                         value={newPayment.amount}
-                        max={maxPlanAmount}
+                        max={balanceDueActual}
                         onChange={(e) =>
                           setNewPayment({
                             ...newPayment,
@@ -1418,308 +1506,251 @@ export function PaymentManagement({
                           })
                         }
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Monto máximo: ${maxPlanAmount.toLocaleString()}
-                      </p>
+                      {newPayment.amount > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Saldo restante: $
+                          {Math.max(
+                            balanceDueActual - newPayment.amount,
+                            0
+                          ).toLocaleString()}
+                        </p>
+                      )}
                     </div>
-                  )}
-                  {newPayment.planId && (
-                    <div className="grid gap-2">
-                      <Label htmlFor="nextInstallmentDue">
-                        Vencimiento próxima cuota
-                      </Label>
-                      <Input
-                        id="nextInstallmentDue"
-                        type="date"
-                        value={nextInstallmentDueValue}
-                        onChange={(e) =>
-                          setNewPayment({
-                            ...newPayment,
-                            nextInstallmentDue: e.target.value,
-                          })
-                        }
-                        disabled={newPayment.installments === 1}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {newPayment.installments === 1
-                          ? "Se utilizará la misma fecha que el fin del plan."
-                          : "Registra cuándo debería abonarse la próxima cuota."}
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
+                  </>
+                )}
 
-              {/* PAGO DE PLAN EXISTENTE */}
-              {newPayment.type === "existing_plan" && selectedMember && (
-                <>
+                {/* CAMPOS DE PRODUCTO */}
+                {newPayment.type === "product" && (
                   <div className="grid gap-2">
-                    <Label>Plan actual</Label>
-                    <Input value={selectedMember.plan} disabled />
-                    <p className="text-xs text-muted-foreground">
-                      Saldo actual: ${balanceDueActual.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="amount">Monto a abonar</Label>
+                    <Label htmlFor="amount">Monto</Label>
                     <Input
                       id="amount"
                       type="number"
                       value={newPayment.amount}
-                      max={balanceDueActual}
                       onChange={(e) =>
                         setNewPayment({
                           ...newPayment,
-                          amount: Number(e.target.value),
+                          amount: parseFloat(e.target.value),
                         })
                       }
                     />
-                    {newPayment.amount > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Saldo restante: $
-                        {Math.max(
-                          balanceDueActual - newPayment.amount,
-                          0
-                        ).toLocaleString()}
-                      </p>
-                    )}
                   </div>
-                </>
-              )}
+                )}
 
-              {/* CAMPOS DE PRODUCTO */}
-              {newPayment.type === "product" && (
+                {/* MÉTODO DE PAGO */}
                 <div className="grid gap-2">
-                  <Label htmlFor="amount">Monto</Label>
+                  <Label htmlFor="method">Método de Pago</Label>
+                  <Select
+                    value={newPayment.method}
+                    onValueChange={(value) =>
+                      setNewPayment({ ...newPayment, method: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona método" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {paymentMethods.map((method) => (
+                        <SelectItem key={method} value={method}>
+                          {method}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                  newPayment.method
+                ) && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label htmlFor="cardBrand">Tipo de Tarjeta</Label>
+                      <Select
+                        value={newPayment.cardBrand}
+                        onValueChange={(value) =>
+                          setNewPayment({ ...newPayment, cardBrand: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona tarjeta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {cardBrands.map((brand) => (
+                            <SelectItem key={brand} value={brand}>
+                              {brand}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="cardInstallments">
+                        Número de cuotas en la tarjeta
+                      </Label>
+                      <Input
+                        id="cardInstallments"
+                        type="number"
+                        min={1}
+                        value={newPayment.cardInstallments}
+                        onChange={(e) =>
+                          setNewPayment({
+                            ...newPayment,
+                            cardInstallments: parseInt(e.target.value) || 1,
+                          })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* FECHA */}
+                <div className="grid gap-2">
+                  <Label htmlFor="date">Fecha del Pago</Label>
                   <Input
-                    id="amount"
-                    type="number"
-                    value={newPayment.amount}
+                    id="date"
+                    type="date"
+                    value={newPayment.date}
+                    onChange={(e) =>
+                      setNewPayment({ ...newPayment, date: e.target.value })
+                    }
+                  />
+                </div>
+
+                {newPayment.type === "new_plan" && (
+                  <div className="grid gap-2 md:col-span-2 xl:col-span-3">
+                    <Label htmlFor="startDate">Fecha de inicio del plan</Label>
+                    <Input
+                      id="startDate"
+                      type="date"
+                      value={newPayment.startDate}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const computedNext = calculatePlanEndDate(
+                          value,
+                          selectedPlan
+                        );
+                        setNewPayment({
+                          ...newPayment,
+                          startDate: value,
+                          nextInstallmentDue:
+                            newPayment.installments === 1
+                              ? computedNext
+                              : newPayment.nextInstallmentDue || computedNext,
+                        });
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      El plan se calculará desde esta fecha (útil si se registra
+                      con atraso)
+                    </p>
+                  </div>
+                )}
+
+                {/* DESCRIPCIÓN */}
+                <div className="grid gap-2 md:col-span-2 xl:col-span-3">
+                  <Label htmlFor="description">Descripción</Label>
+                  <Input
+                    id="description"
+                    value={newPayment.description}
                     onChange={(e) =>
                       setNewPayment({
                         ...newPayment,
-                        amount: parseFloat(e.target.value),
+                        description: e.target.value,
                       })
                     }
                   />
                 </div>
-              )}
 
-              {/* MÉTODO DE PAGO */}
-              <div className="grid gap-2">
-                <Label htmlFor="method">Método de Pago</Label>
-                <Select
-                  value={newPayment.method}
-                  onValueChange={(value) =>
-                    setNewPayment({ ...newPayment, method: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona método" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {paymentMethods.map((method) => (
-                      <SelectItem key={method} value={method}>
-                        {method}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-               {[
-                "Tarjeta de Crédito",
-                "Tarjeta de Débito",
-              ].includes(newPayment.method) && (
-                <>
-                  <div className="grid gap-2">
-                    <Label htmlFor="cardBrand">Tipo de Tarjeta</Label>
-                    <Select
-                      value={newPayment.cardBrand}
-                      onValueChange={(value) =>
-                        setNewPayment({ ...newPayment, cardBrand: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona tarjeta" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {cardBrands.map((brand) => (
-                          <SelectItem key={brand} value={brand}>
-                            {brand}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="cardInstallments">
-                      Número de cuotas en la tarjeta
-                    </Label>
-                    <Input
-                      id="cardInstallments"
-                      type="number"
-                      min={1}
-                      value={newPayment.cardInstallments}
-                      onChange={(e) =>
-                        setNewPayment({
-                          ...newPayment,
-                          cardInstallments: parseInt(e.target.value) || 1,
-                        })
-                      }
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* FECHA */}
-              <div className="grid gap-2">
-                <Label htmlFor="date">Fecha del Pago</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={newPayment.date}
-                  onChange={(e) =>
-                    setNewPayment({ ...newPayment, date: e.target.value })
-                  }
-                />
-              </div>
-
-              {newPayment.type === "new_plan" && (
-                <div className="grid gap-2">
-                  <Label htmlFor="startDate">Fecha de inicio del plan</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={newPayment.startDate}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      const computedNext = calculatePlanEndDate(
-                        value,
-                        selectedPlan
-                      );
-                      setNewPayment({
-                        ...newPayment,
-                        startDate: value,
-                        nextInstallmentDue:
-                          newPayment.installments === 1
-                            ? computedNext
-                            : newPayment.nextInstallmentDue || computedNext,
-                      });
-                    }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    El plan se calculará desde esta fecha (útil si se registra
-                    con atraso)
-                  </p>
-                </div>
-              )}
-
-              {/* DESCRIPCIÓN */}
-              <div className="grid gap-2">
-                <Label htmlFor="description">Descripción</Label>
-                <Input
-                  id="description"
-                  value={newPayment.description}
-                  onChange={(e) =>
-                    setNewPayment({
-                      ...newPayment,
-                      description: e.target.value,
-                    })
-                  }
-                />
-              </div>
-
-              {/* RESUMEN */}
-              {newPayment.type === "new_plan" &&
-                newPayment.memberId &&
-                newPayment.planId &&
-                newPayment.amount > 0 && (
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <h4 className="font-medium text-green-800 mb-2">
-                      Resumen de Renovación
-                    </h4>
-                    <div className="text-sm text-green-700">
-                      <p>
-                        <strong>Socio:</strong>{" "}
-                        {
-                          members.find((m) => m.id === newPayment.memberId)
-                            ?.name
-                        }
-                      </p>
-                      <p>
-                        <strong>Plan:</strong>{" "}
-                        {plans.find((p) => p.id === newPayment.planId)?.name}
-                      </p>
-                      <p>
-                        <strong>Monto:</strong> $
-                        {newPayment.amount.toLocaleString()}
-                      </p>
-                      <p className="mt-1 text-xs">
-                        ✅ El socio se activará y se actualizará su próximo
-                        vencimiento
-                      </p>
+                {/* RESUMEN */}
+                {newPayment.type === "new_plan" &&
+                  newPayment.memberId &&
+                  newPayment.planId &&
+                  newPayment.amount > 0 && (
+                    <div className="p-3 bg-green-50 rounded-lg md:col-span-2 xl:col-span-3">
+                      <h4 className="font-medium text-green-800 mb-2">
+                        Resumen de Renovación
+                      </h4>
+                      <div className="text-sm text-green-700">
+                        <p>
+                          <strong>Socio:</strong>{" "}
+                          {
+                            members.find((m) => m.id === newPayment.memberId)
+                              ?.name
+                          }
+                        </p>
+                        <p>
+                          <strong>Plan:</strong>{" "}
+                          {plans.find((p) => p.id === newPayment.planId)?.name}
+                        </p>
+                        <p>
+                          <strong>Monto:</strong> $
+                          {newPayment.amount.toLocaleString()}
+                        </p>
+                        <p className="mt-1 text-xs">
+                          ✅ El socio se activará y se actualizará su próximo
+                          vencimiento
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )}
-              {newPayment.type === "existing_plan" &&
-                newPayment.memberId &&
-                newPayment.amount > 0 && (
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <h4 className="font-medium text-green-800 mb-2">
-                      Resumen de Pago
-                    </h4>
-                    <div className="text-sm text-green-700">
-                      <p>
-                        <strong>Socio:</strong>{" "}
-                        {
-                          members.find((m) => m.id === newPayment.memberId)
-                            ?.name
-                        }
-                      </p>
-                      <p>
-                        <strong>Plan:</strong> {selectedMember?.plan}
-                      </p>
-                      <p>
-                        <strong>Monto:</strong> $
-                        {newPayment.amount.toLocaleString()}
-                      </p>
-                      <p className="mt-1 text-xs">
-                        Saldo restante: $
-                        {Math.max(
-                          balanceDueActual - newPayment.amount,
-                          0
-                        ).toLocaleString()}
-                      </p>
+                  )}
+                {newPayment.type === "existing_plan" &&
+                  newPayment.memberId &&
+                  newPayment.amount > 0 && (
+                    <div className="p-3 bg-green-50 rounded-lg md:col-span-2 xl:col-span-3">
+                      <h4 className="font-medium text-green-800 mb-2">
+                        Resumen de Pago
+                      </h4>
+                      <div className="text-sm text-green-700">
+                        <p>
+                          <strong>Socio:</strong>{" "}
+                          {
+                            members.find((m) => m.id === newPayment.memberId)
+                              ?.name
+                          }
+                        </p>
+                        <p>
+                          <strong>Plan:</strong> {selectedMember?.plan}
+                        </p>
+                        <p>
+                          <strong>Monto:</strong> $
+                          {newPayment.amount.toLocaleString()}
+                        </p>
+                        <p className="mt-1 text-xs">
+                          Saldo restante: $
+                          {Math.max(
+                            balanceDueActual - newPayment.amount,
+                            0
+                          ).toLocaleString()}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )}
-              {newPayment.type === "product" &&
-                newPayment.memberId &&
-                newPayment.description &&
-                newPayment.amount > 0 && (
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <h4 className="font-medium text-green-800 mb-2">
-                      Resumen de Venta
-                    </h4>
-                    <div className="text-sm text-green-700">
-                      <p>
-                        <strong>Socio:</strong>{" "}
-                        {
-                          members.find((m) => m.id === newPayment.memberId)
-                            ?.name
-                        }
-                      </p>
-                      <p>
-                        <strong>Descripción:</strong> {newPayment.description}
-                      </p>
-                      <p>
-                        <strong>Monto:</strong> $
-                        {newPayment.amount.toLocaleString()}
-                      </p>
+                  )}
+                {newPayment.type === "product" &&
+                  newPayment.memberId &&
+                  newPayment.description &&
+                  newPayment.amount > 0 && (
+                    <div className="p-3 bg-green-50 rounded-lg md:col-span-2 xl:col-span-3">
+                      <h4 className="font-medium text-green-800 mb-2">
+                        Resumen de Venta
+                      </h4>
+                      <div className="text-sm text-green-700">
+                        <p>
+                          <strong>Socio:</strong>{" "}
+                          {
+                            members.find((m) => m.id === newPayment.memberId)
+                              ?.name
+                          }
+                        </p>
+                        <p>
+                          <strong>Descripción:</strong> {newPayment.description}
+                        </p>
+                        <p>
+                          <strong>Monto:</strong> $
+                          {newPayment.amount.toLocaleString()}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+              </div>
             </div>
             <DialogFooter>
               <Button
@@ -1728,9 +1759,10 @@ export function PaymentManagement({
                 disabled={
                   !newPayment.memberId ||
                   !newPayment.method ||
-                   (["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                  (["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
                     newPayment.method
-                  ) && !newPayment.cardBrand) ||
+                  ) &&
+                    !newPayment.cardBrand) ||
                   (newPayment.type === "new_plan"
                     ? !newPayment.planId ||
                       !newPayment.startDate ||
@@ -2160,10 +2192,9 @@ export function PaymentManagement({
                   </SelectContent>
                 </Select>
               </div>
-               {[
-                "Tarjeta de Crédito",
-                "Tarjeta de Débito",
-              ].includes(editPaymentData.method) && (
+              {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                editPaymentData.method
+              ) && (
                 <>
                   <div className="grid gap-2">
                     <Label htmlFor="edit-card-brand">Tipo de Tarjeta</Label>
