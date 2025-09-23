@@ -811,9 +811,8 @@ export function MemberManagement({
                 type="submit"
                 onClick={handleAddMember}
                 disabled={
-                  ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
-                    newMember.paymentMethod
-                  ) && !newMember.cardBrand
+                  newMember.paymentMethod === "Tarjeta de Crédito" &&
+                  (!newMember.cardBrand || newMember.cardInstallments < 1)
                 }
               >
                 Agregar Socio
