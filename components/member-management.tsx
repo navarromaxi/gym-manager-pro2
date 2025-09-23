@@ -80,9 +80,7 @@ const MEMBERS_PER_BATCH = 10;
 const formatDateForAlert = (isoDate: string) => {
   if (!isoDate) return "";
   const date = toLocalDate(isoDate);
-  return Number.isNaN(date.getTime())
-    ? isoDate
-    : date.toLocaleDateString();
+  return Number.isNaN(date.getTime()) ? isoDate : date.toLocaleDateString();
 };
 
 const getRealStatus = (member: Member): "active" | "expired" | "inactive" => {
@@ -195,7 +193,7 @@ export function MemberManagement({
       ? calculatedPlanEndDate
       : newMember.nextInstallmentDue || calculatedPlanEndDate;
 
-   useEffect(() => {
+  useEffect(() => {
     const checkTable = async () => {
       const { data } = await supabase
         .from("pg_tables")
@@ -252,9 +250,7 @@ export function MemberManagement({
     const today = new Date();
     const expiringCustomPlanMemberIds =
       statusFilter === "custom_expiring"
-        ? new Set(
-            getExpiringCustomPlans().map((plan) => plan.member_id)
-          )
+        ? new Set(getExpiringCustomPlans().map((plan) => plan.member_id))
         : null;
     const filtered = sortedMembers.filter((member) => {
       // búsqueda (debounced)
@@ -265,11 +261,11 @@ export function MemberManagement({
         name.includes(debouncedSearch) ||
         email.includes(debouncedSearch);
 
-        if (!matchesSearch) return false;
+      if (!matchesSearch) return false;
 
-        const realStatus = getRealStatus(member);
+      const realStatus = getRealStatus(member);
 
-        if (statusFilter === "expiring_soon") {
+      if (statusFilter === "expiring_soon") {
         const nextPayment = toLocalDate(member.next_payment);
         const diffDays = Math.ceil(
           (nextPayment.getTime() - today.getTime()) / 86400000
@@ -304,12 +300,7 @@ export function MemberManagement({
     }
 
     return filtered;
-  }, [
-    sortedMembers,
-    debouncedSearch,
-    statusFilter,
-    getExpiringCustomPlans,
-  ]);
+  }, [sortedMembers, debouncedSearch, statusFilter, getExpiringCustomPlans]);
 
   useEffect(() => {
     setVisibleCount(MEMBERS_PER_BATCH);
@@ -325,7 +316,6 @@ export function MemberManagement({
       Math.min(prev + MEMBERS_PER_BATCH, filteredMembers.length)
     );
   };
-
 
   const handleAddMember = async () => {
     try {
@@ -449,7 +439,7 @@ export function MemberManagement({
         start_date: newMember.planStartDate,
         plan: member.plan,
         method: newMember.paymentMethod,
-         card_brand: ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+        card_brand: ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
           newMember.paymentMethod
         )
           ? newMember.cardBrand
@@ -712,7 +702,7 @@ export function MemberManagement({
   const expiredMembers = getExpiredMembers();
   const membersToFollowUp = getMembersToFollowUp();
   const membersWithBalanceDue = getMembersWithBalanceDue();
-   const todayMidnight = new Date();
+  const todayMidnight = new Date();
   todayMidnight.setHours(0, 0, 0, 0);
   const membersWithPartialDueSoon = membersWithBalanceDue.filter((member) => {
     if (!member.next_installment_due) return false;
@@ -730,14 +720,13 @@ export function MemberManagement({
     return dueDate.getTime() < todayMidnight.getTime();
   });
   const expiringCustomPlansForAlert = getExpiringCustomPlans();
-   const visibleExpiringCustomPlansForAlert =
-    expiringCustomPlansForAlert.filter(
-      (plan) => !dismissedCustomPlanAlertIds.includes(plan.id)
-    );
+  const visibleExpiringCustomPlansForAlert = expiringCustomPlansForAlert.filter(
+    (plan) => !dismissedCustomPlanAlertIds.includes(plan.id)
+  );
   const expiringCustomPlanMembersCount = new Set(
     expiringCustomPlansForAlert.map((plan) => plan.member_id)
   ).size;
-   const handleDismissCustomPlanAlert = useCallback((planId: string) => {
+  const handleDismissCustomPlanAlert = useCallback((planId: string) => {
     setDismissedCustomPlanAlertIds((prev) =>
       prev.includes(planId) ? prev : [...prev, planId]
     );
@@ -761,296 +750,303 @@ export function MemberManagement({
               Nuevo Socio
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-5xl">
             <DialogHeader>
               <DialogTitle>Agregar Nuevo Socio</DialogTitle>
               <DialogDescription>
                 Completa los datos del nuevo miembro del gimnasio.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Nombre completo</Label>
-                <Input
-                  id="name"
-                  value={newMember.name}
-                  onChange={(e) =>
-                    setNewMember({ ...newMember, name: e.target.value })
-                  }
-                  placeholder="Juan Pérez"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={newMember.email}
-                  onChange={(e) =>
-                    setNewMember({ ...newMember, email: e.target.value })
-                  }
-                  placeholder="juan@email.com"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="phone">Teléfono</Label>
-                <Input
-                  id="phone"
-                  value={newMember.phone}
-                  onChange={(e) =>
-                    setNewMember({ ...newMember, phone: e.target.value })
-                  }
-                  placeholder="099123456"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="planStartDate">Fecha de inicio del plan</Label>
-                <Input
-                  id="planStartDate"
-                  type="date"
-                  value={newMember.planStartDate}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const computedNext = calculatePlanEndDate(
-                      value,
-                      selectedPlanForNewMember
-                    );
-                    setNewMember({
-                      ...newMember,
-                      planStartDate: value,
-                      nextInstallmentDue:
-                        newMember.installments === 1
-                          ? computedNext
-                          : newMember.nextInstallmentDue || computedNext,
-                    });
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">
-                  El plan se calculará desde esta fecha (útil si se registra con
-                  atraso)
-                </p>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="paymentDate">Fecha de pago</Label>
-                <Input
-                  id="paymentDate"
-                  type="date"
-                  value={newMember.paymentDate}
-                  onChange={(e) =>
-                    setNewMember({ ...newMember, paymentDate: e.target.value })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="plan">Plan</Label>
-                <Select
-                  value={newMember.plan}
-                  onValueChange={(value) => {
-                    const selectedPlan = plans.find((p) => p.name === value);
-                    const computedNext = calculatePlanEndDate(
-                      newMember.planStartDate,
-                      selectedPlan
-                    );
-                    setNewMember({
-                      ...newMember,
-                      plan: value,
-                      planPrice: selectedPlan?.price || 0,
-                      installments: 1,
-                      paymentAmount: selectedPlan?.price || 0,
-                      nextInstallmentDue: computedNext,
-                    });
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona un plan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plans
-                      .filter((plan) => plan.is_active)
-                      .map((plan) => (
-                        <SelectItem key={plan.id} value={plan.name}>
-                          {plan.name} - ${plan.price}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {newMember.plan && (
-                <>
-                  <div className="grid gap-2">
-                    <Label htmlFor="planPrice">Precio total del plan</Label>
-                    <Input
-                      id="planPrice"
-                      type="number"
-                      value={newMember.planPrice}
-                      onChange={(e) => {
-                        const price = parseFloat(e.target.value) || 0;
-                        setNewMember({
-                          ...newMember,
-                          planPrice: price,
-                          paymentAmount:
-                            newMember.installments === 1
-                              ? price
-                              : newMember.paymentAmount,
-                        });
-                      }}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="installments">Cantidad de cuotas</Label>
-                    <Select
-                      value={newMember.installments.toString()}
-                      onValueChange={(value) => {
-                        const installments = parseInt(value);
-                        const computedNext = calculatePlanEndDate(
-                          newMember.planStartDate,
-                          selectedPlanForNewMember
-                        );
-                        setNewMember({
-                          ...newMember,
-                          installments,
-                          paymentAmount:
-                            installments === 1 ? newMember.planPrice : 0,
-                          nextInstallmentDue:
-                            installments === 1
-                              ? computedNext
-                              : newMember.nextInstallmentDue || computedNext,
-                        });
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona cuotas" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1</SelectItem>
-                        <SelectItem value="2">2</SelectItem>
-                        <SelectItem value="3">3</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {newMember.installments > 1 && (
+            <div className="grid gap-6 py-4 max-h-[80vh] overflow-y-auto pr-2">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Nombre completo</Label>
+                  <Input
+                    id="name"
+                    value={newMember.name}
+                    onChange={(e) =>
+                      setNewMember({ ...newMember, name: e.target.value })
+                    }
+                    placeholder="Juan Pérez"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={newMember.email}
+                    onChange={(e) =>
+                      setNewMember({ ...newMember, email: e.target.value })
+                    }
+                    placeholder="juan@email.com"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="phone">Teléfono</Label>
+                  <Input
+                    id="phone"
+                    value={newMember.phone}
+                    onChange={(e) =>
+                      setNewMember({ ...newMember, phone: e.target.value })
+                    }
+                    placeholder="099123456"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="planStartDate">
+                    Fecha de inicio del plan
+                  </Label>
+                  <Input
+                    id="planStartDate"
+                    type="date"
+                    value={newMember.planStartDate}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const computedNext = calculatePlanEndDate(
+                        value,
+                        selectedPlanForNewMember
+                      );
+                      setNewMember({
+                        ...newMember,
+                        planStartDate: value,
+                        nextInstallmentDue:
+                          newMember.installments === 1
+                            ? computedNext
+                            : newMember.nextInstallmentDue || computedNext,
+                      });
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    El plan se calculará desde esta fecha (útil si se registra
+                    con atraso)
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="paymentDate">Fecha de pago</Label>
+                  <Input
+                    id="paymentDate"
+                    type="date"
+                    value={newMember.paymentDate}
+                    onChange={(e) =>
+                      setNewMember({
+                        ...newMember,
+                        paymentDate: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="plan">Plan</Label>
+                  <Select
+                    value={newMember.plan}
+                    onValueChange={(value) => {
+                      const selectedPlan = plans.find((p) => p.name === value);
+                      const computedNext = calculatePlanEndDate(
+                        newMember.planStartDate,
+                        selectedPlan
+                      );
+                      setNewMember({
+                        ...newMember,
+                        plan: value,
+                        planPrice: selectedPlan?.price || 0,
+                        installments: 1,
+                        paymentAmount: selectedPlan?.price || 0,
+                        nextInstallmentDue: computedNext,
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un plan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {plans
+                        .filter((plan) => plan.is_active)
+                        .map((plan) => (
+                          <SelectItem key={plan.id} value={plan.name}>
+                            {plan.name} - ${plan.price}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {newMember.plan && (
+                  <>
                     <div className="grid gap-2">
-                      <Label htmlFor="paymentAmount">Monto a abonar</Label>
+                      <Label htmlFor="planPrice">Precio total del plan</Label>
                       <Input
-                        id="paymentAmount"
+                        id="planPrice"
                         type="number"
-                        value={newMember.paymentAmount}
+                        value={newMember.planPrice}
+                        onChange={(e) => {
+                          const price = parseFloat(e.target.value) || 0;
+                          setNewMember({
+                            ...newMember,
+                            planPrice: price,
+                            paymentAmount:
+                              newMember.installments === 1
+                                ? price
+                                : newMember.paymentAmount,
+                          });
+                        }}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="installments">Cantidad de cuotas</Label>
+                      <Select
+                        value={newMember.installments.toString()}
+                        onValueChange={(value) => {
+                          const installments = parseInt(value);
+                          const computedNext = calculatePlanEndDate(
+                            newMember.planStartDate,
+                            selectedPlanForNewMember
+                          );
+                          setNewMember({
+                            ...newMember,
+                            installments,
+                            paymentAmount:
+                              installments === 1 ? newMember.planPrice : 0,
+                            nextInstallmentDue:
+                              installments === 1
+                                ? computedNext
+                                : newMember.nextInstallmentDue || computedNext,
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona cuotas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1</SelectItem>
+                          <SelectItem value="2">2</SelectItem>
+                          <SelectItem value="3">3</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {newMember.installments > 1 && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="paymentAmount">Monto a abonar</Label>
+                        <Input
+                          id="paymentAmount"
+                          type="number"
+                          value={newMember.paymentAmount}
+                          onChange={(e) =>
+                            setNewMember({
+                              ...newMember,
+                              paymentAmount: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Saldo pendiente: $
+                          {(
+                            newMember.planPrice - newMember.paymentAmount
+                          ).toFixed(2)}
+                        </p>
+                      </div>
+                    )}
+                    <div className="grid gap-2">
+                      <Label htmlFor="nextInstallmentDue">
+                        Vencimiento próxima cuota
+                      </Label>
+                      <Input
+                        id="nextInstallmentDue"
+                        type="date"
+                        value={nextInstallmentDueValue}
                         onChange={(e) =>
                           setNewMember({
                             ...newMember,
-                            paymentAmount: parseFloat(e.target.value) || 0,
+                            nextInstallmentDue: e.target.value,
+                          })
+                        }
+                        disabled={newMember.installments === 1}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {newMember.installments === 1
+                          ? "Se utilizará la misma fecha que el fin del plan."
+                          : "Registra cuándo debería abonarse la próxima cuota."}
+                      </p>
+                    </div>
+                  </>
+                )}
+                <div className="grid gap-2">
+                  <Label htmlFor="paymentMethod">Método de Pago</Label>
+                  <Select
+                    value={newMember.paymentMethod}
+                    onValueChange={(value) =>
+                      setNewMember({
+                        ...newMember,
+                        paymentMethod: value,
+                        cardBrand: "",
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona método de pago" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {paymentMethods.map((method) => (
+                        <SelectItem key={method} value={method}>
+                          {method}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {newMember.paymentMethod === "Tarjeta de Crédito" && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label>Tipo de Tarjeta</Label>
+                      <Select
+                        value={newMember.cardBrand}
+                        onValueChange={(value) =>
+                          setNewMember({ ...newMember, cardBrand: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona tarjeta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {cardBrands.map((brand) => (
+                            <SelectItem key={brand} value={brand}>
+                              {brand}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="cardInstallments">
+                        Número de cuotas en la tarjeta
+                      </Label>
+                      <Input
+                        id="cardInstallments"
+                        type="number"
+                        min={1}
+                        value={newMember.cardInstallments}
+                        onChange={(e) =>
+                          setNewMember({
+                            ...newMember,
+                            cardInstallments: parseInt(e.target.value) || 1,
                           })
                         }
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Saldo pendiente: $
-                        {(
-                          newMember.planPrice - newMember.paymentAmount
-                        ).toFixed(2)}
-                      </p>
                     </div>
-                  )}
-                  <div className="grid gap-2">
-                    <Label htmlFor="nextInstallmentDue">
-                      Vencimiento próxima cuota
-                    </Label>
-                    <Input
-                      id="nextInstallmentDue"
-                      type="date"
-                      value={nextInstallmentDueValue}
-                      onChange={(e) =>
-                        setNewMember({
-                          ...newMember,
-                          nextInstallmentDue: e.target.value,
-                        })
-                      }
-                      disabled={newMember.installments === 1}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {newMember.installments === 1
-                        ? "Se utilizará la misma fecha que el fin del plan."
-                        : "Registra cuándo debería abonarse la próxima cuota."}
-                    </p>
-                  </div>
-                </>
-              )}
-              <div className="grid gap-2">
-                <Label htmlFor="paymentMethod">Método de Pago</Label>
-                <Select
-                  value={newMember.paymentMethod}
-                  onValueChange={(value) =>
-                    setNewMember({
-                      ...newMember,
-                      paymentMethod: value,
-                      cardBrand: "",
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona método de pago" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {paymentMethods.map((method) => (
-                      <SelectItem key={method} value={method}>
-                        {method}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {newMember.paymentMethod === "Tarjeta de Crédito" && (
-                <>
-                  <div className="grid gap-2">
-                    <Label>Tipo de Tarjeta</Label>
-                    <Select
-                      value={newMember.cardBrand}
-                      onValueChange={(value) =>
-                        setNewMember({ ...newMember, cardBrand: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona tarjeta" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {cardBrands.map((brand) => (
-                          <SelectItem key={brand} value={brand}>
-                            {brand}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="cardInstallments">
-                      Número de cuotas en la tarjeta
-                    </Label>
-                    <Input
-                      id="cardInstallments"
-                      type="number"
-                      min={1}
-                      value={newMember.cardInstallments}
-                      onChange={(e) =>
-                        setNewMember({
-                          ...newMember,
-                          cardInstallments: parseInt(e.target.value) || 1,
-                        })
-                      }
-                    />
-                  </div>
-                </>
-              )}
-              <div className="grid gap-2">
-                <Label htmlFor="description">Descripción</Label>
-                <Input
-                  id="description"
-                  value={newMember.description}
-                  onChange={(e) =>
-                    setNewMember({
-                      ...newMember,
-                      description: e.target.value,
-                    })
-                  }
-                />
+                  </>
+                )}
+                <div className="grid gap-2 md:col-span-2 lg:col-span-3">
+                  <Label htmlFor="description">Descripción</Label>
+                  <Input
+                    id="description"
+                    value={newMember.description}
+                    onChange={(e) =>
+                      setNewMember({
+                        ...newMember,
+                        description: e.target.value,
+                      })
+                    }
+                  />
+                </div>
               </div>
             </div>
             <DialogFooter>
@@ -1058,7 +1054,7 @@ export function MemberManagement({
                 type="submit"
                 onClick={handleAddMember}
                 disabled={
-                   ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                  ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
                     newMember.paymentMethod
                   ) && !newMember.cardBrand
                 }
@@ -1118,7 +1114,7 @@ export function MemberManagement({
         <CardHeader>
           <CardTitle>Lista de Socios ({filteredMembers.length})</CardTitle>
 
-           {membersWithPartialDueSoon.map((member) => (
+          {membersWithPartialDueSoon.map((member) => (
             <div
               key={`partial-due-soon-${member.id}`}
               className="mt-2 rounded text-sm border-l-4 border-sky-500 bg-sky-100 p-3 text-sky-700"
@@ -1153,14 +1149,12 @@ export function MemberManagement({
             return (
               <div
                 key={`custom-plan-expiring-alert-${plan.id}`}
-                 className="mt-2 flex items-start justify-between gap-3 rounded border-l-4 border-amber-500 bg-amber-100 p-3 text-sm text-amber-800"
+                className="mt-2 flex items-start justify-between gap-3 rounded border-l-4 border-amber-500 bg-amber-100 p-3 text-sm text-amber-800"
               >
                 <span>
                   ⚠️ Al socio "{memberName}" se le está por vencer el plan
                   personalizado en los próximos diez días
-                  {formattedEndDate
-                    ? ` (vence el ${formattedEndDate}).`
-                    : "."}
+                  {formattedEndDate ? ` (vence el ${formattedEndDate}).` : "."}
                 </span>
                 <Button
                   type="button"
@@ -1177,8 +1171,8 @@ export function MemberManagement({
           })}
           {expiringMembers.length > 0 && (
             <div className="mt-2 text-sm text-orange-700 bg-orange-100 border-l-4 border-orange-500 p-3 rounded flex justify-between items-center">
-               ⚠️ Tienes {expiringMembers.length} socios con vencimiento
-              próximo (menos de 10 días).
+              ⚠️ Tienes {expiringMembers.length} socios con vencimiento próximo
+              (menos de 10 días).
               <Button
                 variant="ghost"
                 className="text-orange-700 hover:underline"
@@ -1205,7 +1199,7 @@ export function MemberManagement({
             </div>
           )}
 
-           {expiringCustomPlanMembersCount > 0 && (
+          {expiringCustomPlanMembersCount > 0 && (
             <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/60 p-4 text-sm shadow-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-3 text-amber-800">
@@ -1213,10 +1207,10 @@ export function MemberManagement({
                   <div>
                     <p className="font-medium">
                       {expiringCustomPlanMembersCount} socio
-                      {expiringCustomPlanMembersCount === 1 ? "" : "s"} con
-                      plan personalizado próximo
-                      {expiringCustomPlanMembersCount === 1 ? "" : "s"} a
-                      vencer (10 días).
+                      {expiringCustomPlanMembersCount === 1 ? "" : "s"} con plan
+                      personalizado próximo
+                      {expiringCustomPlanMembersCount === 1 ? "" : "s"} a vencer
+                      (10 días).
                     </p>
                     <p className="text-xs text-amber-700">
                       Revisa estos planes para renovar o contactar a los socios.
@@ -1251,8 +1245,6 @@ export function MemberManagement({
               </Button>
             </div>
           )}
-          
-          
         </CardHeader>
         {filteredMembers.length === 0 && (
           <div className="mt-2 text-sm text-muted-foreground">

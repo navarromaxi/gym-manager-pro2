@@ -250,13 +250,6 @@ const areDatesEquivalent = (
   return candidateParts.year === filterParts.year;
 };
 
-const formatFilterDate = (date: Date) => {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
-};
-
 export function ProspectManagement({
   prospects,
   setProspects,
@@ -1171,15 +1164,10 @@ export function ProspectManagement({
               </Label>
               <Input
                 id="contact-date-filter"
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="dd/mm o dd/mm/aaaa"
+                type="date"
                 value={contactDateFilter}
-                 onChange={(event) =>
-                  setContactDateFilter(
-                    event.target.value.replace(/[^0-9/\-: ]/g, "")
-                  )
+                  onChange={(event) =>
+                  setContactDateFilter(event.target.value)
                 }
               />
               <div className="flex gap-2">
@@ -1189,7 +1177,9 @@ export function ProspectManagement({
                   variant="outline"
                   className="flex-1"
                   onClick={() =>
-                    setContactDateFilter(formatFilterDate(new Date()))
+                    setContactDateFilter(
+                      new Date().toISOString().split("T")[0]
+                    )
                   }
                 >
                   Hoy
