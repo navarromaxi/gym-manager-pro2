@@ -50,6 +50,8 @@ interface Member {
   phone?: string;
   joinDate?: string;
   join_date?: string;
+  referralSource?: string | null;
+  referral_source?: string | null;
   plan?: string;
   planPrice?: number;
   plan_price?: number;
@@ -517,6 +519,91 @@ const isWithinPeriod = (date: Date) => {
     0
   );
 
+    const getReferralSourceLabel = (member: Member) => {
+    const rawReferral = pick(
+      member as any,
+      "referralSource",
+      "referral_source"
+    ) as string | undefined;
+    if (typeof rawReferral === "string" && rawReferral.trim().length > 0) {
+      return rawReferral;
+    }
+    return "Sin seleccionar";
+  };
+
+  const formatDateCell = (value?: string | Date | null) => {
+    if (!value) return "";
+    if (value instanceof Date) {
+      return toLocalMidnight(value).toLocaleDateString();
+    }
+    const parsed = toLocalDateFromISO(value);
+    return parsed ? parsed.toLocaleDateString() : "";
+  };
+
+  const newMembersInPeriod = members.filter((member) => {
+    const joinISO = pick(member as any, "joinDate", "join_date") as
+      | string
+      | undefined;
+    if (!joinISO) return false;
+    const joinDate = toLocalDateFromISO(joinISO);
+    if (!joinDate) return false;
+    const joinMid = toLocalMidnight(joinDate);
+    if (periodStart && joinMid < periodStart) return false;
+    if (periodEnd && joinMid > periodEnd) return false;
+    return true;
+  });
+
+  const totalNewMembers = newMembersInPeriod.length;
+
+  const referralDistributionEntries = Object.entries(
+    newMembersInPeriod.reduce((acc, member) => {
+      const label = getReferralSourceLabel(member);
+      acc[label] = (acc[label] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
+  )
+    .map(([source, count]) => ({
+      source,
+      count,
+      percentage:
+        totalNewMembers > 0
+          ? Math.round((count / totalNewMembers) * 100)
+          : 0,
+    }))
+    .sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.source.localeCompare(b.source);
+    });
+
+  const newMembersDetails = newMembersInPeriod
+    .map((member) => {
+      const joinISO = pick(member as any, "joinDate", "join_date") as
+        | string
+        | undefined;
+      const joinDate = joinISO ? toLocalDateFromISO(joinISO) : null;
+      const joinMid = joinDate ? toLocalMidnight(joinDate) : null;
+      const planName = pick(
+        member as any,
+        "plan",
+        "planName",
+        "plan_name"
+      ) as string | undefined;
+
+      return {
+        id: member.id,
+        name: (pick(member as any, "name") as string | undefined) ?? member.name,
+        referral: getReferralSourceLabel(member),
+        joinDate: joinMid,
+        joinDateFormatted: formatDateCell(joinISO),
+        plan: planName ?? "",
+      };
+    })
+    .sort((a, b) => {
+      const aTime = a.joinDate ? a.joinDate.getTime() : 0;
+      const bTime = b.joinDate ? b.joinDate.getTime() : 0;
+      return bTime - aTime;
+    });
+
   const paymentMethodDistribution = filteredPayments.reduce((acc, payment) => {
     acc[payment.method] = (acc[payment.method] || 0) + 1;
     return acc;
@@ -658,15 +745,6 @@ const isWithinPeriod = (date: Date) => {
     expiring: "Por vencer",
     expired: "Vencido",
     inactive: "Inactivo",
-  };
-
-  const formatDateCell = (value?: string | Date | null) => {
-    if (!value) return "";
-    if (value instanceof Date) {
-      return toLocalMidnight(value).toLocaleDateString();
-    }
-    const parsed = toLocalDateFromISO(value);
-    return parsed ? parsed.toLocaleDateString() : "";
   };
 
   const formatBooleanCell = (value: unknown) => {
@@ -1444,6 +1522,69 @@ const isWithinPeriod = (date: Date) => {
           </CardContent>
         </Card>
       </div>
+
+       {/* Referral Source Report */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Users className="mr-2 h-5 w-5" />
+            Socios que nos conocieron por
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {totalNewMembers > 0
+              ? `Período: ${getTimeFilterLabel()} · Nuevos socios: ${totalNewMembers}`
+              : `No se registraron nuevos socios en ${getTimeFilterLabel()}.`}
+          </p>
+        </CardHeader>
+        <CardContent>
+          {totalNewMembers > 0 ? (
+            <div className="space-y-6">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {referralDistributionEntries.map(({ source, count, percentage }) => (
+                  <div
+                    key={source}
+                    className="flex items-center justify-between rounded-lg border p-3"
+                  >
+                    <div>
+                      <p className="font-medium">{source}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {percentage}% de los nuevos socios
+                      </p>
+                    </div>
+                    <Badge variant="secondary">{count}</Badge>
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Socio</TableHead>
+                      <TableHead>Fecha de Alta</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead>Nos conoció por</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {newMembersDetails.map((member) => (
+                      <TableRow key={member.id}>
+                        <TableCell className="font-medium">{member.name}</TableCell>
+                        <TableCell>{member.joinDateFormatted}</TableCell>
+                        <TableCell>{member.plan || "-"}</TableCell>
+                        <TableCell>{member.referral}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No se registraron nuevos socios en {getTimeFilterLabel()}.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Income Trend */}
       <Card>
