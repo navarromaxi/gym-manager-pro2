@@ -105,10 +105,66 @@ interface Expense {
   is_recurring?: boolean;
 }
 
+type ProspectStatus =
+  | "averiguador"
+  | "trial_scheduled"
+  | "reagendado"
+  | "asistio"
+  | "no_asistio"
+  | "inactivo"
+  | "otro";
+
+type ProspectPriority = "green" | "yellow" | "red";
+
+interface Prospect {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  contactDate?: string | null;
+  contact_date?: string | null;
+  interest?: string | null;
+  status?: ProspectStatus | null;
+  notes?: string | null;
+  priority_level?: ProspectPriority | null;
+  priorityLevel?: ProspectPriority | null;
+  scheduled_date?: string | null;
+  scheduledDate?: string | null;
+  created_at?: string | null;
+  createdAt?: string | null;
+}
+
+interface CustomPlan {
+  id: string;
+  member_id?: string;
+  memberId?: string;
+  member_name?: string;
+  memberName?: string;
+  name: string;
+  description?: string | null;
+  price?: number | null;
+  start_date?: string | null;
+  startDate?: string | null;
+  end_date?: string | null;
+  endDate?: string | null;
+  is_active?: boolean | null;
+  isActive?: boolean | null;
+  payment_date?: string | null;
+  paymentDate?: string | null;
+  payment_method?: string | null;
+  paymentMethod?: string | null;
+  card_brand?: string | null;
+  cardBrand?: string | null;
+  card_installments?: number | null;
+  cardInstallments?: number | null;
+}
+
 interface ReportsSectionProps {
   members: Member[];
   payments: Payment[];
   expenses: Expense[];
+  prospects: Prospect[];
+  customPlans: CustomPlan[];
   gymName: string;
 }
 
@@ -165,6 +221,8 @@ export function ReportsSection({
   members,
   payments,
   expenses,
+  prospects,
+  customPlans,
   gymName,
 }: ReportsSectionProps) {
   const [timeFilter, setTimeFilter] = useState("current_month");
@@ -576,6 +634,32 @@ const isWithinPeriod = (date: Date) => {
     red: "Rojo",
   };
 
+  const prospectStatusLabels: Record<ProspectStatus, string> = {
+    averiguador: "Averiguador",
+    trial_scheduled: "Clase prueba coordinada",
+    reagendado: "Reagendado",
+    asistio: "Asistió",
+    no_asistio: "No asistió",
+    inactivo: "Inactivo",
+    otro: "Otro",
+  };
+
+  const prospectPriorityLabels: Record<ProspectPriority, string> = {
+    red: "Alta",
+    yellow: "Media",
+    green: "Baja",
+  };
+
+  const customPlanStatusLabels: Record<
+    "active" | "expiring" | "expired" | "inactive",
+    string
+  > = {
+    active: "Activo",
+    expiring: "Por vencer",
+    expired: "Vencido",
+    inactive: "Inactivo",
+  };
+
   const formatDateCell = (value?: string | Date | null) => {
     if (!value) return "";
     if (value instanceof Date) {
@@ -589,6 +673,21 @@ const isWithinPeriod = (date: Date) => {
     if (value === undefined || value === null) return "";
     return value ? "Sí" : "No";
   };
+
+  const getProspectStatusLabel = (status?: string | null) =>
+    status ? prospectStatusLabels[status as ProspectStatus] ?? status : "";
+
+  const getProspectPriorityLabel = (priority?: string | null) =>
+    priority
+      ? prospectPriorityLabels[priority as ProspectPriority] ?? priority
+      : "";
+
+  const getCustomPlanStatusLabel = (status?: string | null) =>
+    status
+      ? customPlanStatusLabels[
+          status as "active" | "expiring" | "expired" | "inactive"
+        ] ?? status
+      : "";
 
   const getOverdueDays = (iso?: string | null) => {
     if (!iso) return "";
@@ -784,7 +883,122 @@ const isWithinPeriod = (date: Date) => {
       };
     });
 
-    return { resumen, pagos, gastos, socios, proximos };
+     const interesados = prospects.map((prospect) => {
+      const status = pick(prospect as any, "status") as
+        | ProspectStatus
+        | undefined;
+      const priority = pick(
+        prospect as any,
+        "priority_level",
+        "priorityLevel"
+      ) as ProspectPriority | undefined;
+      const contactISO = pick(
+        prospect as any,
+        "contact_date",
+        "contactDate"
+      ) as string | undefined;
+      const scheduledISO = pick(
+        prospect as any,
+        "scheduled_date",
+        "scheduledDate"
+      ) as string | undefined;
+      const createdISO = pick(
+        prospect as any,
+        "created_at",
+        "createdAt"
+      ) as string | undefined;
+
+      return {
+        InteresadoId: prospect.id,
+        Nombre: pick(prospect as any, "name") ?? prospect.name,
+        Email: pick(prospect as any, "email") ?? prospect.email ?? "",
+        Telefono: pick(prospect as any, "phone") ?? prospect.phone ?? "",
+        Interes: pick(prospect as any, "interest") ?? prospect.interest ?? "",
+        Estado: getProspectStatusLabel(status),
+        EstadoCodigo: status ?? "",
+        Prioridad: getProspectPriorityLabel(priority),
+        PrioridadCodigo: priority ?? "",
+        FechaContacto: formatDateCell(contactISO),
+        FechaAgendada: formatDateCell(scheduledISO),
+        FechaCreacion: formatDateCell(createdISO),
+        Notas: pick(prospect as any, "notes") ?? prospect.notes ?? "",
+      };
+    });
+
+    const planesPersonalizados = customPlans.map((plan) => {
+      const startISO = pick(plan as any, "start_date", "startDate") as
+        | string
+        | undefined;
+      const endISO = pick(plan as any, "end_date", "endDate") as
+        | string
+        | undefined;
+      const paymentISO = pick(plan as any, "payment_date", "paymentDate") as
+        | string
+        | undefined;
+      const isActive = pick(plan as any, "is_active", "isActive") as
+        | boolean
+        | null
+        | undefined;
+      const endDate = endISO ? toLocalDateFromISO(endISO) : null;
+      const daysUntilEnd = endDate
+        ? Math.ceil(
+            (toLocalMidnight(endDate).getTime() - todayMid.getTime()) /
+              86400000
+          )
+        : "";
+
+      let statusCode: "active" | "expiring" | "expired" | "inactive" | "" =
+        "";
+      if (typeof isActive === "boolean") {
+        if (!isActive) {
+          statusCode = "inactive";
+        } else if (typeof daysUntilEnd === "number") {
+          if (daysUntilEnd < 0) statusCode = "expired";
+          else if (daysUntilEnd <= 7) statusCode = "expiring";
+          else statusCode = "active";
+        } else {
+          statusCode = "active";
+        }
+      }
+
+      return {
+        PlanPersonalizadoId: plan.id,
+        NombrePlan: pick(plan as any, "name") ?? plan.name,
+        SocioId:
+          (pick(plan as any, "member_id", "memberId") as string | undefined) ||
+          "",
+        Socio:
+          pick(plan as any, "member_name", "memberName") ??
+            plan.member_name ??
+            "",
+        Precio: pick(plan as any, "price") ?? plan.price ?? "",
+        FechaInicio: formatDateCell(startISO),
+        FechaFin: formatDateCell(endISO),
+        DiasHastaVencimiento:
+          typeof daysUntilEnd === "number" ? daysUntilEnd : "",
+        Estado: getCustomPlanStatusLabel(statusCode),
+        EstadoCodigo: statusCode,
+        Activo:
+          typeof isActive === "boolean" ? formatBooleanCell(isActive) : "",
+        MetodoPago:
+          pick(plan as any, "payment_method", "paymentMethod") ?? "",
+        FechaPago: formatDateCell(paymentISO),
+        MarcaTarjeta: pick(plan as any, "card_brand", "cardBrand") ?? "",
+        Cuotas:
+          pick(plan as any, "card_installments", "cardInstallments") ?? "",
+        Descripcion: pick(plan as any, "description") ?? plan.description ?? "",
+      };
+    });
+
+    return {
+      resumen,
+      pagos,
+      gastos,
+      socios,
+      proximos,
+      interesados,
+      planesPersonalizados,
+    };
   }
 
   // === Exportadores ===
@@ -803,7 +1017,15 @@ const isWithinPeriod = (date: Date) => {
 
   // CSV (genera 1 .csv por "hoja"; Excel lo abre directo)
   function exportCSV() {
-    const { resumen, pagos, gastos, socios, proximos } = buildSheets();
+    const {
+      resumen,
+      pagos,
+      gastos,
+      socios,
+      proximos,
+      interesados,
+      planesPersonalizados,
+    } = buildSheets();
 
     const files: { name: string; rows: Array<Record<string, any>> }[] = [
       { name: "Resumen", rows: resumen },
@@ -811,6 +1033,8 @@ const isWithinPeriod = (date: Date) => {
       { name: "Gastos", rows: gastos },
       { name: "Socios", rows: socios },
       { name: "ProximosVencimientos", rows: proximos },
+      { name: "Interesados", rows: interesados },
+      { name: "PlanesPersonalizados", rows: planesPersonalizados },
     ];
 
     const base = gymName.toLowerCase().replace(/\s+/g, "-");

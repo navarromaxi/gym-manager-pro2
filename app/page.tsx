@@ -968,6 +968,8 @@ export default function GymManagementSystem() {
             members={members}
             payments={payments}
             expenses={expenses}
+            prospects={prospects}
+            customPlans={customPlans}
             gymName={gymData?.name || ""}
           />
         )}
