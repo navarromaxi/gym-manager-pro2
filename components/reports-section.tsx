@@ -34,6 +34,7 @@ import {
   AlertTriangle,
   Filter,
   RefreshCw,
+  UserCheck,
 } from "lucide-react";
 import { PieChart, Pie } from "recharts";
 import {
@@ -557,6 +558,51 @@ const isWithinPeriod = (date: Date) => {
   });
 
   const totalNewMembers = newMembersInPeriod.length;
+
+  const getProspectDateForFiltering = (prospect: Prospect) => {
+    const iso = pick(
+      prospect as any,
+      "contact_date",
+      "contactDate",
+      "created_at",
+      "createdAt",
+      "scheduled_date",
+      "scheduledDate"
+    ) as string | undefined;
+    return iso ? toLocalDateFromISO(iso) : null;
+  };
+
+  const interestedProspectsInPeriod = prospects.filter((prospect) => {
+    const status = pick(prospect as any, "status") as
+      | ProspectStatus
+      | undefined;
+    if (status && status !== "averiguador") return false;
+    const date = getProspectDateForFiltering(prospect);
+    if (!date) return false;
+    const mid = toLocalMidnight(date);
+    if (periodStart && mid < periodStart) return false;
+    if (periodEnd && mid > periodEnd) return false;
+    return true;
+  });
+
+  const totalInterestedProspects = interestedProspectsInPeriod.length;
+  const rawConvertedProspects = newMembersInPeriod.length;
+  const convertedProspectsCount = Math.min(
+    rawConvertedProspects,
+    totalInterestedProspects
+  );
+  const notConvertedProspectsCount =
+    totalInterestedProspects - convertedProspectsCount;
+  const conversionRate =
+    totalInterestedProspects > 0
+      ? Math.round((convertedProspectsCount / totalInterestedProspects) * 100)
+      : 0;
+  const nonConversionRate =
+    totalInterestedProspects > 0
+      ? Math.round(
+          (notConvertedProspectsCount / totalInterestedProspects) * 100
+        )
+      : 0;
 
   const referralDistributionEntries = Object.entries(
     newMembersInPeriod.reduce((acc, member) => {
@@ -1379,40 +1425,8 @@ const isWithinPeriod = (date: Date) => {
         </CardContent>
       </Card>
 
-      {/* Plan Distribution */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Distribución por Planes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-               {planDistributionEntries.length > 0 ? (
-                planDistributionEntries.map(({ plan, count }) => (
-                  <div key={plan} className="flex items-center justify-between">
-                    <span className="font-medium">{plan}</span>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-muted-foreground">
-                        {count} socios
-                      </span>
-                      <Badge variant="outline">
-                        {totalPlanMembers > 0
-                          ? Math.round((count / totalPlanMembers) * 100)
-                          : 0}
-                        %
-                      </Badge>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No hay pagos de planes en el período seleccionado.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
+     {/* Distribuciones y Conversión */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Métodos de Pago - {getTimeFilterLabel()}</CardTitle>
@@ -1495,40 +1509,132 @@ const isWithinPeriod = (date: Date) => {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-       {/* Referral Source Report */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Users className="mr-2 h-5 w-5" />
-            Socios que nos conocieron por
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {totalNewMembers > 0
-              ? `Período: ${getTimeFilterLabel()} · Nuevos socios: ${totalNewMembers}`
-              : `No se registraron nuevos socios en ${getTimeFilterLabel()}.`}
-          </p>
-        </CardHeader>
-        <CardContent>
-          {totalNewMembers > 0 ? (
-             <div className="space-y-3">
-              {referralDistributionEntries.map(({ source, count, percentage }) => (
-                <div key={source} className="rounded-lg border p-3">
-                  <p className="font-medium">{source}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Cantidad: {count} · Porcentaje sobre el total: {percentage}%
-                  </p>
-                </div>
-              ))}
+          <CardHeader>
+            <CardTitle>Distribución por Planes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {planDistributionEntries.length > 0 ? (
+                planDistributionEntries.map(({ plan, count }) => (
+                  <div key={plan} className="flex items-center justify-between">
+                    <span className="font-medium">{plan}</span>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-muted-foreground">
+                        {count} socios
+                      </span>
+                      <Badge variant="outline">
+                        {totalPlanMembers > 0
+                          ? Math.round((count / totalPlanMembers) * 100)
+                          : 0}
+                        %
+                      </Badge>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No hay pagos de planes en el período seleccionado.
+                </p>
+              )}
             </div>
-          ) : (
+           </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Users className="mr-2 h-5 w-5" />
+              Socios que nos conocieron por
+            </CardTitle>
             <p className="text-sm text-muted-foreground">
-              No se registraron nuevos socios en {getTimeFilterLabel()}.
+              {totalNewMembers > 0
+                ? `Período: ${getTimeFilterLabel()} · Nuevos socios: ${totalNewMembers}`
+                : `No se registraron nuevos socios en ${getTimeFilterLabel()}.`}
             </p>
-          )}
-        </CardContent>
-      </Card>
+           </CardHeader>
+          <CardContent>
+            {totalNewMembers > 0 ? (
+              <div className="space-y-3">
+                {referralDistributionEntries.map(
+                  ({ source, count, percentage }) => (
+                    <div key={source} className="rounded-lg border p-3">
+                      <p className="font-medium">{source}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Cantidad: {count} · Porcentaje sobre el total: {percentage}%
+                      </p>
+                    </div>
+                  )
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No se registraron nuevos socios en {getTimeFilterLabel()}.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <UserCheck className="mr-2 h-5 w-5" />
+              Conversión de Interesados
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Seguimiento de interesados con filtro de {getTimeFilterLabel()}
+            </p>
+          </CardHeader>
+          <CardContent>
+            {totalInterestedProspects > 0 ? (
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-sm text-muted-foreground">
+                      Interesados del período
+                    </p>
+                    <p className="text-2xl font-bold">
+                      {totalInterestedProspects}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-sm text-muted-foreground">
+                      Convertidos a socios
+                    </p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {convertedProspectsCount}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-sm text-muted-foreground">
+                      Tasa de conversión
+                    </p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {conversionRate}%
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {convertedProspectsCount} de {totalInterestedProspects} interesados
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-sm text-muted-foreground">No convertidos</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {notConvertedProspectsCount}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {nonConversionRate}% del total
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No se registraron interesados en {getTimeFilterLabel()}.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Income Trend */}
       <Card>

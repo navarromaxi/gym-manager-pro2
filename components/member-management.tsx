@@ -380,6 +380,9 @@ export function MemberManagement({
         memberStatus = "expired";
       }
 
+      const planName = selectedPlan?.name || newMember.plan || "";
+      const paymentDescription =
+        newMember.description?.trim() || `Pago de plan ${planName}`.trim();
       const memberId = `${gymId}_member_${Date.now()}`;
 
       const member: Member = {
@@ -451,7 +454,7 @@ export function MemberManagement({
             ? newMember.cardInstallments
             : undefined,
         type: "plan",
-        description: newMember.description || undefined,
+        description: paymentDescription,
         plan_id: selectedPlan?.id,
       };
 
