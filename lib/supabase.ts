@@ -25,6 +25,7 @@ export interface Member {
   name: string
   email: string
   phone: string
+  referral_source?: string | null
   join_date: string
   plan: string
   plan_price: number

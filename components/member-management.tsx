@@ -140,6 +140,7 @@ export function MemberManagement({
   const [newMember, setNewMember] = useState({
     name: "",
     email: "",
+    referralSource: "",
     phone: "",
     plan: "",
     planPrice: 0,
@@ -387,6 +388,7 @@ export function MemberManagement({
         name: newMember.name,
         email: newMember.email,
         phone: newMember.phone,
+        referral_source: newMember.referralSource || null,
         plan: newMember.plan,
         plan_price: newMember.planPrice,
         description: newMember.description || null,
@@ -466,6 +468,7 @@ export function MemberManagement({
       setNewMember({
         name: "",
         email: "",
+        referralSource: "",
         phone: "",
         plan: "",
         planPrice: 0,
@@ -781,6 +784,33 @@ export function MemberManagement({
                     }
                     placeholder="juan@email.com"
                   />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="referralSource">Como nos conocistes?</Label>
+                  <Select
+                    value={newMember.referralSource || "none"}
+                    onValueChange={(value) =>
+                      setNewMember({
+                        ...newMember,
+                        referralSource: value === "none" ? "" : value,
+                      })
+                    }
+                  >
+                    <SelectTrigger id="referralSource">
+                      <SelectValue placeholder="Sin seleccionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin seleccionar</SelectItem>
+                      <SelectItem value="Facebook">Facebook</SelectItem>
+                      <SelectItem value="Instagram">Instagram</SelectItem>
+                      <SelectItem value="Referido">Referido</SelectItem>
+                      <SelectItem value="Pase por el club">
+                        Pase por el club
+                      </SelectItem>
+                      <SelectItem value="Whatssap">Whatssap</SelectItem>
+                      <SelectItem value="Otro">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="phone">Teléfono</Label>
