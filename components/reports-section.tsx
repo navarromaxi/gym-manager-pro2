@@ -525,8 +525,11 @@ const isWithinPeriod = (date: Date) => {
       "referralSource",
       "referral_source"
     ) as string | undefined;
-    if (typeof rawReferral === "string" && rawReferral.trim().length > 0) {
-      return rawReferral;
+     if (typeof rawReferral === "string") {
+      const trimmed = rawReferral.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
     }
     return "Sin seleccionar";
   };
@@ -573,35 +576,6 @@ const isWithinPeriod = (date: Date) => {
     .sort((a, b) => {
       if (b.count !== a.count) return b.count - a.count;
       return a.source.localeCompare(b.source);
-    });
-
-  const newMembersDetails = newMembersInPeriod
-    .map((member) => {
-      const joinISO = pick(member as any, "joinDate", "join_date") as
-        | string
-        | undefined;
-      const joinDate = joinISO ? toLocalDateFromISO(joinISO) : null;
-      const joinMid = joinDate ? toLocalMidnight(joinDate) : null;
-      const planName = pick(
-        member as any,
-        "plan",
-        "planName",
-        "plan_name"
-      ) as string | undefined;
-
-      return {
-        id: member.id,
-        name: (pick(member as any, "name") as string | undefined) ?? member.name,
-        referral: getReferralSourceLabel(member),
-        joinDate: joinMid,
-        joinDateFormatted: formatDateCell(joinISO),
-        plan: planName ?? "",
-      };
-    })
-    .sort((a, b) => {
-      const aTime = a.joinDate ? a.joinDate.getTime() : 0;
-      const bTime = b.joinDate ? b.joinDate.getTime() : 0;
-      return bTime - aTime;
     });
 
   const paymentMethodDistribution = filteredPayments.reduce((acc, payment) => {
@@ -1538,45 +1512,15 @@ const isWithinPeriod = (date: Date) => {
         </CardHeader>
         <CardContent>
           {totalNewMembers > 0 ? (
-            <div className="space-y-6">
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {referralDistributionEntries.map(({ source, count, percentage }) => (
-                  <div
-                    key={source}
-                    className="flex items-center justify-between rounded-lg border p-3"
-                  >
-                    <div>
-                      <p className="font-medium">{source}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {percentage}% de los nuevos socios
-                      </p>
-                    </div>
-                    <Badge variant="secondary">{count}</Badge>
-                  </div>
-                ))}
-              </div>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Socio</TableHead>
-                      <TableHead>Fecha de Alta</TableHead>
-                      <TableHead>Plan</TableHead>
-                      <TableHead>Nos conoció por</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {newMembersDetails.map((member) => (
-                      <TableRow key={member.id}>
-                        <TableCell className="font-medium">{member.name}</TableCell>
-                        <TableCell>{member.joinDateFormatted}</TableCell>
-                        <TableCell>{member.plan || "-"}</TableCell>
-                        <TableCell>{member.referral}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+             <div className="space-y-3">
+              {referralDistributionEntries.map(({ source, count, percentage }) => (
+                <div key={source} className="rounded-lg border p-3">
+                  <p className="font-medium">{source}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Cantidad: {count} · Porcentaje sobre el total: {percentage}%
+                  </p>
+                </div>
+              ))}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
