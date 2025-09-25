@@ -111,6 +111,7 @@ import type {
 } from "@/lib/supabase";
 
 const NEW_PROSPECT_STATUSES: Prospect["status"][] = ["averiguador"];
+const PROSPECTS_PAGE_SIZE = 10;
 
 // === Helpers de fecha/estado para el dashboard ===
 const toLocalDate = (iso: string) => {
@@ -143,6 +144,9 @@ export default function GymManagementSystem() {
   const [members, setMembers] = useState<Member[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [prospectsPage, setProspectsPage] = useState(1);
+  const [prospectsTotal, setProspectsTotal] = useState<number | null>(null);
+  const [prospectsLoadingMore, setProspectsLoadingMore] = useState(false);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -182,6 +186,9 @@ export default function GymManagementSystem() {
     setMembers([]);
     setPayments([]);
     setProspects([]);
+    setProspectsPage(1);
+    setProspectsTotal(null);
+    setProspectsLoadingMore(false);
     setExpenses([]);
     setPlans([]);
     setActivities([]);
@@ -194,12 +201,20 @@ export default function GymManagementSystem() {
     try {
       console.log("Cargando datos para gym:", gymId);
 
+      setProspectsPage(1);
+      setProspectsTotal(null);
+      setProspectsLoadingMore(false);
+
       // Cargar miembros
       const [
         { data: membersData, error: membersError },
         { data: paymentsData, error: paymentsError },
         { data: expensesData, error: expensesError },
-        { data: prospectsData, error: prospectsError },
+        {
+          data: prospectsData,
+          error: prospectsError,
+          count: prospectsCount,
+        },
         { data: plansData, error: plansError },
         { data: activitiesData, error: activitiesError },
         { data: customPlansData, error: customPlansError },
@@ -229,9 +244,13 @@ export default function GymManagementSystem() {
         supabase
           .from("prospects")
           .select(
-            "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, created_at"
+            "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, created_at",
+            { count: "exact" }
           )
-          .eq("gym_id", gymId),
+          .eq("gym_id", gymId)
+          .order("contact_date", { ascending: false, nullsFirst: false })
+          .order("created_at", { ascending: false })
+          .range(0, PROSPECTS_PAGE_SIZE - 1),
         supabase
           .from("plans")
           .select(
@@ -303,6 +322,12 @@ export default function GymManagementSystem() {
         status: mapProspectStatusFromDb(prospect.status),
       })) as Prospect[];
       setProspects(normalizedProspects);
+      setProspectsPage(normalizedProspects.length > 0 ? 1 : 0);
+      setProspectsTotal(
+        typeof prospectsCount === "number"
+          ? prospectsCount
+          : normalizedProspects.length
+      );
       setPlans(plansData || []);
       setActivities(activitiesData || []);
       setCustomPlans(customPlansData || []);
@@ -328,6 +353,74 @@ export default function GymManagementSystem() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadMoreProspects = async () => {
+    if (!gymData?.id) return;
+    if (prospectsLoadingMore) return;
+    if (prospectsTotal !== null && prospects.length >= prospectsTotal) return;
+
+    const nextPage = prospectsPage + 1;
+    const from = (nextPage - 1) * PROSPECTS_PAGE_SIZE;
+    const to = from + PROSPECTS_PAGE_SIZE - 1;
+
+    setProspectsLoadingMore(true);
+
+    try {
+      const { data, error, count } = await supabase
+        .from("prospects")
+        .select(
+          "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, created_at",
+          { count: "exact" }
+        )
+        .eq("gym_id", gymData.id)
+        .order("contact_date", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+
+      const normalized = (data ?? []).map((prospect: any) => ({
+        ...prospect,
+        status: mapProspectStatusFromDb(prospect.status),
+      })) as Prospect[];
+
+      if (normalized.length > 0) {
+        setProspects((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const merged = [...prev];
+          for (const item of normalized) {
+            if (!existingIds.has(item.id)) {
+              merged.push(item);
+            }
+          }
+          return merged;
+        });
+        setProspectsPage(nextPage);
+      }
+
+      if (typeof count === "number") {
+        setProspectsTotal(count);
+      }
+    } catch (error) {
+      console.error("Error cargando más interesados:", error);
+    } finally {
+      setProspectsLoadingMore(false);
+    }
+  };
+
+  const handleProspectAdded = () => {
+    setProspectsTotal((prev) =>
+      typeof prev === "number" ? prev + 1 : prev
+    );
+  };
+
+  const handleProspectRemoved = () => {
+    setProspectsTotal((prev) => {
+      if (typeof prev !== "number") return prev;
+      const next = prev - 1;
+      return next >= 0 ? next : 0;
+    });
   };
 
   // CREAR DATOS DE EJEMPLO SI NO EXISTEN
@@ -626,6 +719,11 @@ export default function GymManagementSystem() {
       monthlyProfit: income - expensesTotal,
     };
   }, [payments, expenses]);
+
+  const hasMoreProspectsOnServer =
+    typeof prospectsTotal === "number"
+      ? prospects.length < prospectsTotal
+      : false;
 
   const newProspectsCount = useMemo(
     () =>
@@ -954,6 +1052,13 @@ export default function GymManagementSystem() {
             setPayments={setPayments}
             plans={plans}
             gymId={gymData?.id || ""}
+            serverPaging
+            hasMoreOnServer={hasMoreProspectsOnServer}
+            onLoadMoreFromServer={loadMoreProspects}
+            loadingMoreFromServer={prospectsLoadingMore}
+            totalProspectsCount={prospectsTotal ?? undefined}
+            onProspectAdded={handleProspectAdded}
+            onProspectRemoved={handleProspectRemoved}
           />
         )}
         {activeTab === "expenses" && (

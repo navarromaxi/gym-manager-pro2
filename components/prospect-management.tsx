@@ -53,6 +53,13 @@ interface ProspectManagementProps {
   setPayments: (updater: (prev: Payment[]) => Payment[]) => void;
   plans: Plan[];
   gymId: string;
+  serverPaging?: boolean;
+  hasMoreOnServer?: boolean;
+  onLoadMoreFromServer?: () => void;
+  loadingMoreFromServer?: boolean;
+  totalProspectsCount?: number;
+  onProspectAdded?: () => void;
+  onProspectRemoved?: () => void;
 }
 
 interface ConversionData {
@@ -66,6 +73,7 @@ interface ConversionData {
   cardBrand: string;
   cardInstallments: number;
   description: string;
+  referralSource: string;
   nextInstallmentDue: string;
 }
 
@@ -329,6 +337,13 @@ export function ProspectManagement({
   setPayments,
   plans,
   gymId,
+  serverPaging = false,
+  hasMoreOnServer = false,
+  onLoadMoreFromServer,
+  loadingMoreFromServer = false,
+  totalProspectsCount,
+  onProspectAdded,
+  onProspectRemoved,
 }: ProspectManagementProps) {
   const PROSPECT_CONVERSION_REFERRAL = "prospect_conversion";
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -364,6 +379,17 @@ export function ProspectManagement({
     "Tarjeta de Débito",
     "Tarjeta de Crédito",
   ];
+
+  const referralSources = [
+    { value: "none", label: "Sin seleccionar" },
+    { value: "Facebook", label: "Facebook" },
+    { value: "Instagram", label: "Instagram" },
+    { value: "Referido", label: "Referido" },
+    { value: "Pase por el club", label: "Pase por el club" },
+    { value: "Whatssap", label: "Whatssap" },
+    { value: "Otro", label: "Otro" },
+  ];
+
   const cardBrands = [
     "VISA",
     "OCA",
@@ -386,6 +412,7 @@ export function ProspectManagement({
       cardBrand: "",
       cardInstallments: 1,
       description: "",
+      referralSource: "",
       nextInstallmentDue: today,
     };
   };
@@ -579,6 +606,7 @@ export function ProspectManagement({
   });
 
   useEffect(() => {
+    if (serverPaging) return;
     setVisibleCount(PROSPECTS_PER_BATCH);
   }, [
     searchTerm,
@@ -587,6 +615,7 @@ export function ProspectManagement({
     scheduledDateFilter,
     contactDateFilter,
     contactDateRangeFilter,
+    serverPaging,
   ]);
 
   const sortedProspects = [...filteredProspects].sort((a, b) => {
@@ -596,14 +625,37 @@ export function ProspectManagement({
   });
 
   const totalFiltered = sortedProspects.length;
-  const currentVisibleCount = Math.min(visibleCount, totalFiltered);
+  const currentVisibleCount = serverPaging
+    ? totalFiltered
+    : Math.min(visibleCount, totalFiltered);
   const displayedProspects = sortedProspects.slice(0, currentVisibleCount);
-  const canLoadMore = currentVisibleCount < totalFiltered;
+  const canLoadMoreLocal = !serverPaging && currentVisibleCount < totalFiltered;
 
   const handleLoadMore = () => {
     setVisibleCount((prev) =>
       Math.min(prev + PROSPECTS_PER_BATCH, sortedProspects.length)
     );
+  };
+
+   const totalLabel =
+    serverPaging && typeof totalProspectsCount === "number"
+      ? totalProspectsCount
+      : totalFiltered;
+
+  const showLoadMoreButton = serverPaging
+    ? hasMoreOnServer || loadingMoreFromServer
+    : canLoadMoreLocal;
+
+  const loadMoreDisabled =
+    serverPaging && (loadingMoreFromServer || !onLoadMoreFromServer);
+
+  const handleLoadMoreClick = () => {
+    if (loadMoreDisabled) return;
+    if (serverPaging) {
+      onLoadMoreFromServer?.();
+    } else {
+      handleLoadMore();
+    }
   };
 
   const handleAddProspect = async () => {
@@ -647,6 +699,7 @@ export function ProspectManagement({
       };
 
       setProspects((prev) => [...prev, addedProspect]);
+      onProspectAdded?.();
       setNewProspect({
         name: "",
         email: "",
@@ -714,6 +767,7 @@ export function ProspectManagement({
       if (error) throw error;
 
       setProspects((prev) => prev.filter((p) => p.id !== id));
+      onProspectRemoved?.();
     } catch (error) {
       console.error("Error eliminando interesado:", error);
       alert("Error al eliminar el interesado. Inténtalo de nuevo.");
@@ -806,10 +860,12 @@ export function ProspectManagement({
         name: convertingProspect.name,
         email: convertingProspect.email || "",
         phone: convertingProspect.phone || "",
-        referral_source: PROSPECT_CONVERSION_REFERRAL,
+        referral_source:
+          conversionData.referralSource || PROSPECT_CONVERSION_REFERRAL,
         join_date: conversionData.paymentDate,
         plan: selectedPlan.name,
         plan_price: conversionData.planPrice,
+        description: conversionData.description.trim() || null,
         last_payment: conversionData.planStartDate,
         next_payment: nextPaymentISO,
         next_installment_due: nextInstallmentDue,
@@ -844,6 +900,11 @@ export function ProspectManagement({
           console.warn("Error registrando contrato de plan:", contractError);
         }
       }
+      
+      const planName = selectedPlan?.name || conversionData.plan || "";
+      const paymentDescription =
+        conversionData.description.trim() ||
+        (planName ? `Pago de plan ${planName}` : "Pago de plan");
 
       const newPayment: Payment = {
         id: `${gymId}_payment_${Date.now()}`,
@@ -865,7 +926,7 @@ export function ProspectManagement({
             ? conversionData.cardInstallments
             : undefined,
         type: "plan",
-        description: conversionData.description || undefined,
+        description: paymentDescription,
         plan_id: selectedPlan.id,
       };
 
@@ -886,6 +947,7 @@ export function ProspectManagement({
       setProspects((prevProspects) =>
         prevProspects.filter((p) => p.id !== convertingProspect.id)
       );
+      onProspectRemoved?.();
 
       handleConvertDialogOpenChange(false);
       alert("Interesado convertido a socio exitosamente!");
@@ -1400,17 +1462,29 @@ export function ProspectManagement({
           </div>
           <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-muted-foreground">
-              {totalFiltered > 0 && (
+              {displayedProspects.length > 0 && (
                 <>
-                  Mostrando <strong>{displayedProspects.length}</strong> de{" "}
-                  <strong>{totalFiltered}</strong> interesados cargados
+                  Mostrando <strong>{displayedProspects.length}</strong>
+                  {totalLabel > displayedProspects.length && (
+                    <>
+                      {" "}de <strong>{totalLabel}</strong>
+                    </>
+                  )}{" "}
+                  interesados{serverPaging ? "" : " cargados"}
                 </>
               )}
             </div>
-            {canLoadMore && (
+             {showLoadMoreButton && (
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={handleLoadMore}>
-                  Cargar más interesados
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLoadMoreClick}
+                  disabled={loadMoreDisabled}
+                >
+                  {serverPaging && loadingMoreFromServer
+                    ? "Cargando..."
+                    : "Cargar más interesados"}
                 </Button>
               </div>
             )}
@@ -1867,6 +1941,29 @@ export function ProspectManagement({
                     </div>
                   </>
                 )}
+                 <div className="grid gap-2">
+                  <Label htmlFor="convert-referral">¿Cómo nos conoció?</Label>
+                  <Select
+                    value={conversionData.referralSource || "none"}
+                    onValueChange={(value) =>
+                      setConversionData((prev) => ({
+                        ...prev,
+                        referralSource: value === "none" ? "" : value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="convert-referral">
+                      <SelectValue placeholder="Sin seleccionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {referralSources.map((source) => (
+                        <SelectItem key={source.value} value={source.value}>
+                          {source.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid gap-2">
                   <Label htmlFor="convert-description">Descripción</Label>
                   <Input
