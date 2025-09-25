@@ -295,6 +295,47 @@ export function MemberManagement({
     });
   }, [members]);
 
+  const getMembersToFollowUp = useCallback(() => {
+    const today = new Date();
+    return members.filter((member) => {
+      let referenceDate: Date | null = null;
+
+      for (const payment of payments) {
+        if (
+          payment.member_id === member.id &&
+          payment.type === "plan" &&
+          payment.start_date
+        ) {
+          const startDate = toLocalDate(payment.start_date);
+          if (Number.isNaN(startDate.getTime())) continue;
+          if (!referenceDate || startDate.getTime() > referenceDate.getTime()) {
+            referenceDate = startDate;
+          }
+        }
+      }
+
+      if (!referenceDate) {
+        const joinDate = toLocalDate(member.join_date);
+        if (Number.isNaN(joinDate.getTime())) return false;
+        referenceDate = joinDate;
+      }
+
+      const diffDays = Math.floor(
+        (today.getTime() - referenceDate.getTime()) / 86400000
+      );
+      return !member.followed_up && diffDays >= 5 && diffDays <= 12;
+    });
+  }, [members, payments]);
+
+  const membersToFollowUp = useMemo(
+    () => getMembersToFollowUp(),
+    [getMembersToFollowUp]
+  );
+  const followUpMemberIds = useMemo(
+    () => new Set(membersToFollowUp.map((member) => member.id)),
+    [membersToFollowUp]
+  );
+
   const filteredMembers = useMemo(() => {
     const today = new Date();
     const expiringCustomPlanMemberIds =
@@ -323,12 +364,7 @@ export function MemberManagement({
       }
 
       if (statusFilter === "follow_up") {
-        const joinDate = toLocalDate(member.join_date);
-        const diffDays = Math.floor(
-          (today.getTime() - joinDate.getTime()) / 86400000
-        );
-        // @ts-ignore posible campo no tipado
-        return !member.followed_up && diffDays >= 5 && diffDays <= 10;
+        return followUpMemberIds.has(member.id);
       }
 
       if (statusFilter === "balance_due") {
@@ -719,42 +755,10 @@ export function MemberManagement({
       alert("No se pudo marcar como contactado.");
     }
   };
-  //ACAA PEGO
-  const getMembersToFollowUp = () => {
-    const today = new Date();
-    return members.filter((member) => {
-      let referenceDate: Date | null = null;
-
-      for (const payment of payments) {
-        if (
-          payment.member_id === member.id &&
-          payment.type === "plan" &&
-          payment.start_date
-        ) {
-          const startDate = toLocalDate(payment.start_date);
-          if (Number.isNaN(startDate.getTime())) continue;
-          if (!referenceDate || startDate.getTime() > referenceDate.getTime()) {
-            referenceDate = startDate;
-          }
-        }
-      }
-
-      if (!referenceDate) {
-        const joinDate = toLocalDate(member.join_date);
-        if (Number.isNaN(joinDate.getTime())) return false;
-        referenceDate = joinDate;
-      }
-
-      const diffDays = Math.floor(
-        (today.getTime() - referenceDate.getTime()) / 86400000
-      );
-      return !member.followed_up && diffDays >= 5 && diffDays <= 12;
-    });
-  };
+  
 
   const expiringMembers = getExpiringMembers();
   const expiredMembers = getExpiredMembers();
-  const membersToFollowUp = getMembersToFollowUp();
   const membersWithBalanceDue = getMembersWithBalanceDue();
   const todayMidnight = new Date();
   todayMidnight.setHours(0, 0, 0, 0);
