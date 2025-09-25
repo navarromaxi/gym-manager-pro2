@@ -76,7 +76,7 @@ type PlanFormState = {
 
 const createEmptyPlanForm = (): PlanFormState => ({
   member_id: "",
-  name: "",
+  name: "Personalizado",
   description: "",
   price: 0,
   start_date: new Date().toLocaleDateString("en-CA"),
@@ -574,200 +574,202 @@ export function CustomPlanManagement({
               Nuevo Plan
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-5xl">
             <DialogHeader>
               <DialogTitle>Crear Plan Personalizado</DialogTitle>
               <DialogDescription>
                 Asocia un plan especial a un socio.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Buscar Socio</Label>
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar socio..."
-                    className="pl-8"
-                    value={memberSearch}
-                    onFocus={() => setIsMemberSelectOpen(true)}
-                    onChange={(e) => handleMemberSearchChange(e.target.value)}
-                  />
-                </div>
-                <Select
-                  open={isMemberSelectOpen}
-                  onOpenChange={setIsMemberSelectOpen}
-                  value={newPlan.member_id}
-                  onValueChange={(v) => {
-                    setNewPlan({ ...newPlan, member_id: v });
-                    const selectedMember = members.find((m) => m.id === v);
-                    if (selectedMember) {
-                      setMemberSearch(selectedMember.name);
-                    }
-                    setIsMemberSelectOpen(false);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar socio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredMembers.length === 0 ? (
-                      <SelectItem value="no-results" disabled>
-                        Sin resultados
-                      </SelectItem>
-                    ) : (
-                      filteredMembers.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>Nombre del Plan</Label>
-                <Input
-                  value={newPlan.name}
-                  onChange={(e) =>
-                    setNewPlan({ ...newPlan, name: e.target.value })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Descripción</Label>
-                <Input
-                  value={newPlan.description}
-                  onChange={(e) =>
-                    setNewPlan({ ...newPlan, description: e.target.value })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Precio ($)</Label>
-                <Input
-                  type="number"
-                  value={newPlan.price}
-                  onChange={(e) =>
-                    setNewPlan({ ...newPlan, price: Number(e.target.value) })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Fecha de inicio</Label>
-                <Input
-                  type="date"
-                  value={newPlan.start_date}
-                  onChange={(e) =>
-                    setNewPlan({ ...newPlan, start_date: e.target.value })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Fecha de pago</Label>
-                <Input
-                  type="date"
-                  value={newPlan.payment_date}
-                  onChange={(e) =>
-                    setNewPlan({ ...newPlan, payment_date: e.target.value })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Método de pago</Label>
-                <Select
-                  value={newPlan.payment_method}
-                  onValueChange={(v) =>
-                    setNewPlan({
-                      ...newPlan,
-                      payment_method: v,
-                      card_brand: "",
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar método" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Efectivo">Efectivo</SelectItem>
-                    <SelectItem value="Transferencia">Transferencia</SelectItem>
-                    <SelectItem value="Tarjeta de Débito">
-                      Tarjeta de Débito
-                    </SelectItem>
-                    <SelectItem value="Tarjeta de Crédito">
-                      Tarjeta de Crédito
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
-                newPlan.payment_method || ""
-              ) && (
-                <>
-                  <div className="grid gap-2">
-                    <Label>Tipo de Tarjeta</Label>
-                    <Select
-                      value={newPlan.card_brand}
-                      onValueChange={(v) =>
-                        setNewPlan({ ...newPlan, card_brand: v })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar tarjeta" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {cardBrands.map((brand) => (
-                          <SelectItem key={brand} value={brand}>
-                            {brand}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="cardInstallments">
-                      Número de cuotas en la tarjeta
-                    </Label>
+             <div className="grid gap-6 py-4 max-h-[80vh] overflow-y-auto pr-2">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2 md:col-span-2">
+                  <Label>Buscar Socio</Label>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="cardInstallments"
-                      type="number"
-                      min={1}
-                      value={newPlan.card_installments}
-                      onChange={(e) =>
-                        setNewPlan({
-                          ...newPlan,
-                          card_installments: parseInt(e.target.value) || 1,
-                        })
-                      }
+                      placeholder="Buscar socio..."
+                      className="pl-8"
+                      value={memberSearch}
+                      onFocus={() => setIsMemberSelectOpen(true)}
+                      onChange={(e) => handleMemberSearchChange(e.target.value)}
                     />
                   </div>
-                </>
-              )}
-              <div className="grid gap-2">
-                <Label htmlFor="payment_description">
-                  Descripción del pago
-                </Label>
-                <Input
-                  id="payment_description"
-                  value={newPlan.payment_description}
-                  onChange={(e) =>
-                    setNewPlan({
-                      ...newPlan,
-                      payment_description: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Fecha de finalización</Label>
-                <Input
-                  type="date"
-                  value={newPlan.end_date}
-                  onChange={(e) =>
-                    setNewPlan({ ...newPlan, end_date: e.target.value })
-                  }
-                />
+                  <Select
+                    open={isMemberSelectOpen}
+                    onOpenChange={setIsMemberSelectOpen}
+                    value={newPlan.member_id}
+                    onValueChange={(v) => {
+                      setNewPlan({ ...newPlan, member_id: v });
+                      const selectedMember = members.find((m) => m.id === v);
+                      if (selectedMember) {
+                        setMemberSearch(selectedMember.name);
+                      }
+                      setIsMemberSelectOpen(false);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar socio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredMembers.length === 0 ? (
+                        <SelectItem value="no-results" disabled>
+                          Sin resultados
+                        </SelectItem>
+                      ) : (
+                        filteredMembers.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Nombre del Plan</Label>
+                  <Input
+                    value={newPlan.name}
+                    onChange={(e) =>
+                      setNewPlan({ ...newPlan, name: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Descripción</Label>
+                  <Input
+                    value={newPlan.description}
+                    onChange={(e) =>
+                      setNewPlan({ ...newPlan, description: e.target.value })
+                    }
+                     />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Precio ($)</Label>
+                  <Input
+                    type="number"
+                    value={newPlan.price}
+                    onChange={(e) =>
+                      setNewPlan({ ...newPlan, price: Number(e.target.value) })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Fecha de inicio</Label>
+                  <Input
+                    type="date"
+                    value={newPlan.start_date}
+                    onChange={(e) =>
+                      setNewPlan({ ...newPlan, start_date: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Fecha de pago</Label>
+                  <Input
+                    type="date"
+                    value={newPlan.payment_date}
+                    onChange={(e) =>
+                      setNewPlan({ ...newPlan, payment_date: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Método de pago</Label>
+                  <Select
+                    value={newPlan.payment_method}
+                    onValueChange={(v) =>
+                      setNewPlan({
+                        ...newPlan,
+                        payment_method: v,
+                        card_brand: "",
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar método" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Efectivo">Efectivo</SelectItem>
+                      <SelectItem value="Transferencia">Transferencia</SelectItem>
+                      <SelectItem value="Tarjeta de Débito">
+                        Tarjeta de Débito
+                      </SelectItem>
+                    <SelectItem value="Tarjeta de Crédito">
+                        Tarjeta de Crédito
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+               {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                  newPlan.payment_method || ""
+                ) && (
+                  <div className="grid gap-4 md:grid-cols-2 md:col-span-2">
+                    <div className="grid gap-2">
+                      <Label>Tipo de Tarjeta</Label>
+                      <Select
+                        value={newPlan.card_brand}
+                        onValueChange={(v) =>
+                          setNewPlan({ ...newPlan, card_brand: v })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar tarjeta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {cardBrands.map((brand) => (
+                            <SelectItem key={brand} value={brand}>
+                              {brand}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="cardInstallments">
+                        Número de cuotas en la tarjeta
+                      </Label>
+                      <Input
+                        id="cardInstallments"
+                        type="number"
+                        min={1}
+                        value={newPlan.card_installments}
+                        onChange={(e) =>
+                          setNewPlan({
+                            ...newPlan,
+                            card_installments: parseInt(e.target.value) || 1,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                 )}
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="payment_description">
+                    Descripción del pago
+                  </Label>
+                  <Input
+                    id="payment_description"
+                    value={newPlan.payment_description}
+                    onChange={(e) =>
+                      setNewPlan({
+                        ...newPlan,
+                        payment_description: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Fecha de finalización</Label>
+                  <Input
+                    type="date"
+                    value={newPlan.end_date}
+                    onChange={(e) =>
+                      setNewPlan({ ...newPlan, end_date: e.target.value })
+                    }
+                  />
+                </div>
               </div>
             </div>
             <DialogFooter>

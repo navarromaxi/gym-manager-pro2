@@ -202,6 +202,44 @@ export function MemberManagement({
     });
   }, [effectiveMembers]);
 
+  const membersToFollowUp = useMemo(() => {
+    const today = new Date();
+    return members.filter((member) => {
+      let referenceDate: Date | null = null;
+
+      for (const payment of payments) {
+        if (
+          payment.member_id === member.id &&
+          payment.type === "plan" &&
+          payment.start_date
+        ) {
+          const startDate = toLocalDate(payment.start_date);
+          if (Number.isNaN(startDate.getTime())) continue;
+          if (!referenceDate || startDate.getTime() > referenceDate.getTime()) {
+            referenceDate = startDate;
+          }
+        }
+      }
+
+      if (!referenceDate) {
+        const joinDate = toLocalDate(member.join_date);
+        if (Number.isNaN(joinDate.getTime())) {
+          return false;
+        }
+        referenceDate = joinDate;
+      }
+      const diffDays = Math.floor(
+        (today.getTime() - referenceDate.getTime()) / 86400000
+      );
+      // @ts-ignore (si tu tipo Member aún no declara followed_up)
+      return !member.followed_up && diffDays >= 5 && diffDays <= 12;
+    });
+  }, [members, payments]);
+
+  const followUpMemberIds = useMemo(
+    () => new Set(membersToFollowUp.map((member) => member.id)),
+    [membersToFollowUp]
+  ); 
   const filteredMembers = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
 
@@ -232,9 +270,13 @@ export function MemberManagement({
         return (member.balance_due || 0) > 0;
       }
 
+      if (statusFilter === "follow_up") {
+        return followUpMemberIds.has(member.id);
+      }
+
       return statusFilter === "all" || getRealStatus(member) === statusFilter;
     });
-  }, [sortedMembers, searchTerm, statusFilter]);
+  }, [sortedMembers, searchTerm, statusFilter, followUpMemberIds]);
 
   const totalFiltered = filteredMembers.length;
   const currentVisibleCount = Math.min(visibleCount, totalFiltered);
@@ -531,39 +573,7 @@ export function MemberManagement({
   };
 
   // ⛳ Socios a contactar (ingresaron hace 5–12 días y no follow-up)
-  const getMembersToFollowUp = () => {
-    const today = new Date();
-    return members.filter((member) => {
-      let referenceDate: Date | null = null;
-
-      for (const payment of payments) {
-        if (
-          payment.member_id === member.id &&
-          payment.type === "plan" &&
-          payment.start_date
-        ) {
-          const startDate = toLocalDate(payment.start_date);
-          if (Number.isNaN(startDate.getTime())) continue;
-          if (!referenceDate || startDate.getTime() > referenceDate.getTime()) {
-            referenceDate = startDate;
-          }
-        }
-      }
-
-      if (!referenceDate) {
-        const joinDate = toLocalDate(member.join_date);
-        if (Number.isNaN(joinDate.getTime())) {
-          return false;
-        }
-        referenceDate = joinDate;
-      }
-      const diffDays = Math.floor(
-        (today.getTime() - referenceDate.getTime()) / 86400000
-      );
-      // @ts-ignore (si tu tipo Member aún no declara followed_up)
-      return !member.followed_up && diffDays >= 5 && diffDays <= 12;
-    });
-  };
+  
 
   // ⛳ Socios con saldo pendiente
   const getMembersWithBalanceDue = () => {
@@ -857,6 +867,9 @@ export function MemberManagement({
                 <SelectItem value="expiring_soon">
                   Próximo a vencerse (10 días)
                 </SelectItem>
+                <SelectItem value="follow_up">
+                  Pendientes de seguimiento
+                </SelectItem>
                 <SelectItem value="balance_due">Saldo pendiente</SelectItem>
               </SelectContent>
             </Select>
@@ -889,7 +902,7 @@ export function MemberManagement({
             </div>
           )}
 
-          {getMembersToFollowUp().length > 0 && (
+          {membersToFollowUp.length > 0 && (
             <div className="mt-2 text-sm text-yellow-700 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded flex items-center justify-between">
               <span>
                 ⚠️ Tienes socios que ingresaron hace entre 5 y 12 días y aún no
