@@ -43,6 +43,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import type { Prospect, Member, Payment, Plan } from "@/lib/supabase";
 import { mapProspectStatusToDb } from "@/lib/prospect-status";
+import { detectContractTable } from "@/lib/contract-table";
+import type { ContractTableName } from "@/lib/contract-table";
 
 interface ProspectManagementProps {
   prospects: Prospect[];
@@ -419,9 +421,9 @@ export function ProspectManagement({
   const [conversionData, setConversionData] = useState<ConversionData>(
     getInitialConversionData
   );
-  const [contractTable, setContractTable] = useState<
-    "plan_contracts" | "plan_contract" | null
-  >(null);
+  const [contractTable, setContractTable] = useState<ContractTableName | null>(
+    null
+  );
 
   const selectedConversionPlan = useMemo(() => {
     return plans.find((plan) => plan.name === conversionData.plan) ?? null;
@@ -515,21 +517,8 @@ export function ProspectManagement({
 
   useEffect(() => {
     const checkTable = async () => {
-      const { data, error } = await supabase
-        .from("pg_tables")
-        .select("tablename")
-        .in("tablename", ["plan_contracts", "plan_contract"]);
-
-      if (error) {
-        console.warn("Error verificando tablas de contratos:", error);
-        return;
-      }
-
-      const tableName = data?.[0]?.tablename as
-        | "plan_contracts"
-        | "plan_contract"
-        | undefined;
-      setContractTable(tableName ?? null);
+      const table = await detectContractTable();
+      setContractTable(table);
     };
 
     checkTable();

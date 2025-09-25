@@ -179,10 +179,23 @@ function toLocalMidnight(d: Date) {
   x.setHours(0, 0, 0, 0);
   return x;
 }
+function parseFlexibleDate(raw?: string | null) {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const dateOnlyMatch = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(trimmed);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(trimmed);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
 function parseDateSafe(s?: string | null) {
-  if (!s) return null;
-  const d = new Date(`${s}T00:00:00`);
-  return isNaN(d.getTime()) ? null : d;
+  const parsed = parseFlexibleDate(s);
+  return parsed ? toLocalMidnight(parsed) : null;
 }
 
 function downloadBlob(content: Blob, filename: string) {
@@ -235,16 +248,18 @@ export function ReportsSection({
 
   /** =================== Estado REAL (misma lógica que MemberManagement) =================== */
 // Normaliza "YYYY-MM-DD" a medianoche local (evita desfase por UTC)
-const toLocalDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
+const toLocalDate = (isoDate: string) => {
+  const parsed = parseFlexibleDate(isoDate);
+  return parsed ? toLocalMidnight(parsed) : new Date(NaN);
+};
+
 
 const todayMid = toLocalMidnight(new Date());
 
 /** === helpers de fecha consistentes con MemberManagement === */
 function toLocalDateISO(s?: string | null) {
-  if (!s) return null;
-  // normaliza "YYYY-MM-DD" a medianoche local (evita desfase UTC)
-  const d = new Date(`${s}T00:00:00`);
-  return isNaN(d.getTime()) ? null : d;
+  const parsed = parseFlexibleDate(s);
+  return parsed ? toLocalMidnight(parsed) : null;
 }
 
 function getRealStatusReport(m: Member): DerivedStatus {
@@ -275,8 +290,10 @@ const pick = <T extends object>(obj: T, ...keys: string[]) => {
   }
   return undefined;
 };
-const toLocalDateFromISO = (iso?: string | null) =>
-  iso ? new Date(`${iso}T00:00:00`) : null;
+const toLocalDateFromISO = (iso?: string | null) => {
+  const parsed = parseFlexibleDate(iso);
+  return parsed ? toLocalMidnight(parsed) : null;
+};
 
 const memberIdOf = (payment: Payment): string | undefined =>
   (pick(payment as any, "member_id", "memberId") as string | undefined) ||

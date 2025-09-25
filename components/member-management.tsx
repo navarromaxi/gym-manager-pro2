@@ -34,6 +34,8 @@ import {
 import { Plus, Edit, Trash2, Search, CalendarClock, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
+import { detectContractTable } from "@/lib/contract-table";
+import type { ContractTableName } from "@/lib/contract-table";
 
 
 // Normaliza fechas a medianoche local admitiendo strings con o sin tiempo
@@ -172,9 +174,9 @@ export function MemberManagement({
     "TARJETA D",
     "MERCADO PAGO",
   ];
-  const [contractTable, setContractTable] = useState<
-    "plan_contracts" | "plan_contract" | null
-  >(null);
+  const [contractTable, setContractTable] = useState<ContractTableName | null>(
+    null
+  );
   const [refreshKey, setRefreshKey] = useState(0);
   const [visibleCount, setVisibleCount] = useState(MEMBERS_PER_BATCH);
   const [dismissedCustomPlanAlertIds, setDismissedCustomPlanAlertIds] =
@@ -197,12 +199,10 @@ export function MemberManagement({
 
   useEffect(() => {
     const checkTable = async () => {
-      const { data } = await supabase
-        .from("pg_tables")
-        .select("tablename")
-        .in("tablename", ["plan_contracts", "plan_contract"]);
-      setContractTable((data && data[0]?.tablename) || null);
+      const table = await detectContractTable();
+      setContractTable(table);
     };
+
     checkTable();
   }, []);
   useEffect(() => {

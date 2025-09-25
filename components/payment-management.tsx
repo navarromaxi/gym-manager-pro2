@@ -34,7 +34,8 @@ import {
 import { Plus, Search, DollarSign, Edit, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan, PlanContract } from "@/lib/supabase";
-
+import { detectContractTable } from "@/lib/contract-table";
+import type { ContractTableName } from "@/lib/contract-table";
 interface PaymentManagementProps {
   payments: Payment[];
   setPayments: Dispatch<SetStateAction<Payment[]>>;
@@ -102,34 +103,15 @@ export function PaymentManagement({
   const [planContract, setPlanContract] = useState<PlanContract | null>(null);
   const [methodFilter, setMethodFilter] = useState("all");
   const [installmentFilter, setInstallmentFilter] = useState("all");
-  const [contractTable, setContractTable] = useState<
-    "plan_contracts" | "plan_contract" | null
-  >(null);
+  const [contractTable, setContractTable] = useState<ContractTableName | null>(
+    null
+  );
   const [visibleCount, setVisibleCount] = useState(PAYMENTS_PER_BATCH);
 
   useEffect(() => {
     const checkTable = async () => {
-      const { error: errorContracts } = await supabase
-        .from("plan_contracts")
-        .select("id", { head: true })
-        .limit(1);
-
-      if (!errorContracts) {
-        setContractTable("plan_contracts");
-        return;
-      }
-
-      const { error: errorContract } = await supabase
-        .from("plan_contract")
-        .select("id", { head: true })
-        .limit(1);
-
-      if (!errorContract) {
-        setContractTable("plan_contract");
-        return;
-      }
-
-      setContractTable(null);
+      const table = await detectContractTable();
+      setContractTable(table);
     };
     checkTable();
   }, []);
