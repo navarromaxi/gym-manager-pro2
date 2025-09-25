@@ -35,6 +35,7 @@ import { Plus, Edit, Trash2, Search, CalendarClock, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
 
+
 // Normaliza fechas a medianoche local admitiendo strings con o sin tiempo
 const toLocalDate = (isoDate: string) => {
   if (!isoDate) return new Date(NaN);

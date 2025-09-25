@@ -875,9 +875,10 @@ export function ProspectManagement({
         followed_up: false,
       };
 
+      const { description: _memberDescription, ...memberInsert } = newMember;
       const { error: memberError } = await supabase
         .from("members")
-        .insert([newMember]);
+        .insert([memberInsert]);
       if (memberError) throw memberError;
 
       // 2. Crear el pago inicial
