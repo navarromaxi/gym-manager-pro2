@@ -203,6 +203,10 @@ export function MemberManagement({
     "TARJETA D",
     "MERCADO PAGO",
   ];
+  const isCardPayment = [
+    "Tarjeta de Crédito",
+    "Tarjeta de Débito",
+  ].includes(newMember.paymentMethod);
   const [contractTable, setContractTable] = useState<ContractTableName | null>(
     null
   );
@@ -1078,46 +1082,46 @@ export function MemberManagement({
                     </SelectContent>
                   </Select>
                 </div>
+                 {isCardPayment && (
+                  <div className="grid gap-2">
+                    <Label>Tipo de Tarjeta</Label>
+                    <Select
+                      value={newMember.cardBrand}
+                      onValueChange={(value) =>
+                        setNewMember({ ...newMember, cardBrand: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona tarjeta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cardBrands.map((brand) => (
+                          <SelectItem key={brand} value={brand}>
+                            {brand}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 {newMember.paymentMethod === "Tarjeta de Crédito" && (
-                  <>
-                    <div className="grid gap-2">
-                      <Label>Tipo de Tarjeta</Label>
-                      <Select
-                        value={newMember.cardBrand}
-                        onValueChange={(value) =>
-                          setNewMember({ ...newMember, cardBrand: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona tarjeta" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {cardBrands.map((brand) => (
-                            <SelectItem key={brand} value={brand}>
-                              {brand}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="cardInstallments">
-                        Número de cuotas en la tarjeta
-                      </Label>
-                      <Input
-                        id="cardInstallments"
-                        type="number"
-                        min={1}
-                        value={newMember.cardInstallments}
-                        onChange={(e) =>
-                          setNewMember({
-                            ...newMember,
-                            cardInstallments: parseInt(e.target.value) || 1,
-                          })
-                        }
-                      />
-                    </div>
-                  </>
+                   <div className="grid gap-2">
+                    <Label htmlFor="cardInstallments">
+                      Número de cuotas en la tarjeta
+                    </Label>
+                    <Input
+                      id="cardInstallments"
+                      type="number"
+                      min={1}
+                      value={newMember.cardInstallments}
+                      onChange={(e) =>
+                        setNewMember({
+                          ...newMember,
+                          cardInstallments: parseInt(e.target.value) || 1,
+                        })
+                      }
+                    />
+                  </div>
                 )}
                 <div className="grid gap-2 md:col-span-2 lg:col-span-3">
                   <Label htmlFor="description">Descripción</Label>
