@@ -1344,7 +1344,7 @@ export function MemberManagement({
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Teléfono</TableHead>
-                <TableHead>Plan</TableHead>
+                <TableHead>Plan actual</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Fin del plan</TableHead>
                 <TableHead>Días Restantes</TableHead>

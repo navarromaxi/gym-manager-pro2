@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Calendar,
   UserPlus,
+  X,
 } from "lucide-react";
 
 import type { MemberManagementProps } from "@/components/member-management";
@@ -157,6 +158,8 @@ export default function GymManagementSystem() {
   >(null);
   const [memberFilter, setMemberFilter] = useState("all");
   const [loading, setLoading] = useState(false);
+  const [dismissedNextContactReminders, setDismissedNextContactReminders] =
+    useState<string[]>([]);
 
   const displayGymName = gymData?.name
     ? sanitizeGymName(gymData.name)
@@ -244,7 +247,7 @@ export default function GymManagementSystem() {
         supabase
           .from("prospects")
           .select(
-            "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, created_at",
+            "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, next_contact_date, created_at",
             { count: "exact" }
           )
           .eq("gym_id", gymId)
@@ -361,7 +364,7 @@ export default function GymManagementSystem() {
       const { data, error, count } = await supabase
         .from("prospects")
         .select(
-          "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, created_at",
+           "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, next_contact_date, created_at",
           { count: "exact" }
         )
         .eq("gym_id", gymData.id)
@@ -568,6 +571,60 @@ export default function GymManagementSystem() {
     [prospects]
   );
 
+   const nextContactTomorrowCount = useMemo(() => {
+    const tomorrow = new Date();
+    tomorrow.setHours(0, 0, 0, 0);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return prospects.reduce((count, prospect) => {
+      if (!prospect.next_contact_date) {
+        return count;
+      }
+
+      const parsed = new Date(`${prospect.next_contact_date}T00:00:00`);
+      if (Number.isNaN(parsed.getTime())) {
+        return count;
+      }
+
+      parsed.setHours(0, 0, 0, 0);
+      return parsed.getTime() === tomorrow.getTime() ? count + 1 : count;
+    }, 0);
+  }, [prospects]);
+
+  const getNextContactReminderKey = (prospect: Prospect) =>
+    `next-contact:${prospect.id}:${prospect.next_contact_date ?? ""}`;
+
+  const nextContactReminders = useMemo(() => {
+    const tomorrow = new Date();
+    tomorrow.setHours(0, 0, 0, 0);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return prospects.filter((prospect) => {
+      if (!prospect.next_contact_date) {
+        return false;
+      }
+
+      const reminderKey = getNextContactReminderKey(prospect);
+      if (dismissedNextContactReminders.includes(reminderKey)) {
+        return false;
+      }
+
+      const parsed = new Date(`${prospect.next_contact_date}T00:00:00`);
+      if (Number.isNaN(parsed.getTime())) {
+        return false;
+      }
+
+      parsed.setHours(0, 0, 0, 0);
+      return parsed.getTime() === tomorrow.getTime();
+    });
+  }, [prospects, dismissedNextContactReminders]);
+
+  const handleDismissNextContactReminder = (key: string) => {
+    setDismissedNextContactReminders((prev) =>
+      prev.includes(key) ? prev : [...prev, key]
+    );
+  };
+
   const goToMembersWithFilter = (filter: string) => {
     setMemberFilter(filter);
     setActiveTab("members");
@@ -769,9 +826,22 @@ export default function GymManagementSystem() {
                 </span>
               </div>
             )}
+            {nextContactTomorrowCount > 0 && (
+              <div
+                className="flex items-center space-x-2 text-purple-600 cursor-pointer hover:bg-purple-50 p-2 rounded"
+                onClick={goToProspects}
+              >
+                <Calendar className="h-4 w-4" />
+                <span>
+                  {nextContactTomorrowCount} interesado
+                  {nextContactTomorrowCount > 1 ? "s" : ""} para contactar mañana
+                </span>
+              </div>
+            )}
             {upcomingExpirations === 0 &&
               expiredMembers === 0 &&
-              newProspectsCount === 0 && (
+              newProspectsCount === 0 &&
+              nextContactTomorrowCount === 0 && (
                 <div className="flex items-center space-x-2 text-green-600">
                   <span>✅ Todo en orden</span>
                 </div>
@@ -949,6 +1019,45 @@ export default function GymManagementSystem() {
           />
         )}
       </main>
+      {activeTab === "dashboard" && nextContactReminders.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2">
+          {nextContactReminders.map((prospect) => {
+            const reminderKey = getNextContactReminderKey(prospect);
+
+            return (
+              <div
+                key={reminderKey}
+                className="flex items-start gap-3 rounded-md border border-purple-200 bg-purple-50 p-4 text-sm text-purple-800 shadow-lg"
+              >
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-purple-600" />
+                <div className="flex-1">
+                  <p className="font-semibold">
+                    Mañana debes contactar a {prospect.name}
+                  </p>
+                  {prospect.interest ? (
+                    <p className="text-xs text-purple-700">
+                      Interés: {prospect.interest}
+                    </p>
+                  ) : null}
+                  {prospect.phone ? (
+                    <p className="text-xs text-purple-700">
+                      Teléfono: {prospect.phone}
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDismissNextContactReminder(reminderKey)}
+                  className="ml-2 text-purple-600 transition hover:text-purple-800"
+                  aria-label={`Cerrar recordatorio para ${prospect.name}`}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

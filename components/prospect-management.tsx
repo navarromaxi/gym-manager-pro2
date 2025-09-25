@@ -360,6 +360,7 @@ export function ProspectManagement({
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all"); // Nuevo estado para el filtro de prioridad
   const [scheduledDateFilter, setScheduledDateFilter] = useState(""); // estado para el filtro de fecha
+   const [nextContactDateFilter, setNextContactDateFilter] = useState("");
   const [contactDateFilter, setContactDateFilter] = useState("");
   const [contactDateRangeFilter, setContactDateRangeFilter] =
     useState("all-history");
@@ -373,6 +374,7 @@ export function ProspectManagement({
     notes: "",
     priority_level: "green" as "green" | "yellow" | "red", // Nuevo campo con valor por defecto
     scheduled_date: "",
+    next_contact_date: "",
   });
 
   const paymentMethods = [
@@ -506,8 +508,11 @@ export function ProspectManagement({
     return parsed.toLocaleString(undefined, formatterOptions);
   };
 
-  const getReminderKey = (prospect: Prospect) =>
-    `${prospect.id}-${prospect.scheduled_date ?? ""}`;
+   const getScheduledReminderKey = (prospect: Prospect) =>
+    `scheduled:${prospect.id}:${prospect.scheduled_date ?? ""}`;
+
+  const getNextContactReminderKey = (prospect: Prospect) =>
+    `next-contact:${prospect.id}:${prospect.next_contact_date ?? ""}`;
 
   const handleDismissReminder = (key: string) => {
     setDismissedReminders((prev) =>
@@ -545,7 +550,7 @@ export function ProspectManagement({
         return false;
       }
 
-      const reminderKey = getReminderKey(prospect);
+      const reminderKey = getScheduledReminderKey(prospect);
       if (dismissedReminders.includes(reminderKey)) {
         return false;
       }
@@ -559,6 +564,36 @@ export function ProspectManagement({
       scheduledDate.setHours(0, 0, 0, 0);
 
       return scheduledDate.getTime() === tomorrow.getTime();
+    });
+  })();
+
+  const upcomingNextContactReminders = (() => {
+    if (!isClient) return [] as Prospect[];
+
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setHours(0, 0, 0, 0);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return prospects.filter((prospect) => {
+      if (!prospect.next_contact_date) {
+        return false;
+      }
+
+      const reminderKey = getNextContactReminderKey(prospect);
+      if (dismissedReminders.includes(reminderKey)) {
+        return false;
+      }
+
+      const nextContact = parseScheduledDate(prospect.next_contact_date);
+      if (!nextContact) {
+        return false;
+      }
+
+      const normalized = new Date(nextContact);
+      normalized.setHours(0, 0, 0, 0);
+
+      return normalized.getTime() === tomorrow.getTime();
     });
   })();
 
@@ -584,11 +619,16 @@ export function ProspectManagement({
       scheduledDateFilter
     );
 
+    const matchesNextContactDate = areDatesEquivalent(
+      prospect.next_contact_date,
+      nextContactDateFilter
+    );
     return (
       matchesSearch &&
       matchesStatus &&
       matchesPriority &&
       matchesScheduledDate &&
+      matchesNextContactDate &&
       matchesContactDate &&
       matchesContactDateRange
     );
@@ -602,6 +642,7 @@ export function ProspectManagement({
     statusFilter,
     priorityFilter,
     scheduledDateFilter,
+    nextContactDateFilter,
     contactDateFilter,
     contactDateRangeFilter,
     serverPaging,
@@ -654,6 +695,9 @@ export function ProspectManagement({
       const scheduledDateValue = newProspect.scheduled_date
         ? newProspect.scheduled_date
         : null;
+      const nextContactDateValue = newProspect.next_contact_date
+        ? newProspect.next_contact_date
+        : null;
 
       const { error } = await supabase.from("prospects").insert([
         {
@@ -668,6 +712,7 @@ export function ProspectManagement({
           notes: newProspect.notes,
           priority_level: newProspect.priority_level,
           scheduled_date: scheduledDateValue,
+          next_contact_date: nextContactDateValue,
         },
       ]);
 
@@ -685,6 +730,7 @@ export function ProspectManagement({
         notes: newProspect.notes,
         priority_level: newProspect.priority_level,
         scheduled_date: scheduledDateValue,
+        next_contact_date: nextContactDateValue,
       };
 
       setProspects((prev) => [...prev, addedProspect]);
@@ -699,6 +745,7 @@ export function ProspectManagement({
         notes: "",
         priority_level: "green", // Resetear a verde por defecto
         scheduled_date: "",
+        next_contact_date: "",
       });
       setIsAddDialogOpen(false);
     } catch (error: any) {
@@ -727,6 +774,7 @@ export function ProspectManagement({
           notes: editingProspect.notes,
           priority_level: editingProspect.priority_level, // Incluir el nuevo campo
           scheduled_date: editingProspect.scheduled_date || null,
+          next_contact_date: editingProspect.next_contact_date || null,
         })
         .eq("id", editingProspect.id)
         .eq("gym_id", gymId);
@@ -1143,6 +1191,25 @@ export function ProspectManagement({
                   Fecha prevista para la clase de prueba (opcional).
                 </p>
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="next_contact_date">
+                  Fecha de nuevo contacto
+                </Label>
+                <Input
+                  id="next_contact_date"
+                  type="date"
+                  value={newProspect.next_contact_date}
+                  onChange={(e) =>
+                    setNewProspect({
+                      ...newProspect,
+                      next_contact_date: e.target.value,
+                    })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Define cuándo debes volver a contactar al interesado.
+                </p>
+              </div>
               {/* Nuevo campo para la prioridad */}
               <div className="grid gap-2">
                 <Label htmlFor="priority_level">Prioridad</Label>
@@ -1292,6 +1359,46 @@ export function ProspectManagement({
             </div>
             <div className="space-y-2">
               <Label
+                htmlFor="next-contact-date-filter"
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Próximo contacto
+              </Label>
+              <Input
+                id="next-contact-date-filter"
+                type="date"
+                value={nextContactDateFilter}
+                onChange={(event) =>
+                  setNextContactDateFilter(event.target.value)
+                }
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() =>
+                    setNextContactDateFilter(
+                      new Date().toISOString().split("T")[0]
+                    )
+                  }
+                >
+                  Hoy
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={() => setNextContactDateFilter("")}
+                >
+                  Limpiar
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label
                 htmlFor="contact-date-filter"
                 className="text-sm font-medium text-muted-foreground"
               >
@@ -1364,7 +1471,7 @@ export function ProspectManagement({
         </CardHeader>
         <CardContent>
           <div className="w-full overflow-x-auto">
-            <Table className="min-w-[960px]">
+            <Table className="min-w-[1100px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>
@@ -1373,6 +1480,7 @@ export function ProspectManagement({
                   <TableHead>Fecha Contacto</TableHead>
                   <TableHead>Interés</TableHead>
                   <TableHead>Estado</TableHead>
+                   <TableHead>Próximo contacto</TableHead>
                   <TableHead>Fecha agendada</TableHead>
                   <TableHead>Prioridad</TableHead>
                   {/* Nueva columna en la tabla */}
@@ -1382,6 +1490,9 @@ export function ProspectManagement({
               <TableBody>
                 {displayedProspects.map((prospect) => {
                   const scheduledDate = formatDate(prospect.scheduled_date);
+                  const nextContactDate = formatDate(
+                    prospect.next_contact_date
+                  );
                   return (
                     <TableRow key={prospect.id}>
                       <TableCell className="font-medium">
@@ -1411,6 +1522,20 @@ export function ProspectManagement({
                         ) : (
                           <span className="text-xs text-muted-foreground">
                             Sin coordinar
+                          </span>
+                        )}
+                      </TableCell>
+                       <TableCell>
+                        {nextContactDate ? (
+                          <Badge
+                            variant="outline"
+                            className="border-purple-400 text-purple-600"
+                          >
+                            {nextContactDate}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Sin definir
                           </span>
                         )}
                       </TableCell>
@@ -1610,6 +1735,25 @@ export function ProspectManagement({
                   />
                   <p className="text-xs text-muted-foreground">
                     Fecha coordinada para la clase de prueba (opcional).
+                  </p>
+                </div>
+                 <div className="grid gap-2">
+                  <Label htmlFor="edit-next_contact_date">
+                    Fecha de nuevo contacto
+                  </Label>
+                  <Input
+                    id="edit-next_contact_date"
+                    type="date"
+                    value={editingProspect.next_contact_date ?? ""}
+                    onChange={(e) =>
+                      setEditingProspect({
+                        ...editingProspect,
+                        next_contact_date: e.target.value ? e.target.value : null,
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Planifica cuándo volver a comunicarte con el interesado.
                   </p>
                 </div>
                 <div className="grid gap-2">
@@ -1994,10 +2138,48 @@ export function ProspectManagement({
           </DialogContent>
         </Dialog>
       )}
-      {isClient && upcomingTrialReminders.length > 0 && (
+      {isClient &&
+        (upcomingNextContactReminders.length > 0 ||
+          upcomingTrialReminders.length > 0) && (
         <div className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2">
+           {upcomingNextContactReminders.map((prospect) => {
+            const reminderKey = getNextContactReminderKey(prospect);
+            const nextContactLabel = formatDate(prospect.next_contact_date);
+
+            return (
+              <div
+                key={reminderKey}
+                className="flex items-start gap-3 rounded-md border border-purple-200 bg-purple-50 p-4 text-sm text-purple-800 shadow-lg"
+              >
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-purple-600" />
+                <div className="flex-1">
+                  <p className="font-semibold">
+                    Mañana debes contactar a {prospect.name}
+                  </p>
+                  {nextContactLabel ? (
+                    <p className="text-xs text-purple-700">
+                      Próximo contacto: {nextContactLabel}
+                    </p>
+                  ) : null}
+                  {prospect.interest ? (
+                    <p className="text-xs text-purple-700">
+                      Interés: {prospect.interest}
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDismissReminder(reminderKey)}
+                  className="ml-2 text-purple-600 transition hover:text-purple-800"
+                  aria-label={`Cerrar recordatorio para ${prospect.name}`}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            );
+          })}
           {upcomingTrialReminders.map((prospect) => {
-            const reminderKey = getReminderKey(prospect);
+            const reminderKey = getScheduledReminderKey(prospect);
             const scheduledLabel = formatScheduledDateTime(
               prospect.scheduled_date
             );

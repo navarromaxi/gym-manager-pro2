@@ -81,6 +81,7 @@ export interface Prospect {
   priority_level?: "green" | "yellow" | "red" // ¡NUEVA PROPIEDAD!
   scheduled_date?: string | null
   created_at?: string
+  next_contact_date?: string | null
 }
 
 export interface Plan {
