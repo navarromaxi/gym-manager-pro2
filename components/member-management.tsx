@@ -37,7 +37,6 @@ import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
 import { detectContractTable } from "@/lib/contract-table";
 import type { ContractTableName } from "@/lib/contract-table";
 
-
 // Normaliza fechas a medianoche local admitiendo strings con o sin tiempo
 const toLocalDate = (isoDate: string) => {
   if (!isoDate) return new Date(NaN);
@@ -97,6 +96,36 @@ const getRealStatus = (member: Member): "active" | "expired" | "inactive" => {
   if (diffDays <= 0) return "active";
   if (diffDays <= 30) return "expired";
   return "inactive";
+};
+
+const extractCustomPlanTimestamp = (plan: CustomPlan) => {
+  const parts = plan.id.split("_");
+  const maybeTimestamp = Number.parseInt(parts[parts.length - 1] ?? "", 10);
+  return Number.isNaN(maybeTimestamp) ? 0 : maybeTimestamp;
+};
+
+const getCustomPlanEndDate = (plan: CustomPlan) => {
+  if (!plan.end_date) return null;
+  const parsed = toLocalDate(plan.end_date);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const isCustomPlanMoreRecent = (candidate: CustomPlan, current: CustomPlan) => {
+  const candidateEnd = getCustomPlanEndDate(candidate);
+  const currentEnd = getCustomPlanEndDate(current);
+
+  if (candidateEnd && currentEnd) {
+    if (candidateEnd.getTime() !== currentEnd.getTime()) {
+      return candidateEnd.getTime() > currentEnd.getTime();
+    }
+  }
+
+  if (candidateEnd && !currentEnd) return true;
+  if (!candidateEnd && currentEnd) return false;
+
+  return (
+    extractCustomPlanTimestamp(candidate) > extractCustomPlanTimestamp(current)
+  );
 };
 
 export interface MemberManagementProps {
@@ -182,6 +211,23 @@ export function MemberManagement({
   const [dismissedCustomPlanAlertIds, setDismissedCustomPlanAlertIds] =
     useState<string[]>([]);
 
+  const latestCustomPlanByMember = useMemo(() => {
+    const map = new Map<string, CustomPlan>();
+    for (const plan of customPlans) {
+      const stored = map.get(plan.member_id);
+      if (!stored || isCustomPlanMoreRecent(plan, stored)) {
+        map.set(plan.member_id, plan);
+      }
+    }
+    return map;
+  }, [customPlans]);
+
+  const isLatestCustomPlan = useCallback(
+    (plan: CustomPlan) =>
+      latestCustomPlanByMember.get(plan.member_id)?.id === plan.id,
+    [latestCustomPlanByMember]
+  );
+
   const selectedPlanForNewMember = useMemo(() => {
     return plans.find((p) => p.name === newMember.plan) ?? null;
   }, [plans, newMember.plan]);
@@ -219,6 +265,7 @@ export function MemberManagement({
     const today = new Date();
 
     return customPlans.filter((plan) => {
+      if (!isLatestCustomPlan(plan)) return false;
       if (!plan.is_active) return false;
       if (!plan.end_date) return false;
 
@@ -231,7 +278,7 @@ export function MemberManagement({
 
       return diffDays <= 10 && diffDays >= 0;
     });
-  }, [customPlans]);
+  }, [customPlans, isLatestCustomPlan]);
 
   const sortedMembers = useMemo(() => {
     const parseDate = (value?: string | null) => {
@@ -1307,9 +1354,15 @@ export function MemberManagement({
                 const daysUntilExpiration = getDaysUntilExpiration(
                   member.next_payment
                 );
-                const customPlan = customPlans.find(
-                  (cp) => cp.member_id === member.id && cp.is_active
-                );
+                const customPlan = latestCustomPlanByMember.get(member.id);
+                const parsedCustomPlanEndDate = customPlan?.end_date
+                  ? toLocalDate(customPlan.end_date)
+                  : null;
+                const customPlanEndDate =
+                  parsedCustomPlanEndDate &&
+                  !Number.isNaN(parsedCustomPlanEndDate.getTime())
+                    ? parsedCustomPlanEndDate.toLocaleDateString()
+                    : customPlan?.end_date ?? null;
                 return (
                   <TableRow key={member.id}>
                     <TableCell className="font-medium">{member.name}</TableCell>
@@ -1318,10 +1371,9 @@ export function MemberManagement({
                       <div>
                         {member.plan} - ${member.plan_price}
                       </div>
-                      {customPlan && (
+                      {customPlan && customPlanEndDate && (
                         <div className="ml-4 text-sm text-muted-foreground">
-                          Personalizado -{" "}
-                          {new Date(customPlan.end_date).toLocaleDateString()}
+                          Personalizado - {customPlanEndDate}
                         </div>
                       )}
                     </TableCell>

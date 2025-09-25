@@ -1,13 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { supabase, Member, CustomPlan, Payment } from "@/lib/supabase";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +52,13 @@ interface CustomPlanManagementProps {
   gymId: string;
 }
 
-type StatusFilter = "all" | "active" | "expiring" | "expired" | "inactive";
+type StatusFilter =
+  | "all"
+  | "active"
+  | "expiring"
+  | "expired"
+  | "inactive"
+  | "renewed";
 
 type PlanFormState = {
   member_id: string;
@@ -102,7 +103,9 @@ export function CustomPlanManagement({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [newPlan, setNewPlan] = useState<PlanFormState>(createEmptyPlanForm());
   const [isRenewDialogOpen, setIsRenewDialogOpen] = useState(false);
-  const [renewPlan, setRenewPlan] = useState<PlanFormState>(createEmptyPlanForm());
+  const [renewPlan, setRenewPlan] = useState<PlanFormState>(
+    createEmptyPlanForm()
+  );
   const [renewMemberSearch, setRenewMemberSearch] = useState("");
   const [isRenewMemberSelectOpen, setIsRenewMemberSelectOpen] = useState(false);
 
@@ -151,15 +154,76 @@ export function CustomPlanManagement({
     maximumFractionDigits: 0,
   });
 
+  const getPlanTimestamp = (plan: CustomPlan) => {
+    const parts = plan.id.split("_");
+    const maybeTimestamp = Number.parseInt(parts[parts.length - 1] ?? "", 10);
+    return Number.isNaN(maybeTimestamp) ? 0 : maybeTimestamp;
+  };
+
+  const latestPlanByMember = useMemo(() => {
+    const map = new Map<string, CustomPlan>();
+
+    const isFirstPlanPreferred = (
+      candidate: CustomPlan,
+      current: CustomPlan
+    ) => {
+      const candidateEnd = parseDate(candidate.end_date);
+      const currentEnd = parseDate(current.end_date);
+
+      if (candidateEnd && currentEnd) {
+        if (candidateEnd.getTime() !== currentEnd.getTime()) {
+          return candidateEnd.getTime() > currentEnd.getTime();
+        }
+      }
+
+      if (candidateEnd && !currentEnd) return true;
+      if (!candidateEnd && currentEnd) return false;
+
+      return getPlanTimestamp(candidate) > getPlanTimestamp(current);
+    };
+
+    for (const plan of customPlans) {
+      const stored = map.get(plan.member_id);
+      if (!stored || isFirstPlanPreferred(plan, stored)) {
+        map.set(plan.member_id, plan);
+      }
+    }
+
+    return map;
+  }, [customPlans]);
+
+  const isPlanRenewed = (plan: CustomPlan) => {
+    const latest = latestPlanByMember.get(plan.member_id);
+    if (!latest) return false;
+    if (latest.id === plan.id) return false;
+
+    const latestEnd = parseDate(latest.end_date);
+    const planEnd = parseDate(plan.end_date);
+
+    if (latestEnd && planEnd) {
+      if (latestEnd.getTime() > planEnd.getTime()) return true;
+      if (latestEnd.getTime() < planEnd.getTime()) return false;
+    }
+
+    if (latestEnd && !planEnd) return true;
+    if (!latestEnd && planEnd) return false;
+
+    return getPlanTimestamp(latest) > getPlanTimestamp(plan);
+  };
+
+  const plansForStatus = customPlans.filter((plan) => !isPlanRenewed(plan));
+
   const totalPlans = customPlans.length;
-  const activePlans = customPlans.filter(
+  const activePlans = plansForStatus.filter(
     (plan) => plan.is_active && !isPlanExpired(plan)
   ).length;
-  const expiringSoonCount = customPlans.filter(
+  const expiringSoonCount = plansForStatus.filter(
     (plan) => plan.is_active && isPlanExpiringSoon(plan)
   ).length;
-  const expiredPlans = customPlans.filter((plan) => isPlanExpired(plan)).length;
-  const inactivePlans = customPlans.filter((plan) => !plan.is_active).length;
+  const expiredPlans = plansForStatus.filter((plan) =>
+    isPlanExpired(plan)
+  ).length;
+  const inactivePlans = plansForStatus.filter((plan) => !plan.is_active).length;
   const totalRevenue = customPlans.reduce(
     (sum, plan) => sum + (plan.price || 0),
     0
@@ -172,7 +236,13 @@ export function CustomPlanManagement({
       plan.member_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-   const filteredPlans = searchFilteredPlans.filter((plan) => {
+  const filteredPlans = searchFilteredPlans.filter((plan) => {
+    if (statusFilter !== "all" && statusFilter !== "renewed") {
+      if (isPlanRenewed(plan)) {
+        return false;
+      }
+    }
+
     switch (statusFilter) {
       case "active":
         return plan.is_active && !isPlanExpired(plan);
@@ -182,6 +252,8 @@ export function CustomPlanManagement({
         return isPlanExpired(plan);
       case "inactive":
         return !plan.is_active;
+      case "renewed":
+        return isPlanRenewed(plan);
       default:
         return true;
     }
@@ -220,15 +292,14 @@ export function CustomPlanManagement({
     expiring: "Planes que vencen en los próximos 7 días.",
     expired: "Planes con fecha de finalización vencida.",
     inactive: "Planes marcados como inactivos.",
+    renewed: "Planes que ya fueron renovados por uno más reciente.",
   };
 
   const filterDescription = filterDescriptionMap[statusFilter];
   const hasActiveFilters =
     statusFilter !== "all" || searchTerm.trim().length > 0;
   const resultsLabel =
-    filteredPlans.length === 1
-      ? "1 plan"
-      : `${filteredPlans.length} planes`;
+    filteredPlans.length === 1 ? "1 plan" : `${filteredPlans.length} planes`;
 
   const handleClearFilters = () => {
     setSearchTerm("");
@@ -236,6 +307,13 @@ export function CustomPlanManagement({
   };
 
   const renderStatusBadge = (plan: CustomPlan) => {
+    if (isPlanRenewed(plan)) {
+      return (
+        <Badge className="border-transparent bg-sky-100 text-sky-700">
+          Ya renovado
+        </Badge>
+      );
+    }
     if (!plan.is_active) {
       return (
         <Badge className="border-transparent bg-slate-200 text-slate-700">
@@ -268,6 +346,9 @@ export function CustomPlanManagement({
   };
 
   const renderTimeLeft = (plan: CustomPlan) => {
+    if (isPlanRenewed(plan)) {
+      return <span className="text-xs text-sky-700">Plan renovado</span>;
+    }
     const days = getDaysUntil(plan);
     if (!plan.end_date) {
       return (
@@ -295,9 +376,7 @@ export function CustomPlanManagement({
 
     if (days === 0) {
       return (
-        <span className="text-xs font-medium text-amber-600">
-          Vence hoy
-        </span>
+        <span className="text-xs font-medium text-amber-600">Vence hoy</span>
       );
     }
 
@@ -375,7 +454,6 @@ export function CustomPlanManagement({
     } else {
       setPayments([...payments, payment]);
     }
-
 
     setCustomPlans([...customPlans, plan]);
     setIsAddDialogOpen(false);
@@ -517,10 +595,10 @@ export function CustomPlanManagement({
                   />
                 </div>
                 <Select
-                 open={isMemberSelectOpen}
+                  open={isMemberSelectOpen}
                   onOpenChange={setIsMemberSelectOpen}
                   value={newPlan.member_id}
-                   onValueChange={(v) => {
+                  onValueChange={(v) => {
                     setNewPlan({ ...newPlan, member_id: v });
                     const selectedMember = members.find((m) => m.id === v);
                     if (selectedMember) {
@@ -533,11 +611,11 @@ export function CustomPlanManagement({
                     <SelectValue placeholder="Seleccionar socio" />
                   </SelectTrigger>
                   <SelectContent>
-                     {filteredMembers.length === 0 ? (
+                    {filteredMembers.length === 0 ? (
                       <SelectItem value="no-results" disabled>
                         Sin resultados
                       </SelectItem>
-                  ) : (
+                    ) : (
                       filteredMembers.map((m) => (
                         <SelectItem key={m.id} value={m.id}>
                           {m.name}
@@ -575,7 +653,7 @@ export function CustomPlanManagement({
                   }
                 />
               </div>
-               <div className="grid gap-2">
+              <div className="grid gap-2">
                 <Label>Fecha de inicio</Label>
                 <Input
                   type="date"
@@ -613,16 +691,19 @@ export function CustomPlanManagement({
                   <SelectContent>
                     <SelectItem value="Efectivo">Efectivo</SelectItem>
                     <SelectItem value="Transferencia">Transferencia</SelectItem>
-                    <SelectItem value="Tarjeta de Débito">Tarjeta de Débito</SelectItem>
-                    <SelectItem value="Tarjeta de Crédito">Tarjeta de Crédito</SelectItem>
+                    <SelectItem value="Tarjeta de Débito">
+                      Tarjeta de Débito
+                    </SelectItem>
+                    <SelectItem value="Tarjeta de Crédito">
+                      Tarjeta de Crédito
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-               {[
-                "Tarjeta de Crédito",
-                "Tarjeta de Débito",
-              ].includes(newPlan.payment_method || "") && (
+              {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                newPlan.payment_method || ""
+              ) && (
                 <>
                   <div className="grid gap-2">
                     <Label>Tipo de Tarjeta</Label>
@@ -664,7 +745,9 @@ export function CustomPlanManagement({
                 </>
               )}
               <div className="grid gap-2">
-                <Label htmlFor="payment_description">Descripción del pago</Label>
+                <Label htmlFor="payment_description">
+                  Descripción del pago
+                </Label>
                 <Input
                   id="payment_description"
                   value={newPlan.payment_description}
@@ -695,237 +778,237 @@ export function CustomPlanManagement({
       </div>
 
       <Dialog
-          open={isRenewDialogOpen}
-          onOpenChange={(open) => {
-            if (!open) {
-              resetRenewState();
-            } else {
-              setIsRenewDialogOpen(true);
-            }
-          }}
-        >
-          <DialogContent className="sm:max-w-5xl">
-            <DialogHeader>
-              <DialogTitle>Renovar Plan Personalizado</DialogTitle>
-              <DialogDescription>
-                Actualiza los datos para generar una nueva vigencia del plan
-                seleccionado.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-6 py-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label>Buscar Socio</Label>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar socio..."
-                      className="pl-8"
-                      value={renewMemberSearch}
-                      onFocus={() => setIsRenewMemberSelectOpen(true)}
-                      onChange={(e) =>
-                        handleRenewMemberSearchChange(e.target.value)
-                      }
-                    />
-                  </div>
-                  <Select
-                    open={isRenewMemberSelectOpen}
-                    onOpenChange={setIsRenewMemberSelectOpen}
-                    value={renewPlan.member_id}
-                    onValueChange={(v) => {
-                      setRenewPlan({ ...renewPlan, member_id: v });
-                      const selectedMember = members.find((m) => m.id === v);
-                      if (selectedMember) {
-                        setRenewMemberSearch(selectedMember.name);
-                      }
-                      setIsRenewMemberSelectOpen(false);
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar socio" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {renewFilteredMembers.length === 0 ? (
-                        <SelectItem value="no-results" disabled>
-                          Sin resultados
+        open={isRenewDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            resetRenewState();
+          } else {
+            setIsRenewDialogOpen(true);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Renovar Plan Personalizado</DialogTitle>
+            <DialogDescription>
+              Actualiza los datos para generar una nueva vigencia del plan
+              seleccionado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Buscar Socio</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar socio..."
+                    className="pl-8"
+                    value={renewMemberSearch}
+                    onFocus={() => setIsRenewMemberSelectOpen(true)}
+                    onChange={(e) =>
+                      handleRenewMemberSearchChange(e.target.value)
+                    }
+                  />
+                </div>
+                <Select
+                  open={isRenewMemberSelectOpen}
+                  onOpenChange={setIsRenewMemberSelectOpen}
+                  value={renewPlan.member_id}
+                  onValueChange={(v) => {
+                    setRenewPlan({ ...renewPlan, member_id: v });
+                    const selectedMember = members.find((m) => m.id === v);
+                    if (selectedMember) {
+                      setRenewMemberSearch(selectedMember.name);
+                    }
+                    setIsRenewMemberSelectOpen(false);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar socio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {renewFilteredMembers.length === 0 ? (
+                      <SelectItem value="no-results" disabled>
+                        Sin resultados
+                      </SelectItem>
+                    ) : (
+                      renewFilteredMembers.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.name}
                         </SelectItem>
-                      ) : (
-                        renewFilteredMembers.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.name}
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Nombre del Plan</Label>
+                <Input
+                  value={renewPlan.name}
+                  onChange={(e) =>
+                    setRenewPlan({ ...renewPlan, name: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Descripción</Label>
+                <Input
+                  value={renewPlan.description}
+                  onChange={(e) =>
+                    setRenewPlan({
+                      ...renewPlan,
+                      description: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Precio ($)</Label>
+                <Input
+                  type="number"
+                  value={renewPlan.price}
+                  onChange={(e) =>
+                    setRenewPlan({
+                      ...renewPlan,
+                      price: Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Fecha de inicio</Label>
+                <Input
+                  type="date"
+                  value={renewPlan.start_date}
+                  onChange={(e) =>
+                    setRenewPlan({
+                      ...renewPlan,
+                      start_date: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Fecha de pago</Label>
+                <Input
+                  type="date"
+                  value={renewPlan.payment_date}
+                  onChange={(e) =>
+                    setRenewPlan({
+                      ...renewPlan,
+                      payment_date: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Método de pago</Label>
+                <Select
+                  value={renewPlan.payment_method}
+                  onValueChange={(v) =>
+                    setRenewPlan({
+                      ...renewPlan,
+                      payment_method: v,
+                      card_brand: "",
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar método" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Efectivo">Efectivo</SelectItem>
+                    <SelectItem value="Transferencia">Transferencia</SelectItem>
+                    <SelectItem value="Tarjeta de Débito">
+                      Tarjeta de Débito
+                    </SelectItem>
+                    <SelectItem value="Tarjeta de Crédito">
+                      Tarjeta de Crédito
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                renewPlan.payment_method
+              ) && (
+                <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label>Tarjeta</Label>
+                    <Select
+                      value={renewPlan.card_brand}
+                      onValueChange={(v) =>
+                        setRenewPlan({
+                          ...renewPlan,
+                          card_brand: v,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar tarjeta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cardBrands.map((brand) => (
+                          <SelectItem key={brand} value={brand}>
+                            {brand}
                           </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Nombre del Plan</Label>
-                  <Input
-                    value={renewPlan.name}
-                    onChange={(e) =>
-                      setRenewPlan({ ...renewPlan, name: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Descripción</Label>
-                  <Input
-                    value={renewPlan.description}
-                    onChange={(e) =>
-                      setRenewPlan({
-                        ...renewPlan,
-                        description: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Precio ($)</Label>
-                  <Input
-                    type="number"
-                    value={renewPlan.price}
-                    onChange={(e) =>
-                      setRenewPlan({
-                        ...renewPlan,
-                        price: Number(e.target.value),
-                      })
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Fecha de inicio</Label>
-                  <Input
-                    type="date"
-                    value={renewPlan.start_date}
-                    onChange={(e) =>
-                      setRenewPlan({
-                        ...renewPlan,
-                        start_date: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Fecha de pago</Label>
-                  <Input
-                    type="date"
-                    value={renewPlan.payment_date}
-                    onChange={(e) =>
-                      setRenewPlan({
-                        ...renewPlan,
-                        payment_date: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Método de pago</Label>
-                  <Select
-                    value={renewPlan.payment_method}
-                    onValueChange={(v) =>
-                      setRenewPlan({
-                        ...renewPlan,
-                        payment_method: v,
-                        card_brand: "",
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar método" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Efectivo">Efectivo</SelectItem>
-                      <SelectItem value="Transferencia">Transferencia</SelectItem>
-                      <SelectItem value="Tarjeta de Débito">
-                        Tarjeta de Débito
-                      </SelectItem>
-                      <SelectItem value="Tarjeta de Crédito">
-                        Tarjeta de Crédito
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
-                  renewPlan.payment_method
-                ) && (
-                  <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {renewPlan.payment_method === "Tarjeta de Crédito" && (
                     <div className="grid gap-2">
-                      <Label>Tarjeta</Label>
-                      <Select
-                        value={renewPlan.card_brand}
-                        onValueChange={(v) =>
+                      <Label>Cuotas</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={renewPlan.card_installments}
+                        onChange={(e) =>
                           setRenewPlan({
                             ...renewPlan,
-                            card_brand: v,
+                            card_installments: Number(e.target.value),
                           })
                         }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar tarjeta" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {cardBrands.map((brand) => (
-                            <SelectItem key={brand} value={brand}>
-                              {brand}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
                     </div>
-                    {renewPlan.payment_method === "Tarjeta de Crédito" && (
-                      <div className="grid gap-2">
-                        <Label>Cuotas</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={renewPlan.card_installments}
-                          onChange={(e) =>
-                            setRenewPlan({
-                              ...renewPlan,
-                              card_installments: Number(e.target.value),
-                            })
-                          }
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div className="grid gap-2 md:col-span-2">
-                  <Label htmlFor="renew-payment-description">
-                    Descripción del pago
-                  </Label>
-                  <Input
-                    id="renew-payment-description"
-                    value={renewPlan.payment_description}
-                    onChange={(e) =>
-                      setRenewPlan({
-                        ...renewPlan,
-                        payment_description: e.target.value,
-                      })
-                    }
-                  />
+                  )}
                 </div>
-                <div className="grid gap-2">
-                  <Label>Fecha de finalización</Label>
-                  <Input
-                    type="date"
-                    value={renewPlan.end_date}
-                    onChange={(e) =>
-                      setRenewPlan({
-                        ...renewPlan,
-                        end_date: e.target.value,
-                      })
-                    }
-                  />
-                </div>
+              )}
+              <div className="grid gap-2 md:col-span-2">
+                <Label htmlFor="renew-payment-description">
+                  Descripción del pago
+                </Label>
+                <Input
+                  id="renew-payment-description"
+                  value={renewPlan.payment_description}
+                  onChange={(e) =>
+                    setRenewPlan({
+                      ...renewPlan,
+                      payment_description: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Fecha de finalización</Label>
+                <Input
+                  type="date"
+                  value={renewPlan.end_date}
+                  onChange={(e) =>
+                    setRenewPlan({
+                      ...renewPlan,
+                      end_date: e.target.value,
+                    })
+                  }
+                />
               </div>
             </div>
-            <DialogFooter>
-              <Button onClick={handleRenewPlan}>Guardar renovación</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleRenewPlan}>Guardar renovación</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card className="border border-blue-100 bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-500 text-white shadow-sm">
@@ -992,13 +1075,14 @@ export function CustomPlanManagement({
         </Card>
       </div>
 
-        {expiringSoonCount > 0 && (
+      {expiringSoonCount > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 text-sm shadow-sm">
           <div className="flex items-start gap-3 text-amber-800">
             <CalendarClock className="mt-0.5 h-5 w-5 flex-shrink-0" />
             <div>
               <p className="font-medium">
-                {expiringSoonCount} plan{expiringSoonCount === 1 ? "" : "es"} próximo
+                {expiringSoonCount} plan{expiringSoonCount === 1 ? "" : "es"}{" "}
+                próximo
                 {expiringSoonCount === 1 ? "" : "s"} a vencer
               </p>
               <p className="text-xs text-amber-700">
@@ -1034,6 +1118,7 @@ export function CustomPlanManagement({
                 <SelectItem value="expiring">Próximos a vencer</SelectItem>
                 <SelectItem value="expired">Vencidos</SelectItem>
                 <SelectItem value="inactive">Inactivos</SelectItem>
+                <SelectItem value="renewed">Ya renovados</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1063,7 +1148,7 @@ export function CustomPlanManagement({
             {resultsLabel}
           </Badge>
         </CardHeader>
-         <CardContent className="p-0">
+        <CardContent className="p-0">
           <ScrollArea className="w-full">
             <div className="min-w-[640px]">
               <Table>
@@ -1129,7 +1214,7 @@ export function CustomPlanManagement({
                         </div>
                       </TableCell>
                       <TableCell className="text-right align-top">
-                         <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-2">
                           <Button
                             variant="ghost"
                             size="icon"
