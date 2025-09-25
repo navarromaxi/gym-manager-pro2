@@ -330,6 +330,7 @@ export function ProspectManagement({
   plans,
   gymId,
 }: ProspectManagementProps) {
+  const PROSPECT_CONVERSION_REFERRAL = "prospect_conversion";
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
@@ -805,6 +806,7 @@ export function ProspectManagement({
         name: convertingProspect.name,
         email: convertingProspect.email || "",
         phone: convertingProspect.phone || "",
+        referral_source: PROSPECT_CONVERSION_REFERRAL,
         join_date: conversionData.paymentDate,
         plan: selectedPlan.name,
         plan_price: conversionData.planPrice,

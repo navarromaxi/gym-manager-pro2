@@ -171,6 +171,8 @@ interface ReportsSectionProps {
   gymName: string;
 }
 
+const PROSPECT_CONVERSION_REFERRAL = "prospect_conversion";
+
 /** ==== Helpers de fecha ==== */
 function toLocalMidnight(d: Date) {
   const x = new Date(d);
@@ -520,19 +522,40 @@ const isWithinPeriod = (date: Date) => {
     0
   );
 
-    const getReferralSourceLabel = (member: Member) => {
+    const getMemberReferralSource = (member: Member) => {
     const rawReferral = pick(
       member as any,
       "referralSource",
       "referral_source"
-    ) as string | undefined;
-     if (typeof rawReferral === "string") {
+    ) as string | undefined | null;
+    if (typeof rawReferral === "string") {
       const trimmed = rawReferral.trim();
       if (trimmed.length > 0) {
         return trimmed;
       }
     }
-    return "Sin seleccionar";
+    return undefined;
+     };
+
+  const isProspectConversionReferral = (value?: string) => {
+    if (!value) return false;
+    const normalized = value.toLowerCase();
+    return (
+      normalized === PROSPECT_CONVERSION_REFERRAL ||
+      normalized === "converted_from_prospect" ||
+      normalized.startsWith("prospect:")
+    );
+  };
+
+  const isMemberConvertedFromProspect = (member: Member) =>
+    isProspectConversionReferral(getMemberReferralSource(member));
+
+  const getReferralSourceLabel = (member: Member) => {
+    const referral = getMemberReferralSource(member);
+    if (isProspectConversionReferral(referral)) {
+      return "Convertido desde interesado";
+    }
+    return referral ?? "Sin seleccionar";
   };
 
   const formatDateCell = (value?: string | Date | null) => {
@@ -572,11 +595,7 @@ const isWithinPeriod = (date: Date) => {
     return iso ? toLocalDateFromISO(iso) : null;
   };
 
-  const interestedProspectsInPeriod = prospects.filter((prospect) => {
-    const status = pick(prospect as any, "status") as
-      | ProspectStatus
-      | undefined;
-    if (status && status !== "averiguador") return false;
+    const prospectsInPeriod = prospects.filter((prospect) => {
     const date = getProspectDateForFiltering(prospect);
     if (!date) return false;
     const mid = toLocalMidnight(date);
@@ -585,22 +604,38 @@ const isWithinPeriod = (date: Date) => {
     return true;
   });
 
-  const totalInterestedProspects = interestedProspectsInPeriod.length;
-  const rawConvertedProspects = newMembersInPeriod.length;
-  const convertedProspectsCount = Math.min(
-    rawConvertedProspects,
-    totalInterestedProspects
+  const countProspectsInPeriodByStatus = (status: ProspectStatus) =>
+    prospectsInPeriod.filter((prospect) => {
+      const currentStatus = pick(prospect as any, "status") as
+        | ProspectStatus
+        | undefined;
+      return currentStatus === status;
+    }).length;
+
+  const scheduledProspectsCount =
+    countProspectsInPeriodByStatus("trial_scheduled");
+  const attendedProspectsCount = countProspectsInPeriodByStatus("asistio");
+
+  const convertedMembersInPeriod = newMembersInPeriod.filter(
+    isMemberConvertedFromProspect
   );
-  const notConvertedProspectsCount =
-    totalInterestedProspects - convertedProspectsCount;
+  const convertedProspectsCount = convertedMembersInPeriod.length;
+
+  const totalProspectsInPeriod =
+    prospectsInPeriod.length + convertedProspectsCount;
+  const notConvertedProspectsCount = Math.max(
+    totalProspectsInPeriod - convertedProspectsCount,
+    0
+  );
+
   const conversionRate =
-    totalInterestedProspects > 0
-      ? Math.round((convertedProspectsCount / totalInterestedProspects) * 100)
+    totalProspectsInPeriod > 0
+      ? Math.round((convertedProspectsCount / totalProspectsInPeriod) * 100)
       : 0;
   const nonConversionRate =
-    totalInterestedProspects > 0
+    totalProspectsInPeriod > 0
       ? Math.round(
-          (notConvertedProspectsCount / totalInterestedProspects) * 100
+           (notConvertedProspectsCount / totalProspectsInPeriod) * 100
         )
       : 0;
 
@@ -1584,15 +1619,29 @@ const isWithinPeriod = (date: Date) => {
             </p>
           </CardHeader>
           <CardContent>
-            {totalInterestedProspects > 0 ? (
+            {totalProspectsInPeriod > 0 ? (
               <div className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
+                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-lg border p-3">
                     <p className="text-sm text-muted-foreground">
-                      Interesados del período
+                       Averiguadores cargados
                     </p>
                     <p className="text-2xl font-bold">
-                      {totalInterestedProspects}
+                      {totalProspectsInPeriod}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-sm text-muted-foreground">
+                      Coordinamos clase de prueba
+                    </p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {scheduledProspectsCount}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-sm text-muted-foreground">Asistieron</p>
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {attendedProspectsCount}
                     </p>
                   </div>
                   <div className="rounded-lg border p-3">
@@ -1613,7 +1662,7 @@ const isWithinPeriod = (date: Date) => {
                       {conversionRate}%
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {convertedProspectsCount} de {totalInterestedProspects} interesados
+                      {convertedProspectsCount} de {totalProspectsInPeriod} interesados
                     </p>
                   </div>
                   <div className="rounded-lg border p-3">
