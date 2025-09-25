@@ -843,14 +843,17 @@ export function ProspectManagement({
       }
 
       const memberId = `${gymId}_member_${Date.now()}`;
+      const referralSourceValue = conversionData.referralSource
+        ? `prospect:${conversionData.referralSource}`
+        : PROSPECT_CONVERSION_REFERRAL;
+
       const newMember: Member = {
         id: memberId,
         gym_id: gymId,
         name: convertingProspect.name,
         email: convertingProspect.email || "",
         phone: convertingProspect.phone || "",
-        referral_source:
-          conversionData.referralSource || PROSPECT_CONVERSION_REFERRAL,
+        referral_source: referralSourceValue,
         join_date: conversionData.paymentDate,
         plan: selectedPlan.name,
         plan_price: conversionData.planPrice,

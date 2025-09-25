@@ -554,23 +554,49 @@ const isWithinPeriod = (date: Date) => {
     return undefined;
      };
 
-  const isProspectConversionReferral = (value?: string) => {
-    if (!value) return false;
-    const normalized = value.toLowerCase();
-    return (
+  const parseProspectConversionReferral = (
+    value?: string | null
+  ): { isConversion: boolean; originalSource?: string } => {
+    if (!value) {
+      return { isConversion: false };
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return { isConversion: false };
+    }
+
+  const normalized = trimmed.toLowerCase();
+    if (
       normalized === PROSPECT_CONVERSION_REFERRAL ||
-      normalized === "converted_from_prospect" ||
-      normalized.startsWith("prospect:")
-    );
+       normalized === "converted_from_prospect"
+    ) {
+      return { isConversion: true };
+    }
+
+    if (normalized.startsWith("prospect:")) {
+      const originalSource = trimmed.slice(trimmed.indexOf(":") + 1).trim();
+      return {
+        isConversion: true,
+        originalSource: originalSource || undefined,
+      };
+    }
+
+    return { isConversion: false };
   };
+
+  const isProspectConversionReferral = (value?: string | null) =>
+    parseProspectConversionReferral(value).isConversion;
 
   const isMemberConvertedFromProspect = (member: Member) =>
     isProspectConversionReferral(getMemberReferralSource(member));
 
   const getReferralSourceLabel = (member: Member) => {
     const referral = getMemberReferralSource(member);
-    if (isProspectConversionReferral(referral)) {
-      return "Convertido desde interesado";
+    const parsedReferral = parseProspectConversionReferral(referral);
+    if (parsedReferral.isConversion) {
+      return parsedReferral.originalSource
+        ? `Convertido desde interesado (${parsedReferral.originalSource})`
+        : "Convertido desde interesado";
     }
     return referral ?? "Sin seleccionar";
   };
