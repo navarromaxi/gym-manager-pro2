@@ -1812,7 +1812,7 @@ export function ProspectManagement({
           open={isConvertDialogOpen}
           onOpenChange={handleConvertDialogOpenChange}
         >
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-5xl">
             <DialogHeader>
               <DialogTitle>Convertir a Socio</DialogTitle>
               <DialogDescription>
@@ -1820,304 +1820,310 @@ export function ProspectManagement({
               </DialogDescription>
             </DialogHeader>
             {convertingProspect && (
-              <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
-                <div className="grid gap-2">
-                  <Label htmlFor="convert-plan-start">
-                    Fecha de inicio del plan
-                  </Label>
-                  <Input
-                    id="convert-plan-start"
-                    type="date"
-                    value={conversionData.planStartDate}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setConversionData((prev) => {
-                        const plan = plans.find((p) => p.name === prev.plan);
-                        const computedNext = calculatePlanEndDate(value, plan);
-                        return {
-                          ...prev,
-                          planStartDate: value,
-                          nextInstallmentDue:
-                            prev.installments === 1
-                              ? computedNext
-                              : prev.nextInstallmentDue || computedNext,
-                        };
-                      });
-                    }}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="convert-payment-date">Fecha de pago</Label>
-                  <Input
-                    id="convert-payment-date"
-                    type="date"
-                    value={conversionData.paymentDate}
-                    onChange={(e) =>
-                      setConversionData((prev) => ({
-                        ...prev,
-                        paymentDate: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="convert-plan">Plan</Label>
-                  <Select
-                    value={conversionData.plan}
-                    onValueChange={(value) => {
-                      const selectedPlan = plans.find(
-                        (plan) => plan.name === value
-                      );
-                      const computedNext = calculatePlanEndDate(
-                        conversionData.planStartDate,
-                        selectedPlan
-                      );
-                      setConversionData((prev) => ({
-                        ...prev,
-                        plan: value,
-                        planPrice: selectedPlan?.price || 0,
-                        installments: 1,
-                        paymentAmount: selectedPlan?.price || 0,
-                        nextInstallmentDue: computedNext,
-                      }));
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un plan" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(plans ?? [])
-                        .filter((plan) => plan.is_active)
-                        .map((plan) => (
-                          <SelectItem key={plan.id} value={plan.name}>
-                            {plan.name} - ${plan.price.toLocaleString()} (
-                            {plan.duration} {plan.duration_type})
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {conversionData.plan && (
-                  <>
-                    <div className="grid gap-2">
-                      <Label htmlFor="convert-plan-price">
-                        Precio total del plan
-                      </Label>
-                      <Input
-                        id="convert-plan-price"
-                        type="number"
-                        value={conversionData.planPrice}
-                        onChange={(e) => {
-                          const price = parseFloat(e.target.value) || 0;
-                          setConversionData((prev) => ({
+              <div className="grid gap-6 py-4 max-h-[80vh] overflow-y-auto pr-2">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="convert-plan-start">
+                      Fecha de inicio del plan
+                    </Label>
+                    <Input
+                      id="convert-plan-start"
+                      type="date"
+                      value={conversionData.planStartDate}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setConversionData((prev) => {
+                          const plan = plans.find((p) => p.name === prev.plan);
+                          const computedNext = calculatePlanEndDate(value, plan);
+                          return {
                             ...prev,
-                            planPrice: price,
-                            paymentAmount:
+                             planStartDate: value,
+                            nextInstallmentDue:
                               prev.installments === 1
-                                ? price
-                                : prev.paymentAmount,
-                          }));
-                        }}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="convert-installments">
-                        Cantidad de cuotas
-                      </Label>
-                      <Select
-                        value={conversionData.installments.toString()}
-                        onValueChange={(value) => {
-                          const installments = parseInt(value);
-                          setConversionData((prev) => {
-                            const plan = plans.find(
-                              (p) => p.name === prev.plan
-                            );
-                            const computedNext = calculatePlanEndDate(
-                              prev.planStartDate,
-                              plan
-                            );
-                            return {
-                              ...prev,
-                              installments,
-                              paymentAmount:
-                                installments === 1 ? prev.planPrice : 0,
-                              nextInstallmentDue:
-                                installments === 1
-                                  ? computedNext
-                                  : prev.nextInstallmentDue || computedNext,
-                            };
-                          });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona cuotas" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">1</SelectItem>
-                          <SelectItem value="2">2</SelectItem>
-                          <SelectItem value="3">3</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {conversionData.installments > 1 && (
+                                 ? computedNext
+                                : prev.nextInstallmentDue || computedNext,
+                          };
+                        });
+                      }}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="convert-payment-date">Fecha de pago</Label>
+                    <Input
+                      id="convert-payment-date"
+                      type="date"
+                      value={conversionData.paymentDate}
+                      onChange={(e) =>
+                        setConversionData((prev) => ({
+                          ...prev,
+                          paymentDate: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2 md:col-span-2">
+                    <Label htmlFor="convert-plan">Plan</Label>
+                    <Select
+                      value={conversionData.plan}
+                      onValueChange={(value) => {
+                        const selectedPlan = plans.find(
+                          (plan) => plan.name === value
+                        );
+                        const computedNext = calculatePlanEndDate(
+                          conversionData.planStartDate,
+                          selectedPlan
+                        );
+                        setConversionData((prev) => ({
+                          ...prev,
+                          plan: value,
+                          planPrice: selectedPlan?.price || 0,
+                          installments: 1,
+                          paymentAmount: selectedPlan?.price || 0,
+                          nextInstallmentDue: computedNext,
+                        }));
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un plan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(plans ?? [])
+                          .filter((plan) => plan.is_active)
+                          .map((plan) => (
+                            <SelectItem key={plan.id} value={plan.name}>
+                              {plan.name} - ${plan.price.toLocaleString()} (
+                              {plan.duration} {plan.duration_type})
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {conversionData.plan && (
+                    <>
                       <div className="grid gap-2">
-                        <Label htmlFor="convert-payment-amount">
-                          Monto a abonar
+                        <Label htmlFor="convert-plan-price">
+                          Precio total del plan
                         </Label>
                         <Input
-                          id="convert-payment-amount"
+                          id="convert-plan-price"
                           type="number"
-                          value={conversionData.paymentAmount}
+                          value={conversionData.planPrice}
+                          onChange={(e) => {
+                            const price = parseFloat(e.target.value) || 0;
+                            setConversionData((prev) => ({
+                              ...prev,
+                              planPrice: price,
+                              paymentAmount:
+                                 prev.installments === 1
+                                  ? price
+                                  : prev.paymentAmount,
+                            }));
+                          }}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                       <Label htmlFor="convert-installments">
+                          Cantidad de cuotas
+                        </Label>
+                        <Select
+                          value={conversionData.installments.toString()}
+                          onValueChange={(value) => {
+                            const installments = parseInt(value);
+                            setConversionData((prev) => {
+                              const plan = plans.find(
+                                (p) => p.name === prev.plan
+                              );
+                              const computedNext = calculatePlanEndDate(
+                                prev.planStartDate,
+                                plan
+                              );
+                              return {
+                                ...prev,
+                                installments,
+                                paymentAmount:
+                                  installments === 1
+                                    ? prev.planPrice
+                                    : prev.paymentAmount,
+                                nextInstallmentDue:
+                                  installments === 1
+                                    ? computedNext
+                                    : prev.nextInstallmentDue || computedNext,
+                              };
+                            });
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona cuotas" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">1</SelectItem>
+                            <SelectItem value="2">2</SelectItem>
+                            <SelectItem value="3">3</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {conversionData.installments > 1 && (
+                        <div className="grid gap-2">
+                          <Label htmlFor="convert-payment-amount">
+                            Monto a abonar
+                          </Label>
+                          <Input
+                            id="convert-payment-amount"
+                            type="number"
+                            value={conversionData.paymentAmount}
+                            onChange={(e) =>
+                              setConversionData((prev) => ({
+                                ...prev,
+                                paymentAmount:
+                                  parseFloat(e.target.value) || 0,
+                              }))
+                            }
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Saldo pendiente: $
+                            {(
+                              conversionData.planPrice -
+                              conversionData.paymentAmount
+                            ).toFixed(2)}
+                          </p>
+                        </div>
+                      )}
+                      <div className="grid gap-2 md:col-span-2">
+                        <Label htmlFor="convert-next-installment">
+                          Vencimiento próxima cuota
+                        </Label>
+                        <Input
+                          id="convert-next-installment"
+                          type="date"
+                          value={conversionNextInstallmentValue}
                           onChange={(e) =>
                             setConversionData((prev) => ({
                               ...prev,
-                              paymentAmount: parseFloat(e.target.value) || 0,
+                              nextInstallmentDue: e.target.value,
+                            }))
+                          }
+                           disabled={conversionData.installments === 1}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {conversionData.installments === 1
+                            ? "Se utilizará la misma fecha que el fin del plan."
+                            : "Registra cuándo vence la próxima cuota del socio."}
+                        </p>
+                      </div>
+                     </>
+                  )}
+                  <div className="grid gap-2">
+                    <Label htmlFor="convert-method">Método de Pago</Label>
+                    <Select
+                      value={conversionData.paymentMethod}
+                      onValueChange={(value) =>
+                        setConversionData((prev) => ({
+                          ...prev,
+                          paymentMethod: value,
+                          cardBrand: "",
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona método de pago" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentMethods.map((method) => (
+                          <SelectItem key={method} value={method}>
+                            {method}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                    conversionData.paymentMethod
+                  ) && (
+                    <>
+                      <div className="grid gap-2">
+                        <Label>Tipo de Tarjeta</Label>
+                        <Select
+                          value={conversionData.cardBrand}
+                          onValueChange={(value) =>
+                            setConversionData((prev) => ({
+                              ...prev,
+                              cardBrand: value,
+                            }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona tarjeta" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {cardBrands.map((brand) => (
+                              <SelectItem key={brand} value={brand}>
+                                {brand}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="convert-card-installments">
+                          Número de cuotas en la tarjeta
+                        </Label>
+                        <Input
+                          id="convert-card-installments"
+                          type="number"
+                          min={1}
+                          value={conversionData.cardInstallments}
+                          onChange={(e) =>
+                            setConversionData((prev) => ({
+                              ...prev,
+                              cardInstallments:
+                                parseInt(e.target.value) || 1,
                             }))
                           }
                         />
-                        <p className="text-xs text-muted-foreground">
-                          Saldo pendiente: $
-                          {(
-                            conversionData.planPrice -
-                            conversionData.paymentAmount
-                          ).toFixed(2)}
-                        </p>
                       </div>
-                    )}
-                    <div className="grid gap-2">
-                      <Label htmlFor="convert-next-installment">
-                        Vencimiento próxima cuota
-                      </Label>
-                      <Input
-                        id="convert-next-installment"
-                        type="date"
-                        value={conversionNextInstallmentValue}
-                        onChange={(e) =>
-                          setConversionData((prev) => ({
-                            ...prev,
-                            nextInstallmentDue: e.target.value,
-                          }))
-                        }
-                        disabled={conversionData.installments === 1}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {conversionData.installments === 1
-                          ? "Se utilizará la misma fecha que el fin del plan."
-                          : "Registra cuándo vence la próxima cuota del socio."}
-                      </p>
-                    </div>
-                  </>
-                )}
-                <div className="grid gap-2">
-                  <Label htmlFor="convert-method">Método de Pago</Label>
-                  <Select
-                    value={conversionData.paymentMethod}
-                    onValueChange={(value) =>
-                      setConversionData((prev) => ({
-                        ...prev,
-                        paymentMethod: value,
-                        cardBrand: "",
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona método de pago" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {paymentMethods.map((method) => (
-                        <SelectItem key={method} value={method}>
-                          {method}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    </>
+                  )}
+                  <div className="grid gap-2 md:col-span-2">
+                    <Label htmlFor="convert-referral">¿Cómo nos conoció?</Label>
+                    <Select
+                      value={conversionData.referralSource || "none"}
+                      onValueChange={(value) =>
+                        setConversionData((prev) => ({
+                          ...prev,
+                          referralSource: value === "none" ? "" : value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger id="convert-referral">
+                        <SelectValue placeholder="Sin seleccionar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {referralSources.map((source) => (
+                          <SelectItem key={source.value} value={source.value}>
+                            {source.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2 md:col-span-2">
+                    <Label htmlFor="convert-description">Descripción</Label>
+                    <Input
+                      id="convert-description"
+                      value={conversionData.description}
+                      onChange={(e) =>
+                        setConversionData((prev) => ({
+                          ...prev,
+                          description: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground md:col-span-2">
+                    Se creará un nuevo socio y un pago inicial, y el interesado
+                    será eliminado.
+                  </p>
                 </div>
-                {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
-                  conversionData.paymentMethod
-                ) && (
-                  <>
-                    <div className="grid gap-2">
-                      <Label>Tipo de Tarjeta</Label>
-                      <Select
-                        value={conversionData.cardBrand}
-                        onValueChange={(value) =>
-                          setConversionData((prev) => ({
-                            ...prev,
-                            cardBrand: value,
-                          }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona tarjeta" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {cardBrands.map((brand) => (
-                            <SelectItem key={brand} value={brand}>
-                              {brand}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="convert-card-installments">
-                        Número de cuotas en la tarjeta
-                      </Label>
-                      <Input
-                        id="convert-card-installments"
-                        type="number"
-                        min={1}
-                        value={conversionData.cardInstallments}
-                        onChange={(e) =>
-                          setConversionData((prev) => ({
-                            ...prev,
-                            cardInstallments: parseInt(e.target.value) || 1,
-                          }))
-                        }
-                      />
-                    </div>
-                  </>
-                )}
-                 <div className="grid gap-2">
-                  <Label htmlFor="convert-referral">¿Cómo nos conoció?</Label>
-                  <Select
-                    value={conversionData.referralSource || "none"}
-                    onValueChange={(value) =>
-                      setConversionData((prev) => ({
-                        ...prev,
-                        referralSource: value === "none" ? "" : value,
-                      }))
-                    }
-                  >
-                    <SelectTrigger id="convert-referral">
-                      <SelectValue placeholder="Sin seleccionar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {referralSources.map((source) => (
-                        <SelectItem key={source.value} value={source.value}>
-                          {source.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="convert-description">Descripción</Label>
-                  <Input
-                    id="convert-description"
-                    value={conversionData.description}
-                    onChange={(e) =>
-                      setConversionData((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Se creará un nuevo socio y un pago inicial, y el interesado
-                  será eliminado.
-                </p>
               </div>
             )}
             <DialogFooter>
