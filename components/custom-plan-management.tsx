@@ -67,6 +67,9 @@ type PlanFormState = {
   name: string;
   description: string;
   price: number;
+  installments: number;
+  payment_amount: number;
+  next_installment_due: string;
   start_date: string;
   end_date: string;
   payment_date: string;
@@ -81,6 +84,9 @@ const createEmptyPlanForm = (): PlanFormState => ({
   name: "Personalizado",
   description: "",
   price: 0,
+  installments: 1,
+  payment_amount: 0,
+  next_installment_due: new Date().toLocaleDateString("en-CA"),
   start_date: new Date().toLocaleDateString("en-CA"),
   end_date: "",
   payment_date: new Date().toLocaleDateString("en-CA"),
@@ -103,7 +109,7 @@ export function CustomPlanManagement({
   const [memberSearch, setMemberSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [newPlan, setNewPlan] = useState<PlanFormState>(createEmptyPlanForm());
-   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<CustomPlan | null>(null);
   const [editPlanForm, setEditPlanForm] = useState<PlanFormState>(
     createEmptyPlanForm()
@@ -444,6 +450,24 @@ export function CustomPlanManagement({
     const member = members.find((m) => m.id === newPlan.member_id);
     if (!member) return;
 
+    const paymentAmount =
+      newPlan.installments === 1 ? newPlan.price : newPlan.payment_amount;
+
+    if (newPlan.installments > 1) {
+      if (paymentAmount <= 0) {
+        alert("El monto a abonar debe ser mayor a 0");
+        return;
+      }
+      if (paymentAmount > newPlan.price) {
+        alert("El monto a abonar no puede superar el precio del plan");
+        return;
+      }
+      if (!newPlan.next_installment_due) {
+        alert("Debes ingresar el vencimiento de la próxima cuota");
+        return;
+      }
+    }
+
     const id = `${gymId}_custom_${Date.now()}`;
     const plan: CustomPlan = {
       id,
@@ -470,7 +494,7 @@ export function CustomPlanManagement({
       gym_id: gymId,
       member_id: member.id,
       member_name: member.name,
-      amount: newPlan.price,
+      amount: paymentAmount,
       date: newPlan.payment_date,
       start_date: newPlan.start_date,
       plan: newPlan.name,
@@ -485,7 +509,11 @@ export function CustomPlanManagement({
           ? newPlan.card_installments
           : undefined,
       type: "plan",
-      description: newPlan.payment_description || undefined,
+      description:
+        newPlan.payment_description ||
+        (newPlan.installments > 1
+          ? `Pago en ${newPlan.installments} cuotas. Próximo vencimiento: ${newPlan.next_installment_due}`
+          : undefined),
       plan_id: id,
     };
 
@@ -515,14 +543,29 @@ export function CustomPlanManagement({
       });
     const latestPayment = relatedPayments[0];
 
+    const description = latestPayment?.description || "";
+    const installmentsMatch = description.match(/Pago en (\d+) cuotas?/);
+    const parsedInstallments = installmentsMatch
+      ? Number.parseInt(installmentsMatch[1], 10)
+      : 1;
+    const nextDueMatch = description.match(
+      /Próximo vencimiento: (\d{4}-\d{2}-\d{2})/
+    );
+    const parsedNextDue =
+      nextDueMatch?.[1] ||
+      plan.end_date ||
+      new Date().toLocaleDateString("en-CA");
+
     setEditingPlan(plan);
     setEditPlanForm({
       member_id: plan.member_id,
       name: plan.name,
       description: plan.description || "",
       price: plan.price,
-      start_date:
-        plan.start_date || new Date().toLocaleDateString("en-CA"),
+      installments: parsedInstallments,
+      payment_amount: latestPayment?.amount ?? plan.price,
+      next_installment_due: parsedNextDue,
+      start_date: plan.start_date || new Date().toLocaleDateString("en-CA"),
       end_date: plan.end_date || "",
       payment_date:
         latestPayment?.date ||
@@ -551,6 +594,26 @@ export function CustomPlanManagement({
 
     const member = members.find((m) => m.id === editPlanForm.member_id);
     if (!member) return;
+
+    const paymentAmount =
+      editPlanForm.installments === 1
+        ? editPlanForm.price
+        : editPlanForm.payment_amount;
+
+    if (editPlanForm.installments > 1) {
+      if (paymentAmount <= 0) {
+        alert("El monto a abonar debe ser mayor a 0");
+        return;
+      }
+      if (paymentAmount > editPlanForm.price) {
+        alert("El monto a abonar no puede superar el precio del plan");
+        return;
+      }
+      if (!editPlanForm.next_installment_due) {
+        alert("Debes ingresar el vencimiento de la próxima cuota");
+        return;
+      }
+    }
 
     const { error } = await supabase
       .from("custom_plans")
@@ -593,6 +656,12 @@ export function CustomPlanManagement({
         "Tarjeta de Débito",
       ].includes(editPlanForm.payment_method || "");
 
+      const description = editPlanForm.payment_description
+        ? editPlanForm.payment_description
+        : editPlanForm.installments > 1
+        ? `Pago en ${editPlanForm.installments} cuotas. Próximo vencimiento: ${editPlanForm.next_installment_due}`
+        : null;
+
       const paymentUpdatePayload: Partial<Payment> & {
         card_brand?: string | null;
         card_installments?: number | null;
@@ -600,7 +669,7 @@ export function CustomPlanManagement({
       } = {
         member_id: member.id,
         member_name: member.name,
-        amount: editPlanForm.price,
+        amount: paymentAmount,
         date: editPlanForm.payment_date,
         start_date: editPlanForm.start_date,
         plan: editPlanForm.name,
@@ -612,9 +681,7 @@ export function CustomPlanManagement({
           editPlanForm.payment_method === "Tarjeta de Crédito"
             ? editPlanForm.card_installments
             : null,
-        description: editPlanForm.payment_description
-          ? editPlanForm.payment_description
-          : null,
+        description,
         plan_id: editingPlan.id,
       };
 
@@ -629,25 +696,23 @@ export function CustomPlanManagement({
           paymentError
         );
       } else {
-                setPayments(
-                  payments.map((payment) =>
-                    payment.id === editPaymentId
-                      ? {
-                          ...payment,
-                          member_id: member.id,
-                          member_name: member.name,
-                          amount: editPlanForm.price,
-                          date: editPlanForm.payment_date,
-                          start_date: editPlanForm.start_date,
-                          plan: editPlanForm.name,
-                          method: paymentUpdatePayload.method ?? payment.method,
-                          plan_id: editingPlan.id,
-                          card_brand:
-                            paymentUpdatePayload.card_brand ?? undefined,
-                          card_installments:
-                            paymentUpdatePayload.card_installments ?? undefined,
-                          description:
-                    paymentUpdatePayload.description ?? undefined,
+        setPayments(
+          payments.map((payment) =>
+            payment.id === editPaymentId
+              ? {
+                  ...payment,
+                  member_id: member.id,
+                  member_name: member.name,
+                  amount: paymentAmount,
+                  date: editPlanForm.payment_date,
+                  start_date: editPlanForm.start_date,
+                  plan: editPlanForm.name,
+                  method: paymentUpdatePayload.method ?? payment.method,
+                  plan_id: editingPlan.id,
+                  card_brand: paymentUpdatePayload.card_brand ?? undefined,
+                  card_installments:
+                    paymentUpdatePayload.card_installments ?? undefined,
+                  description: paymentUpdatePayload.description ?? undefined,
                 }
               : payment
           )
@@ -675,8 +740,11 @@ export function CustomPlanManagement({
       name: plan.name,
       description: plan.description,
       price: plan.price,
+      payment_amount: plan.price,
       start_date: plan.start_date || new Date().toLocaleDateString("en-CA"),
       end_date: plan.end_date || "",
+      next_installment_due:
+        plan.end_date || new Date().toLocaleDateString("en-CA"),
     });
     setRenewMemberSearch(member ? member.name : plan.member_name);
     setIsRenewDialogOpen(true);
@@ -691,6 +759,24 @@ export function CustomPlanManagement({
   const handleRenewPlan = async () => {
     const member = members.find((m) => m.id === renewPlan.member_id);
     if (!member) return;
+
+    const paymentAmount =
+      renewPlan.installments === 1 ? renewPlan.price : renewPlan.payment_amount;
+
+    if (renewPlan.installments > 1) {
+      if (paymentAmount <= 0) {
+        alert("El monto a abonar debe ser mayor a 0");
+        return;
+      }
+      if (paymentAmount > renewPlan.price) {
+        alert("El monto a abonar no puede superar el precio del plan");
+        return;
+      }
+      if (!renewPlan.next_installment_due) {
+        alert("Debes ingresar el vencimiento de la próxima cuota");
+        return;
+      }
+    }
 
     const id = `${gymId}_custom_${Date.now()}`;
     const plan: CustomPlan = {
@@ -718,7 +804,7 @@ export function CustomPlanManagement({
       gym_id: gymId,
       member_id: member.id,
       member_name: member.name,
-      amount: renewPlan.price,
+      amount: paymentAmount,
       date: renewPlan.payment_date,
       start_date: renewPlan.start_date,
       plan: renewPlan.name,
@@ -733,7 +819,11 @@ export function CustomPlanManagement({
           ? renewPlan.card_installments
           : undefined,
       type: "plan",
-      description: renewPlan.payment_description || undefined,
+      description:
+        renewPlan.payment_description ||
+        (renewPlan.installments > 1
+          ? `Pago en ${renewPlan.installments} cuotas. Próximo vencimiento: ${renewPlan.next_installment_due}`
+          : undefined),
       plan_id: id,
     };
 
@@ -848,17 +938,104 @@ export function CustomPlanManagement({
                     type="number"
                     value={newPlan.price}
                     onChange={(e) =>
-                      setNewPlan({ ...newPlan, price: Number(e.target.value) })
+                      setNewPlan((prev) => {
+                        const price = Number(e.target.value);
+                        const fallbackDate =
+                          prev.end_date ||
+                          prev.start_date ||
+                          new Date().toLocaleDateString("en-CA");
+                        return {
+                          ...prev,
+                          price,
+                          payment_amount:
+                            prev.installments === 1
+                              ? price
+                              : prev.payment_amount,
+                          next_installment_due:
+                            prev.installments === 1
+                              ? fallbackDate
+                              : prev.next_installment_due || fallbackDate,
+                        };
+                      })
                     }
                   />
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="custom-plan-installments">
+                    Cantidad de cuotas
+                  </Label>
+                  <Select
+                    value={newPlan.installments.toString()}
+                    onValueChange={(value) => {
+                      const installments = Number.parseInt(value, 10);
+                      const fallbackDate =
+                        newPlan.end_date ||
+                        newPlan.start_date ||
+                        new Date().toLocaleDateString("en-CA");
+                      setNewPlan((prev) => ({
+                        ...prev,
+                        installments,
+                        payment_amount: installments === 1 ? prev.price : 0,
+                        next_installment_due:
+                          installments === 1
+                            ? fallbackDate
+                            : prev.next_installment_due || fallbackDate,
+                      }));
+                    }}
+                  >
+                    <SelectTrigger id="custom-plan-installments">
+                      <SelectValue placeholder="Selecciona cuotas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1</SelectItem>
+                      <SelectItem value="2">2</SelectItem>
+                      <SelectItem value="3">3</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {newPlan.installments > 1 && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="custom-plan-payment-amount">
+                      Monto a abonar
+                    </Label>
+                    <Input
+                      id="custom-plan-payment-amount"
+                      type="number"
+                      value={newPlan.payment_amount}
+                      onChange={(e) =>
+                        setNewPlan({
+                          ...newPlan,
+                          payment_amount: Number(e.target.value),
+                        })
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Saldo pendiente: $
+                      {Math.max(
+                        newPlan.price - newPlan.payment_amount,
+                        0
+                      ).toLocaleString()}
+                    </p>
+                  </div>
+                )}
                 <div className="grid gap-2">
                   <Label>Fecha de inicio</Label>
                   <Input
                     type="date"
                     value={newPlan.start_date}
                     onChange={(e) =>
-                      setNewPlan({ ...newPlan, start_date: e.target.value })
+                      setNewPlan((prev) => {
+                        const startDate = e.target.value;
+                        const fallbackDate = prev.end_date || startDate;
+                        return {
+                          ...prev,
+                          start_date: startDate,
+                          next_installment_due:
+                            prev.installments === 1
+                              ? fallbackDate || prev.next_installment_due
+                              : prev.next_installment_due,
+                        };
+                      })
                     }
                   />
                 </div>
@@ -881,6 +1058,7 @@ export function CustomPlanManagement({
                         ...newPlan,
                         payment_method: v,
                         card_brand: "",
+                        card_installments: 1,
                       })
                     }
                   >
@@ -966,9 +1144,41 @@ export function CustomPlanManagement({
                     type="date"
                     value={newPlan.end_date}
                     onChange={(e) =>
-                      setNewPlan({ ...newPlan, end_date: e.target.value })
+                      setNewPlan((prev) => {
+                        const endDate = e.target.value;
+                        return {
+                          ...prev,
+                          end_date: endDate,
+                          next_installment_due:
+                            prev.installments === 1
+                              ? endDate || prev.next_installment_due
+                              : prev.next_installment_due,
+                        };
+                      })
                     }
                   />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="custom-plan-next-installment">
+                    Vencimiento próxima cuota
+                  </Label>
+                  <Input
+                    id="custom-plan-next-installment"
+                    type="date"
+                    value={newPlan.next_installment_due}
+                    onChange={(e) =>
+                      setNewPlan({
+                        ...newPlan,
+                        next_installment_due: e.target.value,
+                      })
+                    }
+                    disabled={newPlan.installments === 1}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {newPlan.installments === 1
+                      ? "Se utilizará la fecha de finalización del plan."
+                      : "Define cuándo debería abonarse la próxima cuota."}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1077,22 +1287,108 @@ export function CustomPlanManagement({
                     type="number"
                     value={editPlanForm.price}
                     onChange={(e) =>
-                      setEditPlanForm({
-                        ...editPlanForm,
-                        price: Number(e.target.value),
+                      setEditPlanForm((prev) => {
+                        const price = Number(e.target.value);
+                        const fallbackDate =
+                          prev.end_date ||
+                          prev.start_date ||
+                          new Date().toLocaleDateString("en-CA");
+                        return {
+                          ...prev,
+                          price,
+                          payment_amount:
+                            prev.installments === 1
+                              ? price
+                              : prev.payment_amount,
+                          next_installment_due:
+                            prev.installments === 1
+                              ? fallbackDate
+                              : prev.next_installment_due || fallbackDate,
+                        };
                       })
                     }
                   />
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-plan-installments">
+                    Cantidad de cuotas
+                  </Label>
+                  <Select
+                    value={editPlanForm.installments.toString()}
+                    onValueChange={(value) => {
+                      const installments = Number.parseInt(value, 10);
+                      const fallbackDate =
+                        editPlanForm.end_date ||
+                        editPlanForm.start_date ||
+                        new Date().toLocaleDateString("en-CA");
+                      setEditPlanForm((prev) => ({
+                        ...prev,
+                        installments,
+                        payment_amount:
+                          installments === 1
+                            ? prev.price
+                            : prev.installments === 1
+                            ? 0
+                            : prev.payment_amount,
+                        next_installment_due:
+                          installments === 1
+                            ? fallbackDate
+                            : prev.next_installment_due || fallbackDate,
+                      }));
+                    }}
+                  >
+                    <SelectTrigger id="edit-plan-installments">
+                      <SelectValue placeholder="Selecciona cuotas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1</SelectItem>
+                      <SelectItem value="2">2</SelectItem>
+                      <SelectItem value="3">3</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {editPlanForm.installments > 1 && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-plan-payment-amount">
+                      Monto a abonar
+                    </Label>
+                    <Input
+                      id="edit-plan-payment-amount"
+                      type="number"
+                      value={editPlanForm.payment_amount}
+                      onChange={(e) =>
+                        setEditPlanForm({
+                          ...editPlanForm,
+                          payment_amount: Number(e.target.value),
+                        })
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Saldo pendiente: $
+                      {Math.max(
+                        editPlanForm.price - editPlanForm.payment_amount,
+                        0
+                      ).toLocaleString()}
+                    </p>
+                  </div>
+                )}
                 <div className="grid gap-2">
                   <Label>Fecha de inicio</Label>
                   <Input
                     type="date"
                     value={editPlanForm.start_date}
                     onChange={(e) =>
-                      setEditPlanForm({
-                        ...editPlanForm,
-                        start_date: e.target.value,
+                      setEditPlanForm((prev) => {
+                        const startDate = e.target.value;
+                        const fallbackDate = prev.end_date || startDate;
+                        return {
+                          ...prev,
+                          start_date: startDate,
+                          next_installment_due:
+                            prev.installments === 1
+                              ? fallbackDate || prev.next_installment_due
+                              : prev.next_installment_due,
+                        };
                       })
                     }
                   />
@@ -1103,9 +1399,16 @@ export function CustomPlanManagement({
                     type="date"
                     value={editPlanForm.end_date}
                     onChange={(e) =>
-                      setEditPlanForm({
-                        ...editPlanForm,
-                        end_date: e.target.value,
+                      setEditPlanForm((prev) => {
+                        const endDate = e.target.value;
+                        return {
+                          ...prev,
+                          end_date: endDate,
+                          next_installment_due:
+                            prev.installments === 1
+                              ? endDate || prev.next_installment_due
+                              : prev.next_installment_due,
+                        };
                       })
                     }
                   />
@@ -1152,6 +1455,28 @@ export function CustomPlanManagement({
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-plan-next-installment">
+                    Vencimiento próxima cuota
+                  </Label>
+                  <Input
+                    id="edit-plan-next-installment"
+                    type="date"
+                    value={editPlanForm.next_installment_due}
+                    onChange={(e) =>
+                      setEditPlanForm({
+                        ...editPlanForm,
+                        next_installment_due: e.target.value,
+                      })
+                    }
+                    disabled={editPlanForm.installments === 1}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {editPlanForm.installments === 1
+                      ? "Se utilizará la fecha de finalización del plan."
+                      : "Define cuándo debería abonarse la próxima cuota."}
+                  </p>
                 </div>
                 {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
                   editPlanForm.payment_method || ""
@@ -1319,13 +1644,92 @@ export function CustomPlanManagement({
                   type="number"
                   value={renewPlan.price}
                   onChange={(e) =>
-                    setRenewPlan({
-                      ...renewPlan,
-                      price: Number(e.target.value),
+                    setRenewPlan((prev) => {
+                      const price = Number(e.target.value);
+                      const fallbackDate =
+                        prev.end_date ||
+                        prev.start_date ||
+                        new Date().toLocaleDateString("en-CA");
+                      return {
+                        ...prev,
+                        price,
+                        payment_amount:
+                          prev.installments === 1 ? price : prev.payment_amount,
+                        next_installment_due:
+                          prev.installments === 1
+                            ? fallbackDate
+                            : prev.next_installment_due || fallbackDate,
+                      };
                     })
                   }
                 />
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="renew-plan-installments">
+                  Cantidad de cuotas
+                </Label>
+                <Select
+                  value={renewPlan.installments.toString()}
+                  onValueChange={(value) => {
+                    const installments = Number.parseInt(value, 10);
+                    const fallbackDate =
+                      renewPlan.end_date ||
+                      renewPlan.start_date ||
+                      new Date().toLocaleDateString("en-CA");
+                    setRenewPlan((prev) => ({
+                      ...prev,
+                      installments,
+                      payment_amount: installments === 1 ? prev.price : 0,
+                      next_installment_due:
+                        installments === 1
+                          ? fallbackDate
+                          : prev.next_installment_due || fallbackDate,
+                    }));
+                  }}
+                >
+                  <SelectTrigger id="renew-plan-installments">
+                    <SelectValue placeholder="Selecciona cuotas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1</SelectItem>
+                    <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="3">3</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {renewPlan.installments > 1 && (
+                <div className="grid gap-2">
+                  <Label htmlFor="renew-plan-payment-amount">
+                    Monto a abonar
+                  </Label>
+                  <Input
+                    id="renew-plan-payment-amount"
+                    type="number"
+                    value={renewPlan.payment_amount}
+                    onChange={(e) =>
+                      setRenewPlan((prev) => {
+                        const startDate = e.target.value;
+                        const fallbackDate = prev.end_date || startDate;
+                        return {
+                          ...prev,
+                          start_date: startDate,
+                          next_installment_due:
+                            prev.installments === 1
+                              ? fallbackDate || prev.next_installment_due
+                              : prev.next_installment_due,
+                        };
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Saldo pendiente: $
+                    {Math.max(
+                      renewPlan.price - renewPlan.payment_amount,
+                      0
+                    ).toLocaleString()}
+                  </p>
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label>Fecha de inicio</Label>
                 <Input
@@ -1361,6 +1765,7 @@ export function CustomPlanManagement({
                       ...renewPlan,
                       payment_method: v,
                       card_brand: "",
+                      card_installments: 1,
                     })
                   }
                 >
@@ -1445,12 +1850,41 @@ export function CustomPlanManagement({
                   type="date"
                   value={renewPlan.end_date}
                   onChange={(e) =>
-                    setRenewPlan({
-                      ...renewPlan,
-                      end_date: e.target.value,
+                    setRenewPlan((prev) => {
+                      const endDate = e.target.value;
+                      return {
+                        ...prev,
+                        end_date: endDate,
+                        next_installment_due:
+                          prev.installments === 1
+                            ? endDate || prev.next_installment_due
+                            : prev.next_installment_due,
+                      };
                     })
                   }
                 />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="renew-plan-next-installment">
+                  Vencimiento próxima cuota
+                </Label>
+                <Input
+                  id="renew-plan-next-installment"
+                  type="date"
+                  value={renewPlan.next_installment_due}
+                  onChange={(e) =>
+                    setRenewPlan({
+                      ...renewPlan,
+                      next_installment_due: e.target.value,
+                    })
+                  }
+                  disabled={renewPlan.installments === 1}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {renewPlan.installments === 1
+                    ? "Se utilizará la fecha de finalización del plan."
+                    : "Define cuándo debería abonarse la próxima cuota."}
+                </p>
               </div>
             </div>
           </div>
