@@ -59,6 +59,8 @@ interface MemberInstallmentState {
   nextInstallmentDue: string | null;
 }
 
+type ReferenceFilterOption = "all" | "new_plan" | "existing_plan" | "product";
+
 const PAYMENTS_PER_BATCH = 10;
 
 export function PaymentManagement({
@@ -103,6 +105,8 @@ export function PaymentManagement({
   const [planContract, setPlanContract] = useState<PlanContract | null>(null);
   const [methodFilter, setMethodFilter] = useState("all");
   const [installmentFilter, setInstallmentFilter] = useState("all");
+  const [referenceFilter, setReferenceFilter] =
+    useState<ReferenceFilterOption>("all");
   const [contractTable, setContractTable] = useState<ContractTableName | null>(
     null
   );
@@ -142,6 +146,19 @@ export function PaymentManagement({
       if (planByName) return planByName.price;
     }
     return 0;
+  };
+
+  const getPaymentReferenceType = (
+    payment: Payment
+  ): ReferenceFilterOption => {
+    if (payment.type === "product") {
+      return "product";
+    }
+
+    const hasStartDate =
+      typeof payment.start_date === "string" && payment.start_date.trim() !== "";
+
+    return hasStartDate ? "new_plan" : "existing_plan";
   };
 
   const getEffectivePaymentDate = (payment: Payment) =>
@@ -577,6 +594,12 @@ export function PaymentManagement({
       });
     }
 
+     if (referenceFilter !== "all") {
+      filtered = filtered.filter(
+        (payment) => getPaymentReferenceType(payment) === referenceFilter
+      );
+    }
+
     if (installmentFilter !== "all") {
       filtered = filtered.filter((payment) => {
         if (payment.type !== "plan") {
@@ -663,6 +686,7 @@ export function PaymentManagement({
     methodFilter,
     periodFilter,
     installmentFilter,
+    referenceFilter,
     paymentInsights,
     membersById,
     latestPlanPaymentByMember,
@@ -670,7 +694,14 @@ export function PaymentManagement({
 
   useEffect(() => {
     setVisibleCount(PAYMENTS_PER_BATCH);
-  }, [searchTerm, methodFilter, periodFilter, installmentFilter, payments]);
+  }, [
+    searchTerm,
+    methodFilter,
+    periodFilter,
+    installmentFilter,
+    referenceFilter,
+    payments,
+  ]);
 
   const visiblePayments = useMemo(() => {
     if (!filteredPayments.length) return [];
@@ -1933,6 +1964,22 @@ export function PaymentManagement({
                 <SelectItem value="previous_month">Mes anterior</SelectItem>
                 <SelectItem value="last_6_months">Últimos 6 meses</SelectItem>
                 <SelectItem value="current_year">Año actual</SelectItem>
+              </SelectContent>
+            </Select>
+             <Select
+              value={referenceFilter}
+              onValueChange={(value) =>
+                setReferenceFilter(value as ReferenceFilterOption)
+              }
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Referencia del pago" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los tipos</SelectItem>
+                <SelectItem value="new_plan">Plan nuevo</SelectItem>
+                <SelectItem value="existing_plan">Plan existente</SelectItem>
+                <SelectItem value="product">Producto</SelectItem>
               </SelectContent>
             </Select>
             <Select

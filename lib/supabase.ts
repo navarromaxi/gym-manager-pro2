@@ -51,10 +51,10 @@ export interface Payment {
   start_date?: string
   plan?: string
   method: string
-  card_brand?: string
-  card_installments?: number
+  card_brand?: string | null
+  card_installments?: number | null
   type: "plan" | "product"
-  description?: string
+  description?: string | null
   plan_id?: string
 }
 

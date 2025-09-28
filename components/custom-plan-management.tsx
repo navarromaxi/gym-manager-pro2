@@ -42,6 +42,7 @@ import {
   Ban,
   PiggyBank,
   RefreshCcw,
+  Pencil,
 } from "lucide-react";
 
 interface CustomPlanManagementProps {
@@ -102,6 +103,13 @@ export function CustomPlanManagement({
   const [memberSearch, setMemberSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [newPlan, setNewPlan] = useState<PlanFormState>(createEmptyPlanForm());
+   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<CustomPlan | null>(null);
+  const [editPlanForm, setEditPlanForm] = useState<PlanFormState>(
+    createEmptyPlanForm()
+  );
+  const [editMemberSearch, setEditMemberSearch] = useState("");
+  const [editPaymentId, setEditPaymentId] = useState<string | null>(null);
   const [isRenewDialogOpen, setIsRenewDialogOpen] = useState(false);
   const [renewPlan, setRenewPlan] = useState<PlanFormState>(
     createEmptyPlanForm()
@@ -301,6 +309,23 @@ export function CustomPlanManagement({
     }
   };
 
+  const editFilteredMembers = useMemo(() => {
+    const normalizedSearch = editMemberSearch.trim().toLowerCase();
+    if (!normalizedSearch) {
+      return members;
+    }
+    return members.filter((m) =>
+      m.name.toLowerCase().includes(normalizedSearch)
+    );
+  }, [editMemberSearch, members]);
+
+  const handleEditMemberSearchChange = (value: string) => {
+    setEditMemberSearch(value);
+    if (value.trim().length === 0) {
+      setEditPlanForm((prev) => ({ ...prev, member_id: "" }));
+    }
+  };
+
   const filterDescriptionMap: Record<StatusFilter, string> = {
     all: "Listado completo de planes personalizados.",
     active: "Planes activos con fecha vigente.",
@@ -314,6 +339,7 @@ export function CustomPlanManagement({
   const hasActiveFilters =
     statusFilter !== "all" || searchTerm.trim().length > 0;
   const showMemberResults = memberSearch.trim().length > 0;
+  const showEditMemberResults = editMemberSearch.trim().length > 0;
   const showRenewMemberResults = renewMemberSearch.trim().length > 0;
   const resultsLabel =
     filteredPlans.length === 1 ? "1 plan" : `${filteredPlans.length} planes`;
@@ -476,6 +502,160 @@ export function CustomPlanManagement({
     setIsAddDialogOpen(false);
     setNewPlan(createEmptyPlanForm());
     setMemberSearch("");
+  };
+
+  const handleOpenEditDialog = (plan: CustomPlan) => {
+    const member = members.find((m) => m.id === plan.member_id);
+    const relatedPayments = payments
+      .filter((payment) => payment.plan_id === plan.id)
+      .sort((a, b) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        return dateB - dateA;
+      });
+    const latestPayment = relatedPayments[0];
+
+    setEditingPlan(plan);
+    setEditPlanForm({
+      member_id: plan.member_id,
+      name: plan.name,
+      description: plan.description || "",
+      price: plan.price,
+      start_date:
+        plan.start_date || new Date().toLocaleDateString("en-CA"),
+      end_date: plan.end_date || "",
+      payment_date:
+        latestPayment?.date ||
+        plan.start_date ||
+        new Date().toLocaleDateString("en-CA"),
+      payment_method: latestPayment?.method || "",
+      card_brand: latestPayment?.card_brand || "",
+      card_installments: latestPayment?.card_installments ?? 1,
+      payment_description: latestPayment?.description || "",
+    });
+    setEditMemberSearch(member ? member.name : plan.member_name);
+    setEditPaymentId(latestPayment?.id ?? null);
+    setIsEditDialogOpen(true);
+  };
+
+  const resetEditState = () => {
+    setIsEditDialogOpen(false);
+    setEditingPlan(null);
+    setEditPlanForm(createEmptyPlanForm());
+    setEditMemberSearch("");
+    setEditPaymentId(null);
+  };
+
+  const handleEditPlan = async () => {
+    if (!editingPlan) return;
+
+    const member = members.find((m) => m.id === editPlanForm.member_id);
+    if (!member) return;
+
+    const { error } = await supabase
+      .from("custom_plans")
+      .update({
+        member_id: member.id,
+        member_name: member.name,
+        name: editPlanForm.name,
+        description: editPlanForm.description,
+        price: editPlanForm.price,
+        start_date: editPlanForm.start_date,
+        end_date: editPlanForm.end_date,
+      })
+      .eq("id", editingPlan.id);
+
+    if (error) {
+      console.error("Error al actualizar plan personalizado:", error);
+      return;
+    }
+
+    setCustomPlans(
+      customPlans.map((plan) =>
+        plan.id === editingPlan.id
+          ? {
+              ...plan,
+              member_id: member.id,
+              member_name: member.name,
+              name: editPlanForm.name,
+              description: editPlanForm.description,
+              price: editPlanForm.price,
+              start_date: editPlanForm.start_date,
+              end_date: editPlanForm.end_date,
+            }
+          : plan
+      )
+    );
+
+    if (editPaymentId) {
+      const includesCardDetails = [
+        "Tarjeta de Crédito",
+        "Tarjeta de Débito",
+      ].includes(editPlanForm.payment_method || "");
+
+      const paymentUpdatePayload: Partial<Payment> & {
+        card_brand?: string | null;
+        card_installments?: number | null;
+        description?: string | null;
+      } = {
+        member_id: member.id,
+        member_name: member.name,
+        amount: editPlanForm.price,
+        date: editPlanForm.payment_date,
+        start_date: editPlanForm.start_date,
+        plan: editPlanForm.name,
+        method: editPlanForm.payment_method || "Efectivo",
+        card_brand: includesCardDetails
+          ? editPlanForm.card_brand || null
+          : null,
+        card_installments:
+          editPlanForm.payment_method === "Tarjeta de Crédito"
+            ? editPlanForm.card_installments
+            : null,
+        description: editPlanForm.payment_description
+          ? editPlanForm.payment_description
+          : null,
+        plan_id: editingPlan.id,
+      };
+
+      const { error: paymentError } = await supabase
+        .from("payments")
+        .update(paymentUpdatePayload)
+        .eq("id", editPaymentId);
+
+      if (paymentError) {
+        console.error(
+          "Error al actualizar pago de personalizado:",
+          paymentError
+        );
+      } else {
+                setPayments(
+                  payments.map((payment) =>
+                    payment.id === editPaymentId
+                      ? {
+                          ...payment,
+                          member_id: member.id,
+                          member_name: member.name,
+                          amount: editPlanForm.price,
+                          date: editPlanForm.payment_date,
+                          start_date: editPlanForm.start_date,
+                          plan: editPlanForm.name,
+                          method: paymentUpdatePayload.method ?? payment.method,
+                          plan_id: editingPlan.id,
+                          card_brand:
+                            paymentUpdatePayload.card_brand ?? undefined,
+                          card_installments:
+                            paymentUpdatePayload.card_installments ?? undefined,
+                          description:
+                    paymentUpdatePayload.description ?? undefined,
+                }
+              : payment
+          )
+        );
+      }
+    }
+
+    resetEditState();
   };
 
   const handleDeletePlan = async (id: string) => {
@@ -798,6 +978,251 @@ export function CustomPlanManagement({
           </DialogContent>
         </Dialog>
       </div>
+
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            resetEditState();
+          } else {
+            setIsEditDialogOpen(true);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Editar Plan Personalizado</DialogTitle>
+            <DialogDescription>
+              Actualiza los datos del plan personalizado seleccionado.
+            </DialogDescription>
+          </DialogHeader>
+          {editingPlan && (
+            <div className="grid gap-6 py-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label>Buscar Socio</Label>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar socio..."
+                      className="pl-8"
+                      value={editMemberSearch}
+                      onChange={(e) =>
+                        handleEditMemberSearchChange(e.target.value)
+                      }
+                    />
+                  </div>
+                  {showEditMemberResults && (
+                    <div className="max-h-32 overflow-y-auto rounded-md border">
+                      {editFilteredMembers.length > 0 ? (
+                        editFilteredMembers.map((member) => (
+                          <div
+                            key={member.id}
+                            className={cn(
+                              "cursor-pointer border-b p-2 text-sm transition-colors last:border-b-0 hover:bg-blue-500/10 dark:hover:bg-blue-500/30",
+                              editPlanForm.member_id === member.id &&
+                                "bg-blue-500/20 dark:bg-blue-500/40"
+                            )}
+                            onClick={() => {
+                              setEditPlanForm((prev) => ({
+                                ...prev,
+                                member_id: member.id,
+                              }));
+                              setEditMemberSearch(member.name);
+                            }}
+                          >
+                            <div className="font-medium">{member.name}</div>
+                            {member.plan && (
+                              <div className="text-xs text-muted-foreground">
+                                Plan actual: {member.plan}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-2 text-sm text-muted-foreground">
+                          No se encontraron socios
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="grid gap-2">
+                  <Label>Nombre del Plan</Label>
+                  <Input
+                    value={editPlanForm.name}
+                    onChange={(e) =>
+                      setEditPlanForm({
+                        ...editPlanForm,
+                        name: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Descripción</Label>
+                  <Input
+                    value={editPlanForm.description}
+                    onChange={(e) =>
+                      setEditPlanForm({
+                        ...editPlanForm,
+                        description: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Precio ($)</Label>
+                  <Input
+                    type="number"
+                    value={editPlanForm.price}
+                    onChange={(e) =>
+                      setEditPlanForm({
+                        ...editPlanForm,
+                        price: Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Fecha de inicio</Label>
+                  <Input
+                    type="date"
+                    value={editPlanForm.start_date}
+                    onChange={(e) =>
+                      setEditPlanForm({
+                        ...editPlanForm,
+                        start_date: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Fecha de finalización</Label>
+                  <Input
+                    type="date"
+                    value={editPlanForm.end_date}
+                    onChange={(e) =>
+                      setEditPlanForm({
+                        ...editPlanForm,
+                        end_date: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Fecha de pago</Label>
+                  <Input
+                    type="date"
+                    value={editPlanForm.payment_date}
+                    onChange={(e) =>
+                      setEditPlanForm({
+                        ...editPlanForm,
+                        payment_date: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Método de pago</Label>
+                  <Select
+                    value={editPlanForm.payment_method}
+                    onValueChange={(value) =>
+                      setEditPlanForm({
+                        ...editPlanForm,
+                        payment_method: value,
+                        card_brand: "",
+                        card_installments: 1,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar método" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Efectivo">Efectivo</SelectItem>
+                      <SelectItem value="Transferencia">
+                        Transferencia
+                      </SelectItem>
+                      <SelectItem value="Tarjeta de Débito">
+                        Tarjeta de Débito
+                      </SelectItem>
+                      <SelectItem value="Tarjeta de Crédito">
+                        Tarjeta de Crédito
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                  editPlanForm.payment_method || ""
+                ) && (
+                  <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label>Tipo de Tarjeta</Label>
+                      <Select
+                        value={editPlanForm.card_brand}
+                        onValueChange={(value) =>
+                          setEditPlanForm({
+                            ...editPlanForm,
+                            card_brand: value,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar tarjeta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {cardBrands.map((brand) => (
+                            <SelectItem key={brand} value={brand}>
+                              {brand}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-card-installments">
+                        Número de cuotas en la tarjeta
+                      </Label>
+                      <Input
+                        id="edit-card-installments"
+                        type="number"
+                        min={1}
+                        value={editPlanForm.card_installments}
+                        onChange={(e) =>
+                          setEditPlanForm({
+                            ...editPlanForm,
+                            card_installments:
+                              Number.parseInt(e.target.value, 10) || 1,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="edit-payment-description">
+                    Descripción del pago
+                  </Label>
+                  <Input
+                    id="edit-payment-description"
+                    value={editPlanForm.payment_description}
+                    onChange={(e) =>
+                      setEditPlanForm({
+                        ...editPlanForm,
+                        payment_description: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={handleEditPlan}>Guardar Cambios</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={isRenewDialogOpen}
@@ -1240,6 +1665,15 @@ export function CustomPlanManagement({
                       </TableCell>
                       <TableCell className="text-right align-top">
                         <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenEditDialog(plan)}
+                            className="text-muted-foreground hover:bg-blue-50 hover:text-blue-600"
+                            aria-label={`Editar plan ${plan.name}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"

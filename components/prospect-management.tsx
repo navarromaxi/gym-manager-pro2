@@ -616,10 +616,13 @@ export function ProspectManagement({
   })();
 
   const filteredProspects = prospects.filter((prospect) => {
-    const matchesSearch =
-      prospect.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prospect.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prospect.notes.toLowerCase().includes(searchTerm.toLowerCase());
+    const normalizedSearch = searchTerm.toLowerCase();
+    const matchesSearch = [
+      prospect.name ?? "",
+      prospect.email ?? "",
+      prospect.notes ?? "",
+      prospect.phone ?? "",
+    ].some((field) => field.toLowerCase().includes(normalizedSearch));
     const matchesStatus =
       statusFilter === "all" || prospect.status === statusFilter;
     const matchesPriority =
@@ -1286,7 +1289,7 @@ export function ProspectManagement({
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="prospect-search"
-                  placeholder="Buscar por nombre, email o notas..."
+                  placeholder="Buscar por nombre, cel, email o notas..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9"
@@ -1503,7 +1506,7 @@ export function ProspectManagement({
                   <TableHead>Fecha Contacto</TableHead>
                   <TableHead>Interés</TableHead>
                   <TableHead>Estado</TableHead>
-                   <TableHead>Próximo contacto</TableHead>
+                  <TableHead>Próximo contacto</TableHead>
                   <TableHead>Fecha agendada</TableHead>
                   <TableHead>Prioridad</TableHead>
                   {/* Nueva columna en la tabla */}
@@ -1535,20 +1538,6 @@ export function ProspectManagement({
                       </TableCell>
                       <TableCell>{getStatusBadge(prospect.status)}</TableCell>
                       <TableCell>
-                        {scheduledDate ? (
-                          <Badge
-                            variant="outline"
-                            className="border-cyan-500 text-cyan-600"
-                          >
-                            {scheduledDate}
-                          </Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            Sin coordinar
-                          </span>
-                        )}
-                      </TableCell>
-                       <TableCell>
                         {nextContactDate ? (
                           <Badge
                             variant="outline"
@@ -1559,6 +1548,20 @@ export function ProspectManagement({
                         ) : (
                           <span className="text-xs text-muted-foreground">
                             Sin definir
+                          </span>
+                        )}
+                      </TableCell>
+                       <TableCell>
+                        {scheduledDate ? (
+                          <Badge
+                            variant="outline"
+                            className="border-cyan-500 text-cyan-600"
+                          >
+                            {scheduledDate}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Sin coordinar
                           </span>
                         )}
                       </TableCell>
