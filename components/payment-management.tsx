@@ -59,7 +59,12 @@ interface MemberInstallmentState {
   nextInstallmentDue: string | null;
 }
 
-type ReferenceFilterOption = "all" | "new_plan" | "existing_plan" | "product";
+type ReferenceFilterOption =
+  | "all"
+  | "new_plan"
+  | "existing_plan"
+  | "product"
+  | "custom_plan";
 
 const PAYMENTS_PER_BATCH = 10;
 
@@ -155,6 +160,10 @@ export function PaymentManagement({
       return "product";
     }
 
+    if (payment.type === "custom_plan") {
+      return "custom_plan";
+    }
+
     const hasStartDate =
       typeof payment.start_date === "string" && payment.start_date.trim() !== "";
 
@@ -168,7 +177,9 @@ export function PaymentManagement({
 
   const findLatestPlanPaymentDate = (list: Payment[], memberId: string) => {
     const relevantPayments = list.filter(
-      (payment) => payment.member_id === memberId && payment.type === "plan"
+      (payment) =>
+        payment.member_id === memberId &&
+        (!payment.type || payment.type === "plan")
     );
 
     if (relevantPayments.length === 0) {
@@ -395,7 +406,7 @@ export function PaymentManagement({
         nextInstallmentDue: member?.next_installment_due ?? null,
       };
 
-      if (payment.type !== "plan") {
+       if (payment.type && payment.type !== "plan") {
         memberStates.set(payment.member_id, previousState);
         insights.set(payment.id, {
           isInstallment: false,
@@ -492,7 +503,7 @@ export function PaymentManagement({
   const latestPlanPaymentByMember = useMemo(() => {
     const map = new Map<string, string>();
     (payments || []).forEach((payment) => {
-      if (payment.type !== "plan") {
+      if (payment.type && payment.type !== "plan") {
         return;
       }
 
@@ -602,7 +613,7 @@ export function PaymentManagement({
 
     if (installmentFilter !== "all") {
       filtered = filtered.filter((payment) => {
-        if (payment.type !== "plan") {
+         if (payment.type && payment.type !== "plan") {
           return false;
         }
 
@@ -1980,6 +1991,7 @@ export function PaymentManagement({
                 <SelectItem value="new_plan">Plan nuevo</SelectItem>
                 <SelectItem value="existing_plan">Plan existente</SelectItem>
                 <SelectItem value="product">Producto</SelectItem>
+                 <SelectItem value="custom_plan">Plan personalizado</SelectItem>
               </SelectContent>
             </Select>
             <Select
@@ -2038,8 +2050,11 @@ export function PaymentManagement({
                     ? insight.balancePending
                     : null;
                 const balanceValue = insightBalance ?? fallbackBalance ?? null;
+                const isPlanPayment =
+                  !payment.type || payment.type === "plan";
+                const isCustomPlanPayment = payment.type === "custom_plan";
                 const hasPendingInstallment =
-                  payment.type === "plan" && (balanceValue ?? 0) > 0;
+                   isPlanPayment && (balanceValue ?? 0) > 0;
                 const nextInstallmentDueRaw =
                   insight?.nextInstallmentDue ??
                   member?.next_installment_due ??
@@ -2068,12 +2083,12 @@ export function PaymentManagement({
                 const nextInstallmentDueDisplay = hasPendingInstallment
                   ? formattedNextDue ?? "Sin definir"
                   : "No corresponde";
-                const detailLabel =
-                  payment.type === "plan" ? payment.plan : payment.description;
-                const rawDetailAmount =
-                  payment.type === "plan"
-                    ? insight?.planPrice ?? member?.plan_price ?? payment.amount
-                    : payment.amount;
+                const detailLabel = isPlanPayment
+                  ? payment.plan
+                  : payment.plan ?? payment.description;
+                const rawDetailAmount = isPlanPayment
+                  ? insight?.planPrice ?? member?.plan_price ?? payment.amount
+                  : payment.amount;
                 const formattedDetailAmount = new Intl.NumberFormat("es-AR", {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 2,
@@ -2100,7 +2115,7 @@ export function PaymentManagement({
                       {payment.card_brand ? ` - ${payment.card_brand}` : ""}
                     </TableCell>
                     <TableCell>
-                      {payment.type === "plan" ? (
+                       {isPlanPayment ? (
                         insight?.isInstallment ? (
                           <Badge variant="secondary">Sí</Badge>
                         ) : (
@@ -2111,7 +2126,7 @@ export function PaymentManagement({
                       )}
                     </TableCell>
                     <TableCell>
-                      {payment.type === "plan" && balanceValue !== null ? (
+                      {isPlanPayment && balanceValue !== null ? (
                         <span
                           className={
                             balanceValue > 0
@@ -2126,11 +2141,22 @@ export function PaymentManagement({
                       )}
                     </TableCell>
                     <TableCell>
-                      <span className={dueStatusClass}>
-                        {nextInstallmentDueDisplay}
-                      </span>
+                       {isPlanPayment && balanceValue !== null ? (
+                        <span className={dueStatusClass}>
+                          {nextInstallmentDueDisplay}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
-                    <TableCell className="capitalize">{payment.type}</TableCell>
+                    <TableCell className="capitalize">
+                      {isCustomPlanPayment
+                        ? "Plan personalizado"
+                        : isPlanPayment
+                        ? "Plan"
+                        : payment.type || "Plan"}
+                    </TableCell>
+                    
                     <TableCell>
                       <div className="flex gap-2">
                         <Button

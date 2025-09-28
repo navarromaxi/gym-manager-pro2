@@ -53,7 +53,7 @@ export interface Payment {
   method: string
   card_brand?: string | null
   card_installments?: number | null
-  type: "plan" | "product"
+  type: "plan" | "product" | "custom_plan"
   description?: string | null
   plan_id?: string
 }

@@ -508,7 +508,7 @@ export function CustomPlanManagement({
         newPlan.payment_method === "Tarjeta de Crédito"
           ? newPlan.card_installments
           : undefined,
-      type: "plan",
+      type: "custom_plan",
       description:
         newPlan.payment_description ||
         (newPlan.installments > 1
@@ -818,7 +818,7 @@ export function CustomPlanManagement({
         renewPlan.payment_method === "Tarjeta de Crédito"
           ? renewPlan.card_installments
           : undefined,
-      type: "plan",
+      type: "custom_plan",
       description:
         renewPlan.payment_description ||
         (renewPlan.installments > 1

@@ -515,21 +515,15 @@ const isWithinPeriod = (date: Date) => {
   );
   const totalProfit = totalIncome - totalExpenseAmount;
 
-  /** =================== Renovaciones (usando estado derivado) =================== */
-  /** =================== Renovaciones ===================
- *  - Renovaron: socios con >1 pago histórico que pagaron en el período
-   *  - No renovaron: vencidos/inactivos con vencimiento en el período
-   *  - Elegibles: renovaron + no_renovaron
-   */
   const filteredPlanPayments = filteredPayments.filter(
-    (payment) => (payment.type ?? "plan") === "plan"
+    (payment) => !payment.type || payment.type === "plan"
   );
 
   const getRenewalStats = () => {
     // Conteo histórico de pagos de planes por socio
     const historicalCounts: Record<string, number> = {};
     for (const payment of payments) {
-      if ((payment.type ?? "plan") !== "plan") continue;
+      if (payment.type && payment.type !== "plan") continue;
       const memberId = memberIdOf(payment);
       if (!memberId) continue;
       historicalCounts[memberId] = (historicalCounts[memberId] || 0) + 1;
@@ -1142,7 +1136,9 @@ const isWithinPeriod = (date: Date) => {
         FechaInicioPlan: formatDateCell(startDate),
         Plan: resolvedPlan,
         Concepto:
-          p.type === "plan" ? resolvedPlan : description || resolvedPlan,
+          !p.type || p.type === "plan" || p.type === "custom_plan"
+            ? resolvedPlan
+            : description || resolvedPlan,
         Metodo: p.method,
         Tarjeta: pick(p as any, "card_brand", "cardBrand") || "",
         Cuotas:
