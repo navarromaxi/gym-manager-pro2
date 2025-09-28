@@ -722,13 +722,70 @@ const isWithinPeriod = (date: Date) => {
     "AMEX",
     "TARJETA D",
     "MERCADO PAGO",
+    "Otros",
   ];
 
-   const buildCardStats = (paymentsList: Payment[]) =>
+    const canonicalCardBrands = cardBrands.map((brand) => brand.toUpperCase());
+
+  const cardBrandAliases: Record<string, string> = {
+    VISA: "VISA",
+    "VISA DEBITO": "VISA",
+    "VISA DÉBITO": "VISA",
+    "VISA CREDITO": "VISA",
+    "VISA CRÉDITO": "VISA",
+    OCA: "OCA",
+    MASTER: "MASTER",
+    MASTERCARD: "MASTER",
+    "MASTER CARD": "MASTER",
+    "MASTER-CARD": "MASTER",
+    CABAL: "CABAL",
+    AMEX: "AMEX",
+    "AMERICAN EXPRESS": "AMEX",
+    "AMERICAN-EXPRESS": "AMEX",
+    "TARJETA D": "TARJETA D",
+    "TARJETA DEBITO": "TARJETA D",
+    "TARJETA DÉBITO": "TARJETA D",
+    "DEBITO": "TARJETA D",
+    "DÉBITO": "TARJETA D",
+    "DEBIT": "TARJETA D",
+    "MERCADO PAGO": "MERCADO PAGO",
+    MERCADOPAGO: "MERCADO PAGO",
+    "MERCADO-PAGO": "MERCADO PAGO",
+    "MERCADO PAGO POS": "MERCADO PAGO",
+    OTRO: "Otros",
+    OTROS: "Otros",
+  };
+
+  const normalizeCardBrand = (value?: string | null) => {
+    if (!value) return "Otros";
+
+    const normalized = value
+      .toString()
+      .normalize("NFD")
+      .replace(/[^\p{L}\p{N} ]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toUpperCase();
+
+    if (!normalized) return "Otros";
+
+    const alias =
+      cardBrandAliases[normalized] ||
+      cardBrandAliases[normalized.replace(/ TARJETA$/, "")];
+
+    if (alias) return alias;
+
+    const brandIndex = canonicalCardBrands.indexOf(normalized);
+    if (brandIndex >= 0) return cardBrands[brandIndex];
+
+    return "Otros";
+  };
+
+  const buildCardStats = (paymentsList: Payment[]) =>
     paymentsList.reduce(
       (acc, payment) => {
-        const brand =
-          pick(payment as any, "card_brand", "cardBrand") || "Otra";
+        const rawBrand = pick(payment as any, "card_brand", "cardBrand");
+        const brand = normalizeCardBrand(rawBrand);
         if (!acc[brand]) acc[brand] = { count: 0, amount: 0 };
         acc[brand].count += 1;
         acc[brand].amount += payment.amount;

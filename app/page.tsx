@@ -158,6 +158,8 @@ export default function GymManagementSystem() {
   >(null);
   const [memberFilter, setMemberFilter] = useState("all");
   const [loading, setLoading] = useState(false);
+  const [pendingProspectStatusFilter, setPendingProspectStatusFilter] =
+    useState<Prospect["status"] | "all" | null>(null);
   const [dismissedNextContactReminders, setDismissedNextContactReminders] =
     useState<string[]>([]);
 
@@ -630,7 +632,12 @@ export default function GymManagementSystem() {
     setActiveTab("members");
   };
 
-  const goToProspects = () => {
+  const goToProspects = (status?: Prospect["status"] | "all") => {
+    if (typeof status === "undefined") {
+      setPendingProspectStatusFilter(null);
+    } else {
+      setPendingProspectStatusFilter(status);
+    }
     setActiveTab("prospects");
   };
 
@@ -817,19 +824,19 @@ export default function GymManagementSystem() {
             {newProspectsCount > 0 && (
               <div
                 className="flex items-center space-x-2 text-blue-600 cursor-pointer hover:bg-blue-50 p-2 rounded"
-                onClick={goToProspects}
+                onClick={() => goToProspects("averiguador")}
               >
                 <UserPlus className="h-4 w-4" />
                 <span>
-                   {newProspectsCount} nuevos
-                  interesados por contactar
+                    {newProspectsCount} nuevos interesados por contactar
+                  (estado "Averiguador")
                 </span>
               </div>
             )}
             {nextContactTomorrowCount > 0 && (
               <div
                 className="flex items-center space-x-2 text-purple-600 cursor-pointer hover:bg-purple-50 p-2 rounded"
-                onClick={goToProspects}
+                 onClick={() => goToProspects("averiguador")}
               >
                 <Calendar className="h-4 w-4" />
                 <span>
@@ -964,6 +971,10 @@ export default function GymManagementSystem() {
             totalProspectsCount={prospectsTotal ?? undefined}
             onProspectAdded={handleProspectAdded}
             onProspectRemoved={handleProspectRemoved}
+            externalStatusFilter={pendingProspectStatusFilter}
+            onExternalStatusFilterApplied={() =>
+              setPendingProspectStatusFilter(null)
+            }
           />
         )}
         {activeTab === "expenses" && (

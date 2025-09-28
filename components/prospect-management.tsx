@@ -62,6 +62,8 @@ interface ProspectManagementProps {
   totalProspectsCount?: number;
   onProspectAdded?: () => void;
   onProspectRemoved?: () => void;
+  externalStatusFilter?: Prospect["status"] | "all" | null;
+  onExternalStatusFilterApplied?: () => void;
 }
 
 interface ConversionData {
@@ -346,6 +348,8 @@ export function ProspectManagement({
   totalProspectsCount,
   onProspectAdded,
   onProspectRemoved,
+  externalStatusFilter,
+  onExternalStatusFilterApplied,
 }: ProspectManagementProps) {
   const PROSPECT_CONVERSION_REFERRAL = "prospect_conversion";
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -357,7 +361,9 @@ export function ProspectManagement({
   );
   const editNotesRef = useRef<HTMLTextAreaElement | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<
+    Prospect["status"] | "all"
+  >("all");
   const [priorityFilter, setPriorityFilter] = useState("all"); // Nuevo estado para el filtro de prioridad
   const [scheduledDateFilter, setScheduledDateFilter] = useState(""); // estado para el filtro de fecha
    const [nextContactDateFilter, setNextContactDateFilter] = useState("");
@@ -403,6 +409,18 @@ export function ProspectManagement({
     "TARJETA D",
     "MERCADO PAGO",
   ];
+   useEffect(() => {
+    if (typeof externalStatusFilter === "undefined") {
+      return;
+    }
+
+    if (externalStatusFilter === null) {
+      return;
+    }
+
+    setStatusFilter(externalStatusFilter);
+    onExternalStatusFilterApplied?.();
+  }, [externalStatusFilter, onExternalStatusFilterApplied]);
   const getInitialConversionData = (): ConversionData => {
     const today = new Date().toISOString().split("T")[0];
     return {
@@ -1282,7 +1300,12 @@ export function ProspectManagement({
               >
                 Estado
               </Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select
+                value={statusFilter}
+                onValueChange={(value) =>
+                  setStatusFilter(value as Prospect["status"] | "all")
+                }
+              >
                 <SelectTrigger id="status-filter" className="w-full">
                   <SelectValue placeholder="Todos los estados" />
                 </SelectTrigger>

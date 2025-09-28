@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { supabase, Member, CustomPlan, Payment } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -99,7 +100,6 @@ export function CustomPlanManagement({
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
-  const [isMemberSelectOpen, setIsMemberSelectOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [newPlan, setNewPlan] = useState<PlanFormState>(createEmptyPlanForm());
   const [isRenewDialogOpen, setIsRenewDialogOpen] = useState(false);
@@ -107,7 +107,6 @@ export function CustomPlanManagement({
     createEmptyPlanForm()
   );
   const [renewMemberSearch, setRenewMemberSearch] = useState("");
-  const [isRenewMemberSelectOpen, setIsRenewMemberSelectOpen] = useState(false);
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -268,22 +267,38 @@ export function CustomPlanManagement({
     return dateA.getTime() - dateB.getTime();
   });
 
-  const filteredMembers = members.filter((m) =>
-    m.name.toLowerCase().includes(memberSearch.toLowerCase())
-  );
+  const filteredMembers = useMemo(() => {
+    const normalizedSearch = memberSearch.trim().toLowerCase();
+    if (!normalizedSearch) {
+      return members;
+    }
+    return members.filter((m) =>
+      m.name.toLowerCase().includes(normalizedSearch)
+    );
+  }, [memberSearch, members]);
 
   const handleMemberSearchChange = (value: string) => {
     setMemberSearch(value);
-    setIsMemberSelectOpen(value.trim().length > 0);
+    if (value.trim().length === 0) {
+      setNewPlan((prev) => ({ ...prev, member_id: "" }));
+    }
   };
 
-  const renewFilteredMembers = members.filter((m) =>
-    m.name.toLowerCase().includes(renewMemberSearch.toLowerCase())
-  );
+  const renewFilteredMembers = useMemo(() => {
+    const normalizedSearch = renewMemberSearch.trim().toLowerCase();
+    if (!normalizedSearch) {
+      return members;
+    }
+    return members.filter((m) =>
+      m.name.toLowerCase().includes(normalizedSearch)
+    );
+  }, [members, renewMemberSearch]);
 
   const handleRenewMemberSearchChange = (value: string) => {
     setRenewMemberSearch(value);
-    setIsRenewMemberSelectOpen(value.trim().length > 0);
+    if (value.trim().length === 0) {
+      setRenewPlan((prev) => ({ ...prev, member_id: "" }));
+    }
   };
 
   const filterDescriptionMap: Record<StatusFilter, string> = {
@@ -298,6 +313,8 @@ export function CustomPlanManagement({
   const filterDescription = filterDescriptionMap[statusFilter];
   const hasActiveFilters =
     statusFilter !== "all" || searchTerm.trim().length > 0;
+  const showMemberResults = memberSearch.trim().length > 0;
+  const showRenewMemberResults = renewMemberSearch.trim().length > 0;
   const resultsLabel =
     filteredPlans.length === 1 ? "1 plan" : `${filteredPlans.length} planes`;
 
@@ -459,7 +476,6 @@ export function CustomPlanManagement({
     setIsAddDialogOpen(false);
     setNewPlan(createEmptyPlanForm());
     setMemberSearch("");
-    setIsMemberSelectOpen(false);
   };
 
   const handleDeletePlan = async (id: string) => {
@@ -483,7 +499,6 @@ export function CustomPlanManagement({
       end_date: plan.end_date || "",
     });
     setRenewMemberSearch(member ? member.name : plan.member_name);
-    setIsRenewMemberSelectOpen(false);
     setIsRenewDialogOpen(true);
   };
 
@@ -491,7 +506,6 @@ export function CustomPlanManagement({
     setIsRenewDialogOpen(false);
     setRenewPlan(createEmptyPlanForm());
     setRenewMemberSearch("");
-    setIsRenewMemberSelectOpen(false);
   };
 
   const handleRenewPlan = async () => {
@@ -581,7 +595,7 @@ export function CustomPlanManagement({
                 Asocia un plan especial a un socio.
               </DialogDescription>
             </DialogHeader>
-             <div className="grid gap-6 py-4 max-h-[80vh] overflow-y-auto pr-2">
+            <div className="grid gap-6 py-4 max-h-[80vh] overflow-y-auto pr-2">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="grid gap-2 md:col-span-2">
                   <Label>Buscar Socio</Label>
@@ -591,41 +605,45 @@ export function CustomPlanManagement({
                       placeholder="Buscar socio..."
                       className="pl-8"
                       value={memberSearch}
-                      onFocus={() => setIsMemberSelectOpen(true)}
                       onChange={(e) => handleMemberSearchChange(e.target.value)}
                     />
                   </div>
-                  <Select
-                    open={isMemberSelectOpen}
-                    onOpenChange={setIsMemberSelectOpen}
-                    value={newPlan.member_id}
-                    onValueChange={(v) => {
-                      setNewPlan({ ...newPlan, member_id: v });
-                      const selectedMember = members.find((m) => m.id === v);
-                      if (selectedMember) {
-                        setMemberSearch(selectedMember.name);
-                      }
-                      setIsMemberSelectOpen(false);
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar socio" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredMembers.length === 0 ? (
-                        <SelectItem value="no-results" disabled>
-                          Sin resultados
-                        </SelectItem>
-                      ) : (
-                        filteredMembers.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.name}
-                          </SelectItem>
+                  {showMemberResults && (
+                    <div className="max-h-32 overflow-y-auto rounded-md border">
+                      {filteredMembers.length > 0 ? (
+                        filteredMembers.map((member) => (
+                          <div
+                            key={member.id}
+                            className={cn(
+                              "cursor-pointer border-b p-2 text-sm transition-colors last:border-b-0 hover:bg-blue-500/10 dark:hover:bg-blue-500/30",
+                              newPlan.member_id === member.id &&
+                                "bg-blue-500/20 dark:bg-blue-500/40"
+                            )}
+                            onClick={() => {
+                              setNewPlan((prev) => ({
+                                ...prev,
+                                member_id: member.id,
+                              }));
+                              setMemberSearch(member.name);
+                            }}
+                          >
+                            <div className="font-medium">{member.name}</div>
+                            {member.plan && (
+                              <div className="text-xs text-muted-foreground">
+                                Plan actual: {member.plan}
+                              </div>
+                            )}
+                          </div>
                         ))
+                      ) : (
+                        <div className="p-2 text-sm text-muted-foreground">
+                          No se encontraron socios
+                        </div>
                       )}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  )}
                 </div>
+
                 <div className="grid gap-2">
                   <Label>Nombre del Plan</Label>
                   <Input
@@ -642,7 +660,7 @@ export function CustomPlanManagement({
                     onChange={(e) =>
                       setNewPlan({ ...newPlan, description: e.target.value })
                     }
-                     />
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label>Precio ($)</Label>
@@ -691,18 +709,20 @@ export function CustomPlanManagement({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Efectivo">Efectivo</SelectItem>
-                      <SelectItem value="Transferencia">Transferencia</SelectItem>
+                      <SelectItem value="Transferencia">
+                        Transferencia
+                      </SelectItem>
                       <SelectItem value="Tarjeta de Débito">
                         Tarjeta de Débito
                       </SelectItem>
-                    <SelectItem value="Tarjeta de Crédito">
+                      <SelectItem value="Tarjeta de Crédito">
                         Tarjeta de Crédito
                       </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-               {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+                {["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
                   newPlan.payment_method || ""
                 ) && (
                   <div className="grid gap-4 md:grid-cols-2 md:col-span-2">
@@ -744,7 +764,7 @@ export function CustomPlanManagement({
                       />
                     </div>
                   </div>
-                 )}
+                )}
                 <div className="grid gap-2 md:col-span-2">
                   <Label htmlFor="payment_description">
                     Descripción del pago
@@ -807,42 +827,45 @@ export function CustomPlanManagement({
                     placeholder="Buscar socio..."
                     className="pl-8"
                     value={renewMemberSearch}
-                    onFocus={() => setIsRenewMemberSelectOpen(true)}
                     onChange={(e) =>
                       handleRenewMemberSearchChange(e.target.value)
                     }
                   />
                 </div>
-                <Select
-                  open={isRenewMemberSelectOpen}
-                  onOpenChange={setIsRenewMemberSelectOpen}
-                  value={renewPlan.member_id}
-                  onValueChange={(v) => {
-                    setRenewPlan({ ...renewPlan, member_id: v });
-                    const selectedMember = members.find((m) => m.id === v);
-                    if (selectedMember) {
-                      setRenewMemberSearch(selectedMember.name);
-                    }
-                    setIsRenewMemberSelectOpen(false);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar socio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {renewFilteredMembers.length === 0 ? (
-                      <SelectItem value="no-results" disabled>
-                        Sin resultados
-                      </SelectItem>
-                    ) : (
-                      renewFilteredMembers.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name}
-                        </SelectItem>
+                {showRenewMemberResults && (
+                  <div className="max-h-32 overflow-y-auto rounded-md border">
+                    {renewFilteredMembers.length > 0 ? (
+                      renewFilteredMembers.map((member) => (
+                        <div
+                          key={member.id}
+                          className={cn(
+                            "cursor-pointer border-b p-2 text-sm transition-colors last:border-b-0 hover:bg-blue-500/10 dark:hover:bg-blue-500/30",
+                            renewPlan.member_id === member.id &&
+                              "bg-blue-500/20 dark:bg-blue-500/40"
+                          )}
+                          onClick={() => {
+                            setRenewPlan((prev) => ({
+                              ...prev,
+                              member_id: member.id,
+                            }));
+                            setRenewMemberSearch(member.name);
+                          }}
+                        >
+                          <div className="font-medium">{member.name}</div>
+                          {member.plan && (
+                            <div className="text-xs text-muted-foreground">
+                              Plan actual: {member.plan}
+                            </div>
+                          )}
+                        </div>
                       ))
+                    ) : (
+                      <div className="p-2 text-sm text-muted-foreground">
+                        No se encontraron socios
+                      </div>
                     )}
-                  </SelectContent>
-                </Select>
+                  </div>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label>Nombre del Plan</Label>
