@@ -76,6 +76,14 @@ const CustomPlanManagement = dynamic(
   { ssr: false }
 );
 
+const OneTimePaymentManagement = dynamic(
+  () =>
+    import("@/components/one-time-payment-management").then(
+      (m) => m.OneTimePaymentManagement
+    ),
+  { ssr: false }
+);
+
 const ActivityManagement = dynamic(
   () =>
     import("@/components/activity-management").then(
@@ -109,6 +117,7 @@ import type {
   Plan,
   Activity,
   CustomPlan,
+  OneTimePayment,
 } from "@/lib/supabase";
 
 const NEW_PROSPECT_STATUSES: Prospect["status"][] = ["averiguador"];
@@ -152,6 +161,9 @@ export default function GymManagementSystem() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [customPlans, setCustomPlans] = useState<CustomPlan[]>([]);
+  const [oneTimePayments, setOneTimePayments] = useState<OneTimePayment[]>(
+    []
+  );
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [gymData, setGymData] = useState<
     { name: string; id: string; logo_url?: string | null } | null
@@ -198,6 +210,7 @@ export default function GymManagementSystem() {
     setPlans([]);
     setActivities([]);
     setCustomPlans([]);
+    setOneTimePayments([]);
   };
 
   // CARGAR DATOS DESDE SUPABASE
@@ -223,6 +236,7 @@ export default function GymManagementSystem() {
         { data: plansData, error: plansError },
         { data: activitiesData, error: activitiesError },
         { data: customPlansData, error: customPlansError },
+        { data: oneTimePaymentsData, error: oneTimePaymentsError },
       ] = await Promise.all([
         supabase
           .from("members")
@@ -274,6 +288,13 @@ export default function GymManagementSystem() {
             "id, gym_id, member_id, member_name, name, description, price, start_date, end_date, is_active"
           )
           .eq("gym_id", gymId),
+          supabase
+          .from("one_time_payments")
+          .select(
+            "id, gym_id, full_name, phone, source, description, visit_date, estimated_payment_date, created_at"
+          )
+          .eq("gym_id", gymId)
+          .order("visit_date", { ascending: false }),
       ]);
 
       if (membersError) {
@@ -319,6 +340,10 @@ export default function GymManagementSystem() {
         );
       }
 
+      if (oneTimePaymentsError) {
+        console.error("Error cargando pagos únicos:", oneTimePaymentsError);
+      }
+
       setMembers(membersData || []);
       setPayments(paymentsData || []);
       setExpenses(expensesData || []);
@@ -336,6 +361,7 @@ export default function GymManagementSystem() {
       setPlans(plansData || []);
       setActivities(activitiesData || []);
       setCustomPlans(customPlansData || []);
+      setOneTimePayments(oneTimePaymentsData || []);
 
       console.log("Datos cargados:", {
         members: membersData?.length || 0,
@@ -343,6 +369,7 @@ export default function GymManagementSystem() {
         plans: plansData?.length || 0,
         activities: activitiesData?.length || 0,
         customPlans: customPlansData?.length || 0,
+        oneTimePayments: oneTimePaymentsData?.length || 0,
       });
     } catch (error) {
       console.error("Error cargando datos:", error);
@@ -905,6 +932,7 @@ export default function GymManagementSystem() {
               { id: "inactives", label: "Inactivos" },
               { id: "plans", label: "Planes" },
                { id: "custom_plans", label: "Personalizados" },
+                { id: "one_time_payments", label: "Pago único" },
               { id: "activities", label: "Actividades" },
               { id: "routines", label: "Rutinas" },
               { id: "expenses", label: "Gastos" },
@@ -991,6 +1019,7 @@ export default function GymManagementSystem() {
             expenses={expenses}
             prospects={prospects}
             customPlans={customPlans}
+             oneTimePayments={oneTimePayments}
             gymName={gymData?.name || ""}
           />
         )}
@@ -1009,6 +1038,13 @@ export default function GymManagementSystem() {
             members={members}
             payments={payments}
             setPayments={setPayments}
+            gymId={gymData?.id || ""}
+          />
+        )}
+         {activeTab === "one_time_payments" && (
+          <OneTimePaymentManagement
+            records={oneTimePayments}
+            setRecords={setOneTimePayments}
             gymId={gymData?.id || ""}
           />
         )}

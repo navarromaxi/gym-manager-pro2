@@ -131,6 +131,18 @@ export interface Activity {
   created_at: string // 👈 AGREGAR ESTO
 }
 
+export interface OneTimePayment {
+  id: string
+  gym_id: string
+  full_name: string
+  phone: string
+  source: string
+  description?: string | null
+  visit_date: string
+  estimated_payment_date: string
+  created_at?: string | null
+}
+
 export interface Product {
   id: string
   gym_id: string

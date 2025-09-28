@@ -162,12 +162,28 @@ interface CustomPlan {
   cardInstallments?: number | null;
 }
 
+interface OneTimePaymentRecord {
+  id: string;
+  full_name?: string | null;
+  fullName?: string | null;
+  phone?: string | null;
+  source?: string | null;
+  description?: string | null;
+  visit_date?: string | null;
+  visitDate?: string | null;
+  estimated_payment_date?: string | null;
+  estimatedPaymentDate?: string | null;
+  created_at?: string | null;
+  createdAt?: string | null;
+}
+
 interface ReportsSectionProps {
   members: Member[];
   payments: Payment[];
   expenses: Expense[];
   prospects: Prospect[];
   customPlans: CustomPlan[];
+  oneTimePayments: OneTimePaymentRecord[];
   gymName: string;
 }
 
@@ -241,6 +257,7 @@ export function ReportsSection({
   expenses,
   prospects,
   customPlans,
+  oneTimePayments,
   gymName,
 }: ReportsSectionProps) {
   const [timeFilter, setTimeFilter] = useState("current_month");
@@ -290,6 +307,46 @@ const pick = <T extends object>(obj: T, ...keys: string[]) => {
   }
   return undefined;
 };
+const getOneTimeVisitDate = (record: OneTimePaymentRecord) => {
+  const value = pick(record as any, "visit_date", "visitDate");
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  return null;
+};
+
+const getOneTimeEstimatedDate = (record: OneTimePaymentRecord) => {
+  const value = pick(
+    record as any,
+    "estimated_payment_date",
+    "estimatedPaymentDate"
+  );
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  return null;
+};
+
+const getOneTimeSource = (record: OneTimePaymentRecord) => {
+  const value = pick(record as any, "source");
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : "Sin origen";
+  }
+  return "Sin origen";
+};
+
+const categorizeOneTimeSource = (source: string) => {
+  const normalized = source.trim().toLowerCase();
+  if (normalized === "tupase") return "TuPase";
+  if (normalized === "paselibre" || normalized === "pase libre") {
+    return "PaseLibre";
+  }
+  return "Otros";
+};
+
 const toLocalDateFromISO = (iso?: string | null) => {
   const parsed = parseFlexibleDate(iso);
   return parsed ? toLocalMidnight(parsed) : null;
@@ -416,12 +473,39 @@ const isWithinPeriod = (date: Date) => {
     const filteredExpenses = expenses.filter((expense) =>
       isWithinPeriod(toLocalDate(expense.date))
     );
+    const filteredOneTimeVisits = oneTimePayments.filter((record) => {
+      const visitDate = getOneTimeVisitDate(record);
+      if (!visitDate) return false;
+      const parsed = toLocalDate(visitDate);
+      if (Number.isNaN(parsed.getTime())) return false;
+      return isWithinPeriod(parsed);
+    });
+    const filteredOneTimeExpected = oneTimePayments.filter((record) => {
+      const estimatedDate = getOneTimeEstimatedDate(record);
+      if (!estimatedDate) return false;
+      const parsed = toLocalDate(estimatedDate);
+      if (Number.isNaN(parsed.getTime())) return false;
+      return isWithinPeriod(parsed);
+    });
 
-    return { filteredPayments, filteredExpenses, periodStart, periodEnd };
+     return {
+      filteredPayments,
+      filteredExpenses,
+      filteredOneTimeVisits,
+      filteredOneTimeExpected,
+      periodStart,
+      periodEnd,
+    };
   };
 
-  const { filteredPayments, filteredExpenses, periodStart, periodEnd } =
-    getFilteredData();
+   const {
+    filteredPayments,
+    filteredExpenses,
+    filteredOneTimeVisits,
+    filteredOneTimeExpected,
+    periodStart,
+    periodEnd,
+  } = getFilteredData();
 
   // Cálculos con datos filtrados
   const totalIncome = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -821,6 +905,80 @@ const isWithinPeriod = (date: Date) => {
     debitCardStats,
     debitCardPayments.length
   );
+
+  const totalOneTimeVisits = filteredOneTimeVisits.length;
+  const totalOneTimeExpected = filteredOneTimeExpected.length;
+
+  const oneTimeSourceTotals = filteredOneTimeExpected.reduce(
+    (acc, record) => {
+      const category = categorizeOneTimeSource(
+        getOneTimeSource(record)
+      ) as "TuPase" | "PaseLibre" | "Otros";
+      acc[category] = (acc[category] || 0) + 1;
+      acc.total += 1;
+      return acc;
+    },
+    { TuPase: 0, PaseLibre: 0, Otros: 0, total: 0 } as Record<
+      "TuPase" | "PaseLibre" | "Otros" | "total",
+      number
+    >
+  );
+
+  const monthlyOneTimeStatsMap = filteredOneTimeExpected.reduce(
+    (
+      acc,
+      record
+    ) => {
+      const estimatedRaw = getOneTimeEstimatedDate(record);
+      const referenceRaw = estimatedRaw ?? getOneTimeVisitDate(record);
+      if (!referenceRaw) return acc;
+      const parsed = toLocalDate(referenceRaw);
+      if (Number.isNaN(parsed.getTime())) return acc;
+      const key = `${parsed.getFullYear()}-${String(
+        parsed.getMonth() + 1
+      ).padStart(2, "0")}`;
+      if (!acc[key]) {
+        acc[key] = {
+          date: toLocalMidnight(parsed),
+          label: parsed.toLocaleDateString("es-ES", {
+            month: "long",
+            year: "numeric",
+          }),
+          total: 0,
+          TuPase: 0,
+          PaseLibre: 0,
+          Otros: 0,
+        };
+      }
+      const category = categorizeOneTimeSource(
+        getOneTimeSource(record)
+      ) as "TuPase" | "PaseLibre" | "Otros";
+      acc[key][category] += 1;
+      acc[key].total += 1;
+      return acc;
+    },
+    {} as Record<
+      string,
+      {
+        date: Date;
+        label: string;
+        total: number;
+        TuPase: number;
+        PaseLibre: number;
+        Otros: number;
+      }
+    >
+  );
+
+  const monthlyOneTimeStats = Object.values(monthlyOneTimeStatsMap)
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map((entry) => ({
+      month: entry.label.charAt(0).toUpperCase() + entry.label.slice(1),
+      total: entry.total,
+      TuPase: entry.TuPase,
+      PaseLibre: entry.PaseLibre,
+      Otros: entry.Otros,
+    }));
 
   const last6MonthsIncome = Array.from({ length: 6 }, (_, i) => {
     const date = new Date();
@@ -1784,6 +1942,82 @@ const isWithinPeriod = (date: Date) => {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <DollarSign className="mr-2 h-5 w-5" />
+            Pagos Únicos por Origen - {getTimeFilterLabel()}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">
+                Visitas registradas
+              </p>
+              <p className="text-2xl font-bold">{totalOneTimeVisits}</p>
+              <p className="text-xs text-muted-foreground">
+                Según fecha de uso dentro del filtro.
+              </p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">Cobros estimados</p>
+              <p className="text-2xl font-bold text-emerald-600">
+                {totalOneTimeExpected}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Se cuenta por fecha estimada de acreditación.
+              </p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">Detalle por origen</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Badge variant="secondary">
+                  TuPase: {oneTimeSourceTotals.TuPase}
+                </Badge>
+                <Badge variant="secondary">
+                  PaseLibre: {oneTimeSourceTotals.PaseLibre}
+                </Badge>
+                <Badge variant="secondary">
+                  Otros: {oneTimeSourceTotals.Otros}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {monthlyOneTimeStats.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Mes</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>TuPase</TableHead>
+                    <TableHead>PaseLibre</TableHead>
+                    <TableHead>Otros</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {monthlyOneTimeStats.map((row) => (
+                    <TableRow key={row.month}>
+                      <TableCell className="font-medium">{row.month}</TableCell>
+                      <TableCell>{row.total}</TableCell>
+                      <TableCell>{row.TuPase}</TableCell>
+                      <TableCell>{row.PaseLibre}</TableCell>
+                      <TableCell>{row.Otros}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No se registran pagos únicos en el período seleccionado.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Income Trend */}
       <Card>
