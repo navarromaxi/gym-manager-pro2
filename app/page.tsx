@@ -1,4 +1,3 @@
-
 // ESTE ARCHIVO ES EL QUE MANEJA LA ENTRADA AL SOFTWARE
 
 "use client";
@@ -161,13 +160,13 @@ export default function GymManagementSystem() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [customPlans, setCustomPlans] = useState<CustomPlan[]>([]);
-  const [oneTimePayments, setOneTimePayments] = useState<OneTimePayment[]>(
-    []
-  );
+  const [oneTimePayments, setOneTimePayments] = useState<OneTimePayment[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [gymData, setGymData] = useState<
-    { name: string; id: string; logo_url?: string | null } | null
-  >(null);
+  const [gymData, setGymData] = useState<{
+    name: string;
+    id: string;
+    logo_url?: string | null;
+  } | null>(null);
   const [memberFilter, setMemberFilter] = useState("all");
   const [loading, setLoading] = useState(false);
   const [pendingProspectStatusFilter, setPendingProspectStatusFilter] =
@@ -228,11 +227,7 @@ export default function GymManagementSystem() {
         { data: membersData, error: membersError },
         { data: paymentsData, error: paymentsError },
         { data: expensesData, error: expensesError },
-        {
-          data: prospectsData,
-          error: prospectsError,
-          count: prospectsCount,
-        },
+        { data: prospectsData, error: prospectsError, count: prospectsCount },
         { data: plansData, error: plansError },
         { data: activitiesData, error: activitiesError },
         { data: customPlansData, error: customPlansError },
@@ -241,7 +236,7 @@ export default function GymManagementSystem() {
         supabase
           .from("members")
           .select(
-           "id, gym_id, name, email, phone, referral_source, join_date, plan, plan_price, last_payment, next_payment, next_installment_due, status, inactive_level, inactive_comment, followed_up, balance_due"
+            "id, gym_id, name, email, phone, referral_source, join_date, plan, plan_price, last_payment, next_payment, next_installment_due, status, inactive_level, inactive_comment, followed_up, balance_due"
           )
           .eq("gym_id", gymId)
           .order("balance_due", { ascending: false })
@@ -288,10 +283,10 @@ export default function GymManagementSystem() {
             "id, gym_id, member_id, member_name, name, description, price, start_date, end_date, is_active"
           )
           .eq("gym_id", gymId),
-          supabase
+        supabase
           .from("one_time_payments")
           .select(
-            "id, gym_id, full_name, phone, source, description, visit_date, estimated_payment_date, created_at"
+            "id, gym_id, full_name, phone, source, amount, description, visit_date, estimated_payment_date, created_at"
           )
           .eq("gym_id", gymId)
           .order("visit_date", { ascending: false }),
@@ -301,37 +296,25 @@ export default function GymManagementSystem() {
         console.error("Error cargando miembros:", membersError);
       }
 
-      
-
       if (paymentsError) {
         console.error("Error cargando pagos:", paymentsError);
       }
-
-     
 
       if (expensesError) {
         console.error("Error cargando gastos:", expensesError);
       }
 
-     
-
       if (prospectsError) {
         console.error("Error cargando interesados:", prospectsError);
       }
-
-      
 
       if (plansError) {
         console.error("Error cargando planes:", plansError);
       }
 
-     
-
       if (activitiesError) {
         console.error("Error cargando actividades:", activitiesError);
       }
-
-     
 
       if (customPlansError) {
         console.error(
@@ -347,10 +330,12 @@ export default function GymManagementSystem() {
       setMembers(membersData || []);
       setPayments(paymentsData || []);
       setExpenses(expensesData || []);
-      const normalizedProspects = (prospectsData ?? []).map((prospect: any) => ({
-        ...prospect,
-        status: mapProspectStatusFromDb(prospect.status),
-      })) as Prospect[];
+      const normalizedProspects = (prospectsData ?? []).map(
+        (prospect: any) => ({
+          ...prospect,
+          status: mapProspectStatusFromDb(prospect.status),
+        })
+      ) as Prospect[];
       setProspects(normalizedProspects);
       setProspectsPage(normalizedProspects.length > 0 ? 1 : 0);
       setProspectsTotal(
@@ -393,7 +378,7 @@ export default function GymManagementSystem() {
       const { data, error, count } = await supabase
         .from("prospects")
         .select(
-           "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, next_contact_date, created_at",
+          "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, next_contact_date, created_at",
           { count: "exact" }
         )
         .eq("gym_id", gymData.id)
@@ -433,9 +418,7 @@ export default function GymManagementSystem() {
   };
 
   const handleProspectAdded = () => {
-    setProspectsTotal((prev) =>
-      typeof prev === "number" ? prev + 1 : prev
-    );
+    setProspectsTotal((prev) => (typeof prev === "number" ? prev + 1 : prev));
   };
 
   const handleProspectRemoved = () => {
@@ -463,7 +446,7 @@ export default function GymManagementSystem() {
       const diffTime = today.getTime() - nextPayment.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-     let status: "active" | "expired" | "inactive" = member.status;
+      let status: "active" | "expired" | "inactive" = member.status;
       let inactiveLevel = member.inactive_level;
 
       if (nextPayment > today) {
@@ -485,7 +468,7 @@ export default function GymManagementSystem() {
       }
       return member;
     });
-     return { members: updatedMembers, hasChanges };
+    return { members: updatedMembers, hasChanges };
   };
 
   // Aplicar actualización de estados
@@ -528,18 +511,20 @@ export default function GymManagementSystem() {
       else inactive += 1;
 
       const next = toLocalDate(member.next_payment);
-      const diffDaysToNext = Math.ceil(
-        (next.getTime() - todayMs) / 86400000
-      );
-    if (diffDaysToNext <= 7 && diffDaysToNext >= 0) {
+      const diffDaysToNext = Math.ceil((next.getTime() - todayMs) / 86400000);
+      if (diffDaysToNext <= 7 && diffDaysToNext >= 0) {
         upcoming += 1;
       }
 
-  const join = toLocalDate(member.join_date);
+      const join = toLocalDate(member.join_date);
       const diffDaysFromJoin = Math.floor(
         (todayMs - join.getTime()) / 86400000
       );
-       if (!member.followed_up && diffDaysFromJoin >= 5 && diffDaysFromJoin <= 12) {
+      if (
+        !member.followed_up &&
+        diffDaysFromJoin >= 5 &&
+        diffDaysFromJoin <= 12
+      ) {
         followUp += 1;
       }
     });
@@ -569,7 +554,7 @@ export default function GymManagementSystem() {
       return sum;
     }, 0);
 
-  const expensesTotal = expenses.reduce((sum, expense) => {
+    const expensesTotal = expenses.reduce((sum, expense) => {
       const expenseDate = toLocalDate(expense.date);
       if (
         expenseDate.getMonth() === month &&
@@ -600,7 +585,7 @@ export default function GymManagementSystem() {
     [prospects]
   );
 
-   const nextContactTomorrowCount = useMemo(() => {
+  const nextContactTomorrowCount = useMemo(() => {
     const tomorrow = new Date();
     tomorrow.setHours(0, 0, 0, 0);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -855,20 +840,21 @@ export default function GymManagementSystem() {
               >
                 <UserPlus className="h-4 w-4" />
                 <span>
-                    {newProspectsCount} nuevos interesados por contactar
-                  (estado "Averiguador")
+                  {newProspectsCount} nuevos interesados por contactar (estado
+                  "Averiguador")
                 </span>
               </div>
             )}
             {nextContactTomorrowCount > 0 && (
               <div
                 className="flex items-center space-x-2 text-purple-600 cursor-pointer hover:bg-purple-50 p-2 rounded"
-                 onClick={() => goToProspects("averiguador")}
+                onClick={() => goToProspects("averiguador")}
               >
                 <Calendar className="h-4 w-4" />
                 <span>
                   {nextContactTomorrowCount} interesado
-                  {nextContactTomorrowCount > 1 ? "s" : ""} para contactar mañana
+                  {nextContactTomorrowCount > 1 ? "s" : ""} para contactar
+                  mañana
                 </span>
               </div>
             )}
@@ -896,7 +882,7 @@ export default function GymManagementSystem() {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-             <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4">
               {gymData?.logo_url && (
                 <img
                   src={gymData.logo_url}
@@ -905,12 +891,10 @@ export default function GymManagementSystem() {
                 />
               )}
               <div>
-                 <h1 className="text-[1.75rem] font-bold leading-tight text-gray-900">
+                <h1 className="text-[1.75rem] font-bold leading-tight text-gray-900">
                   {/* GymManagerPro 2.0 */}
                 </h1>
-                 <p className="text-base text-gray-500">
-                  {displayGymName}
-                </p>
+                <p className="text-base text-gray-500">{displayGymName}</p>
               </div>
             </div>
             <Button variant="outline" onClick={handleLogout}>
@@ -923,7 +907,7 @@ export default function GymManagementSystem() {
       {/* Navigation */}
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-           <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:gap-8">
+          <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:gap-8">
             {[
               { id: "dashboard", label: "Dashboard" },
               { id: "members", label: "Socios" },
@@ -931,8 +915,8 @@ export default function GymManagementSystem() {
               { id: "prospects", label: "Interesados" },
               { id: "inactives", label: "Inactivos" },
               { id: "plans", label: "Planes" },
-               { id: "custom_plans", label: "Personalizados" },
-                { id: "one_time_payments", label: "Pago único" },
+              { id: "custom_plans", label: "Personalizados" },
+              { id: "one_time_payments", label: "Pago único" },
               { id: "activities", label: "Actividades" },
               { id: "routines", label: "Rutinas" },
               { id: "expenses", label: "Gastos" },
@@ -1019,7 +1003,7 @@ export default function GymManagementSystem() {
             expenses={expenses}
             prospects={prospects}
             customPlans={customPlans}
-             oneTimePayments={oneTimePayments}
+            oneTimePayments={oneTimePayments}
             gymName={gymData?.name || ""}
           />
         )}
@@ -1031,7 +1015,7 @@ export default function GymManagementSystem() {
             gymId={gymData?.id || ""}
           />
         )}
-         {activeTab === "custom_plans" && (
+        {activeTab === "custom_plans" && (
           <CustomPlanManagement
             customPlans={customPlans}
             setCustomPlans={setCustomPlans}
@@ -1041,7 +1025,7 @@ export default function GymManagementSystem() {
             gymId={gymData?.id || ""}
           />
         )}
-         {activeTab === "one_time_payments" && (
+        {activeTab === "one_time_payments" && (
           <OneTimePaymentManagement
             records={oneTimePayments}
             setRecords={setOneTimePayments}

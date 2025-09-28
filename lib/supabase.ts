@@ -137,6 +137,7 @@ export interface OneTimePayment {
   full_name: string
   phone: string
   source: string
+  amount: number | null
   description?: string | null
   visit_date: string
   estimated_payment_date: string

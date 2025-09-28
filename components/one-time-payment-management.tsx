@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,13 +43,37 @@ interface OneTimePaymentManagementProps {
 
 type SourceOption = "TuPase" | "PaseLibre" | "Otro";
 
+type SourceTotals = Record<
+  "TuPase" | "PaseLibre" | "Otros" | "total",
+  { count: number; amount: number }
+>;
+
 const SOURCE_OPTIONS: { value: SourceOption; label: string }[] = [
   { value: "TuPase", label: "TuPase" },
   { value: "PaseLibre", label: "PaseLibre" },
   { value: "Otro", label: "Otro diferente" },
 ];
 
+const ONE_TIME_PAGE_SIZE = 10;
 const todayISO = () => new Date().toISOString().split("T")[0];
+
+const currencyFormatter = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
+const formatCurrency = (value?: number | null) =>
+  currencyFormatter.format(value ?? 0);
+
+const parseAmountInput = (value: string) => {
+  if (!value) return Number.NaN;
+  const normalized = value.replace(/\./g, "").replace(/,/g, ".").trim();
+  if (!normalized) return Number.NaN;
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+};
 
 const resolveSource = (option: SourceOption, other: string) => {
   if (option === "Otro") {
@@ -59,7 +83,9 @@ const resolveSource = (option: SourceOption, other: string) => {
   return option;
 };
 
-const normalizeSourceOption = (source: string): {
+const normalizeSourceOption = (
+  source: string
+): {
   option: SourceOption;
   other: string;
 } => {
@@ -80,7 +106,8 @@ const formatDate = (value?: string | null) => {
   });
 };
 
-const toComparableDate = (value: string) => new Date(value + "T00:00:00").getTime();
+const toComparableDate = (value: string) =>
+  new Date(value + "T00:00:00").getTime();
 
 export function OneTimePaymentManagement({
   records,
@@ -90,13 +117,11 @@ export function OneTimePaymentManagement({
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sourceFilter, setSourceFilter] = useState<SourceOption | "all">(
-    "all"
-  );
+  const [sourceFilter, setSourceFilter] = useState<SourceOption | "all">("all");
   const [editingRecord, setEditingRecord] = useState<OneTimePayment | null>(
     null
   );
-
+  const [visibleCount, setVisibleCount] = useState(ONE_TIME_PAGE_SIZE);
   const [newRecord, setNewRecord] = useState({
     fullName: "",
     phone: "",
@@ -105,6 +130,7 @@ export function OneTimePaymentManagement({
     description: "",
     visitDate: todayISO(),
     estimatedPaymentDate: todayISO(),
+    amount: "",
   });
 
   const [editRecordData, setEditRecordData] = useState({
@@ -115,6 +141,7 @@ export function OneTimePaymentManagement({
     description: "",
     visitDate: todayISO(),
     estimatedPaymentDate: todayISO(),
+    amount: "",
   });
 
   const resetNewRecord = () => {
@@ -126,12 +153,13 @@ export function OneTimePaymentManagement({
       description: "",
       visitDate: todayISO(),
       estimatedPaymentDate: todayISO(),
+      amount: "",
     });
   };
 
   const sortedRecords = useMemo(() => {
-    return [...records].sort((a, b) =>
-      toComparableDate(b.visit_date) - toComparableDate(a.visit_date)
+    return [...records].sort(
+      (a, b) => toComparableDate(b.visit_date) - toComparableDate(a.visit_date)
     );
   }, [records]);
 
@@ -139,7 +167,13 @@ export function OneTimePaymentManagement({
     const normalizedSearch = searchTerm.trim().toLowerCase();
     return sortedRecords.filter((record) => {
       if (sourceFilter !== "all" && record.source !== sourceFilter) {
-        if (!(sourceFilter === "Otro" && record.source !== "TuPase" && record.source !== "PaseLibre")) {
+        if (
+          !(
+            sourceFilter === "Otro" &&
+            record.source !== "TuPase" &&
+            record.source !== "PaseLibre"
+          )
+        ) {
           return false;
         }
       }
@@ -158,7 +192,21 @@ export function OneTimePaymentManagement({
       return haystack.includes(normalizedSearch);
     });
   }, [sortedRecords, searchTerm, sourceFilter]);
+  useEffect(() => {
+    setVisibleCount(ONE_TIME_PAGE_SIZE);
+  }, [searchTerm, sourceFilter]);
 
+  const visibleRecords = useMemo(() => {
+    return filteredRecords.slice(0, visibleCount);
+  }, [filteredRecords, visibleCount]);
+
+  const canLoadMore = visibleCount < filteredRecords.length;
+
+  const handleLoadMoreRecords = () => {
+    setVisibleCount((prev) =>
+      Math.min(prev + ONE_TIME_PAGE_SIZE, filteredRecords.length)
+    );
+  };
   const upcomingSettlements = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -170,33 +218,46 @@ export function OneTimePaymentManagement({
         estimated.setHours(0, 0, 0, 0);
         return estimated >= today;
       })
-      .sort((a, b) =>
-        toComparableDate(a.estimated_payment_date) -
-        toComparableDate(b.estimated_payment_date)
+      .sort(
+        (a, b) =>
+          toComparableDate(a.estimated_payment_date) -
+          toComparableDate(b.estimated_payment_date)
       )
       .slice(0, 5);
   }, [records]);
 
-  const totalsBySource = useMemo(() => {
-    return records.reduce(
+  const totalsBySource = useMemo<SourceTotals>(() => {
+    return records.reduce<SourceTotals>(
       (acc, record) => {
         const source =
           record.source === "TuPase" || record.source === "PaseLibre"
             ? record.source
             : "Otros";
-        acc[source] = (acc[source] || 0) + 1;
-        acc.total += 1;
+        const amount = record.amount ?? 0;
+        acc[source].count += 1;
+        acc[source].amount += amount;
+        acc.total.count += 1;
+        acc.total.amount += amount;
         return acc;
       },
-      { TuPase: 0, PaseLibre: 0, Otros: 0, total: 0 } as Record<
-        "TuPase" | "PaseLibre" | "Otros" | "total",
-        number
-      >
+      {
+        TuPase: { count: 0, amount: 0 },
+        PaseLibre: { count: 0, amount: 0 },
+        Otros: { count: 0, amount: 0 },
+        total: { count: 0, amount: 0 },
+      }
     );
   }, [records]);
 
   const handleCreateRecord = async () => {
     if (!gymId) return;
+
+    const parsedAmount = parseAmountInput(newRecord.amount);
+
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      alert("El monto debe ser un número mayor a 0.");
+      return;
+    }
 
     const source = resolveSource(newRecord.sourceOption, newRecord.otherSource);
     const payload = {
@@ -204,6 +265,7 @@ export function OneTimePaymentManagement({
       full_name: newRecord.fullName.trim(),
       phone: newRecord.phone.trim(),
       source,
+      amount: parsedAmount,
       description: newRecord.description.trim() || null,
       visit_date: newRecord.visitDate,
       estimated_payment_date: newRecord.estimatedPaymentDate,
@@ -245,6 +307,10 @@ export function OneTimePaymentManagement({
       description: record.description || "",
       visitDate: record.visit_date,
       estimatedPaymentDate: record.estimated_payment_date,
+      amount:
+        record.amount !== null && record.amount !== undefined
+          ? String(record.amount)
+          : "",
     });
     setIsEditDialogOpen(true);
   };
@@ -257,10 +323,18 @@ export function OneTimePaymentManagement({
       editRecordData.otherSource
     );
 
+    const parsedAmount = parseAmountInput(editRecordData.amount);
+
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      alert("El monto debe ser un número mayor a 0.");
+      return;
+    }
+
     const payload = {
       full_name: editRecordData.fullName.trim(),
       phone: editRecordData.phone.trim(),
       source,
+      amount: parsedAmount,
       description: editRecordData.description.trim() || null,
       visit_date: editRecordData.visitDate,
       estimated_payment_date: editRecordData.estimatedPaymentDate,
@@ -285,9 +359,7 @@ export function OneTimePaymentManagement({
       if (data) {
         setRecords((prev) =>
           prev.map((record) =>
-            record.id === editingRecord.id
-              ? (data as OneTimePayment)
-              : record
+            record.id === editingRecord.id ? (data as OneTimePayment) : record
           )
         );
         setIsEditDialogOpen(false);
@@ -329,8 +401,8 @@ export function OneTimePaymentManagement({
           <div>
             <CardTitle>Pago Único</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Registra las visitas de personas no socias provenientes de agencias
-              externas y lleva el control de los cobros pendientes.
+              Registra las visitas de personas no socias provenientes de
+              agencias externas y lleva el control de los cobros pendientes.
             </p>
           </div>
           <Button onClick={() => setIsAddDialogOpen(true)}>
@@ -376,13 +448,17 @@ export function OneTimePaymentManagement({
             <div className="flex flex-col justify-end gap-2 md:items-end">
               <div className="flex flex-wrap gap-2">
                 <Badge variant="outline">
-                  Total: {totalsBySource.total}
+                  Total: {totalsBySource.total.count} · {" "}
+                  {formatCurrency(totalsBySource.total.amount)}
                 </Badge>
-                <Badge variant="secondary">TuPase: {totalsBySource.TuPase}</Badge>
                 <Badge variant="secondary">
-                  PaseLibre: {totalsBySource.PaseLibre}
+                   PaseLibre: {totalsBySource.PaseLibre.count} · {" "}
+                  {formatCurrency(totalsBySource.PaseLibre.amount)}
                 </Badge>
-                <Badge variant="secondary">Otros: {totalsBySource.Otros}</Badge>
+                <Badge variant="secondary">
+                  Otros: {totalsBySource.Otros.count} · {" "}
+                  {formatCurrency(totalsBySource.Otros.amount)}
+                </Badge>
               </div>
             </div>
           </div>
@@ -408,10 +484,18 @@ export function OneTimePaymentManagement({
                         {record.source}
                       </p>
                     </div>
-                    <Badge variant="outline" className="flex items-center gap-1">
+                    <Badge
+                      variant="outline"
+                      className="flex items-center gap-1"
+                    >
                       <Calendar className="h-3 w-3" />
                       {formatDate(record.estimated_payment_date)}
                     </Badge>
+                     <p className="mt-2 text-sm font-semibold text-emerald-600">
+                    {record.amount !== null && record.amount !== undefined
+                      ? formatCurrency(record.amount)
+                      : "-"}
+                  </p>
                   </div>
                   {record.description && (
                     <p className="mt-2 text-sm text-muted-foreground">
@@ -440,21 +524,29 @@ export function OneTimePaymentManagement({
               seleccionados.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Teléfono</TableHead>
                     <TableHead>Origen</TableHead>
                     <TableHead>Uso del pase</TableHead>
                     <TableHead>Pago estimado</TableHead>
+                    <TableHead>Monto</TableHead>
                     <TableHead>Descripción</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRecords.map((record) => (
+                   {visibleRecords.map((record) => {
+                    const amountDisplay =
+                      record.amount !== null && record.amount !== undefined
+                        ? formatCurrency(record.amount)
+                        : "-";
+
+                    return (
                     <TableRow key={record.id}>
                       <TableCell className="font-medium">
                         {record.full_name}
@@ -466,6 +558,9 @@ export function OneTimePaymentManagement({
                       <TableCell>{formatDate(record.visit_date)}</TableCell>
                       <TableCell>
                         {formatDate(record.estimated_payment_date)}
+                      </TableCell>
+                      <TableCell className="font-semibold text-emerald-600">
+                        {amountDisplay}
                       </TableCell>
                       <TableCell className="max-w-[16rem] truncate">
                         {record.description || "-"}
@@ -489,10 +584,23 @@ export function OneTimePaymentManagement({
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );
+                  })}
                 </TableBody>
               </Table>
             </div>
+            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="text-sm text-muted-foreground">
+                Mostrando <strong>{visibleRecords.length}</strong> de{" "}
+                <strong>{filteredRecords.length}</strong> visitas
+              </div>
+              {canLoadMore && (
+                <Button variant="outline" size="sm" onClick={handleLoadMoreRecords}>
+                  Cargar más visitas
+                </Button>
+              )}
+            </div>
+          </>
           )}
         </CardContent>
       </Card>
@@ -597,6 +705,23 @@ export function OneTimePaymentManagement({
                     estimatedPaymentDate: event.target.value,
                   }))
                 }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="amount">Monto a cobrar</Label>
+              <Input
+                id="amount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={newRecord.amount}
+                onChange={(event) =>
+                  setNewRecord((prev) => ({
+                    ...prev,
+                    amount: event.target.value,
+                  }))
+                }
+                placeholder="0"
               />
             </div>
             <div className="grid gap-2">
@@ -724,6 +849,23 @@ export function OneTimePaymentManagement({
                 }
               />
             </div>
+             <div className="grid gap-2">
+              <Label htmlFor="editAmount">Monto a cobrar</Label>
+              <Input
+                id="editAmount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={editRecordData.amount}
+                onChange={(event) =>
+                  setEditRecordData((prev) => ({
+                    ...prev,
+                    amount: event.target.value,
+                  }))
+                }
+                placeholder="0"
+              />
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="editDescription">Descripción</Label>
               <Textarea
@@ -739,7 +881,10 @@ export function OneTimePaymentManagement({
             </div>
           </div>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+            >
               Cancelar
             </Button>
             <Button onClick={handleUpdateRecord}>Guardar cambios</Button>

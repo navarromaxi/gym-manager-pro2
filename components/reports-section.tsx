@@ -93,7 +93,7 @@ interface Payment {
   card_installments?: number;
   start_date?: string;
   startDate?: string;
-  type: "plan" | "product";
+  type: "plan" | "product" | "custom_plan";
   description?: string;
   plan_id?: string;
   product_id?: string;
@@ -168,6 +168,7 @@ interface OneTimePaymentRecord {
   fullName?: string | null;
   phone?: string | null;
   source?: string | null;
+  amount?: number | null;
   description?: string | null;
   visit_date?: string | null;
   visitDate?: string | null;
@@ -177,6 +178,10 @@ interface OneTimePaymentRecord {
   createdAt?: string | null;
 }
 
+type OneTimeSourceTotals = Record<
+  "TuPase" | "PaseLibre" | "Otros" | "total",
+  { count: number; amount: number }
+>;
 interface ReportsSectionProps {
   members: Member[];
   payments: Payment[];
@@ -222,6 +227,20 @@ function downloadBlob(content: Blob, filename: string) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+
+const currencyFormatter = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
+const formatCurrency = (value?: number | null) =>
+  currencyFormatter.format(value ?? 0);
+
+const formatCountAmount = (entry: { count: number; amount: number }) =>
+  `${entry.count} · ${formatCurrency(entry.amount)}`;
 
 // CSV helper (usa ; para Excel ES). Tolera filas con distintas columnas.
 function toCSV(rows: Array<Record<string, any>>): string {
@@ -336,6 +355,20 @@ const getOneTimeSource = (record: OneTimePaymentRecord) => {
     return trimmed.length > 0 ? trimmed : "Sin origen";
   }
   return "Sin origen";
+};
+
+const getOneTimeAmount = (record: OneTimePaymentRecord) => {
+  const rawValue = pick(record as any, "amount");
+  if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+    return rawValue;
+  }
+  if (typeof rawValue === "string") {
+    const normalized = rawValue.replace(/\./g, "").replace(/,/g, ".").trim();
+    if (!normalized) return 0;
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
 };
 
 const categorizeOneTimeSource = (source: string) => {
@@ -508,7 +541,15 @@ const isWithinPeriod = (date: Date) => {
   } = getFilteredData();
 
   // Cálculos con datos filtrados
-  const totalIncome = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
+  const totalPaymentsIncome = filteredPayments.reduce(
+    (sum, p) => sum + p.amount,
+    0
+  );
+  const totalOneTimeExpectedAmount = filteredOneTimeExpected.reduce(
+    (sum, record) => sum + getOneTimeAmount(record),
+    0
+  );
+  const totalIncome = totalPaymentsIncome + totalOneTimeExpectedAmount;
   const totalExpenseAmount = filteredExpenses.reduce(
     (sum, e) => sum + e.amount,
     0
@@ -901,21 +942,26 @@ const isWithinPeriod = (date: Date) => {
   );
 
   const totalOneTimeVisits = filteredOneTimeVisits.length;
-  const totalOneTimeExpected = filteredOneTimeExpected.length;
+  const totalOneTimeExpectedCount = filteredOneTimeExpected.length;
 
-  const oneTimeSourceTotals = filteredOneTimeExpected.reduce(
+   const oneTimeSourceTotals = filteredOneTimeExpected.reduce<OneTimeSourceTotals>(
     (acc, record) => {
       const category = categorizeOneTimeSource(
         getOneTimeSource(record)
       ) as "TuPase" | "PaseLibre" | "Otros";
-      acc[category] = (acc[category] || 0) + 1;
-      acc.total += 1;
+      const amount = getOneTimeAmount(record);
+      acc[category].count += 1;
+      acc[category].amount += amount;
+      acc.total.count += 1;
+      acc.total.amount += amount;
       return acc;
     },
-    { TuPase: 0, PaseLibre: 0, Otros: 0, total: 0 } as Record<
-      "TuPase" | "PaseLibre" | "Otros" | "total",
-      number
-    >
+    {
+      TuPase: { count: 0, amount: 0 },
+      PaseLibre: { count: 0, amount: 0 },
+      Otros: { count: 0, amount: 0 },
+      total: { count: 0, amount: 0 },
+    }
   );
 
   const monthlyOneTimeStatsMap = filteredOneTimeExpected.reduce(
@@ -938,17 +984,20 @@ const isWithinPeriod = (date: Date) => {
             month: "long",
             year: "numeric",
           }),
-          total: 0,
-          TuPase: 0,
-          PaseLibre: 0,
-          Otros: 0,
+          total: { count: 0, amount: 0 },
+          TuPase: { count: 0, amount: 0 },
+          PaseLibre: { count: 0, amount: 0 },
+          Otros: { count: 0, amount: 0 },
         };
       }
       const category = categorizeOneTimeSource(
         getOneTimeSource(record)
       ) as "TuPase" | "PaseLibre" | "Otros";
-      acc[key][category] += 1;
-      acc[key].total += 1;
+      const amount = getOneTimeAmount(record);
+      acc[key][category].count += 1;
+      acc[key][category].amount += amount;
+      acc[key].total.count += 1;
+      acc[key].total.amount += amount;
       return acc;
     },
     {} as Record<
@@ -956,10 +1005,10 @@ const isWithinPeriod = (date: Date) => {
       {
         date: Date;
         label: string;
-        total: number;
-        TuPase: number;
-        PaseLibre: number;
-        Otros: number;
+         total: { count: number; amount: number };
+        TuPase: { count: number; amount: number };
+        PaseLibre: { count: number; amount: number };
+        Otros: { count: number; amount: number };
       }
     >
   );
@@ -987,12 +1036,31 @@ const isWithinPeriod = (date: Date) => {
       );
     });
 
+    const monthOneTimeExpected = oneTimePayments.filter((record) => {
+      const estimatedRaw = getOneTimeEstimatedDate(record);
+      const referenceRaw = estimatedRaw ?? getOneTimeVisitDate(record);
+      if (!referenceRaw) return false;
+      const referenceDate = toLocalDate(referenceRaw);
+      return (
+        referenceDate.getMonth() === month &&
+        referenceDate.getFullYear() === year
+      );
+    });
+    const monthOneTimeIncome = monthOneTimeExpected.reduce(
+      (sum, record) => sum + getOneTimeAmount(record),
+      0
+    );
+    const monthPaymentsIncome = monthPayments.reduce(
+      (sum, p) => sum + p.amount,
+      0
+    );
+
     return {
       month: date.toLocaleDateString("es-ES", {
         month: "short",
         year: "numeric",
       }),
-      income: monthPayments.reduce((sum, p) => sum + p.amount, 0),
+      income: monthPaymentsIncome + monthOneTimeIncome,
     };
   }).reverse();
 
@@ -1958,25 +2026,28 @@ const isWithinPeriod = (date: Date) => {
               </p>
             </div>
             <div className="rounded-lg border p-3">
-              <p className="text-sm text-muted-foreground">Cobros estimados</p>
+              <p className="text-sm text-muted-foreground">Cobros hechos</p>
               <p className="text-2xl font-bold text-emerald-600">
-                {totalOneTimeExpected}
+                {formatCurrency(totalOneTimeExpectedAmount)}
               </p>
               <p className="text-xs text-muted-foreground">
-                Se cuenta por fecha estimada de acreditación.
+                 {totalOneTimeExpectedCount} cobros estimados (según fecha de
+                acreditación).
               </p>
             </div>
             <div className="rounded-lg border p-3">
               <p className="text-sm text-muted-foreground">Detalle por origen</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Badge variant="secondary">
-                  TuPase: {oneTimeSourceTotals.TuPase}
+                  TuPase: {oneTimeSourceTotals.TuPase.count} · {" "}
                 </Badge>
                 <Badge variant="secondary">
-                  PaseLibre: {oneTimeSourceTotals.PaseLibre}
+                  PaseLibre: {oneTimeSourceTotals.PaseLibre.count} · {" "}
+                  {formatCurrency(oneTimeSourceTotals.PaseLibre.amount)}
                 </Badge>
                 <Badge variant="secondary">
-                  Otros: {oneTimeSourceTotals.Otros}
+                  Otros: {oneTimeSourceTotals.Otros.count} · {" "}
+                  {formatCurrency(oneTimeSourceTotals.Otros.amount)}
                 </Badge>
               </div>
             </div>
@@ -1988,7 +2059,7 @@ const isWithinPeriod = (date: Date) => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Mes</TableHead>
-                    <TableHead>Total</TableHead>
+                    <TableHead>Total (cant · monto)</TableHead>
                     <TableHead>TuPase</TableHead>
                     <TableHead>PaseLibre</TableHead>
                     <TableHead>Otros</TableHead>
@@ -1998,10 +2069,10 @@ const isWithinPeriod = (date: Date) => {
                   {monthlyOneTimeStats.map((row) => (
                     <TableRow key={row.month}>
                       <TableCell className="font-medium">{row.month}</TableCell>
-                      <TableCell>{row.total}</TableCell>
-                      <TableCell>{row.TuPase}</TableCell>
-                      <TableCell>{row.PaseLibre}</TableCell>
-                      <TableCell>{row.Otros}</TableCell>
+                      <TableCell>{formatCountAmount(row.total)}</TableCell>
+                      <TableCell>{formatCountAmount(row.TuPase)}</TableCell>
+                      <TableCell>{formatCountAmount(row.PaseLibre)}</TableCell>
+                      <TableCell>{formatCountAmount(row.Otros)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
