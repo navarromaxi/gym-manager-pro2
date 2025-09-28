@@ -34,6 +34,11 @@ import {
 import { Plus, Search, DollarSign, Edit, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan, PlanContract } from "@/lib/supabase";
+import {
+  ensureCustomPlanMarker,
+  stripCustomPlanMarker,
+  extractCustomPlanIdFromDescription,
+} from "@/lib/custom-plan-payments";
 import { detectContractTable } from "@/lib/contract-table";
 import type { ContractTableName } from "@/lib/contract-table";
 interface PaymentManagementProps {
@@ -79,6 +84,9 @@ export function PaymentManagement({
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [editingCustomPlanId, setEditingCustomPlanId] = useState<string | null>(
+    null
+  );
   const [editPaymentData, setEditPaymentData] = useState({
     amount: 0,
     date: new Date().toLocaleDateString("en-CA"),
@@ -153,9 +161,7 @@ export function PaymentManagement({
     return 0;
   };
 
-  const getPaymentReferenceType = (
-    payment: Payment
-  ): ReferenceFilterOption => {
+  const getPaymentReferenceType = (payment: Payment): ReferenceFilterOption => {
     if (payment.type === "product") {
       return "product";
     }
@@ -165,7 +171,8 @@ export function PaymentManagement({
     }
 
     const hasStartDate =
-      typeof payment.start_date === "string" && payment.start_date.trim() !== "";
+      typeof payment.start_date === "string" &&
+      payment.start_date.trim() !== "";
 
     return hasStartDate ? "new_plan" : "existing_plan";
   };
@@ -406,7 +413,7 @@ export function PaymentManagement({
         nextInstallmentDue: member?.next_installment_due ?? null,
       };
 
-       if (payment.type && payment.type !== "plan") {
+      if (payment.type && payment.type !== "plan") {
         memberStates.set(payment.member_id, previousState);
         insights.set(payment.id, {
           isInstallment: false,
@@ -605,7 +612,7 @@ export function PaymentManagement({
       });
     }
 
-     if (referenceFilter !== "all") {
+    if (referenceFilter !== "all") {
       filtered = filtered.filter(
         (payment) => getPaymentReferenceType(payment) === referenceFilter
       );
@@ -613,7 +620,7 @@ export function PaymentManagement({
 
     if (installmentFilter !== "all") {
       filtered = filtered.filter((payment) => {
-         if (payment.type && payment.type !== "plan") {
+        if (payment.type && payment.type !== "plan") {
           return false;
         }
 
@@ -757,7 +764,7 @@ export function PaymentManagement({
       ? newPayment.installments === 1
         ? calculatedPlanEndDate
         : newPayment.nextInstallmentDue || calculatedPlanEndDate
-        : newPayment.type === "existing_plan"
+      : newPayment.type === "existing_plan"
       ? newPayment.nextInstallmentDue ||
         selectedMember?.next_installment_due ||
         ""
@@ -1100,13 +1107,21 @@ export function PaymentManagement({
 
   const openEditDialog = (payment: Payment) => {
     setEditingPayment(payment);
+    const customPlanId =
+      payment.plan_id ||
+      extractCustomPlanIdFromDescription(payment.description) ||
+      null;
+    setEditingCustomPlanId(customPlanId);
     setEditPaymentData({
       amount: payment.amount,
       date: payment.date,
       method: payment.method,
       cardBrand: payment.card_brand || "",
       cardInstallments: payment.card_installments || 1,
-      description: payment.description || "",
+      description:
+        payment.type === "custom_plan"
+          ? stripCustomPlanMarker(payment.description)
+          : payment.description || "",
       startDate: payment.start_date || "",
     });
     setIsEditDialogOpen(true);
@@ -1115,6 +1130,7 @@ export function PaymentManagement({
   const closeEditDialog = () => {
     setIsEditDialogOpen(false);
     setEditingPayment(null);
+    setEditingCustomPlanId(null);
   };
 
   const handleUpdatePayment = async () => {
@@ -1132,11 +1148,22 @@ export function PaymentManagement({
 
     try {
       const trimmedDescription = editPaymentData.description.trim();
-      const resolvedDescription =
-        trimmedDescription ||
-        editingPayment.description ||
-        editingPayment.plan ||
-        "Pago";
+      const isCustomPlanPayment = editingPayment.type === "custom_plan";
+      const customPlanId =
+        editingCustomPlanId ||
+        editingPayment.plan_id ||
+        extractCustomPlanIdFromDescription(editingPayment.description) ||
+        null;
+
+      const resolvedDescription = isCustomPlanPayment
+        ? ensureCustomPlanMarker(
+            trimmedDescription,
+            customPlanId || editingPayment.id
+          )
+        : trimmedDescription ||
+          editingPayment.description ||
+          editingPayment.plan ||
+          "Pago";
       const paymentUpdate: Record<string, any> = {
         amount: editPaymentData.amount,
         date: editPaymentData.date,
@@ -1554,8 +1581,7 @@ export function PaymentManagement({
                       />
                       {newPayment.amount > 0 && (
                         <p className="text-xs text-muted-foreground">
-                          Saldo restante: $
-                           {remainingBalance.toLocaleString()}
+                          Saldo restante: ${remainingBalance.toLocaleString()}
                         </p>
                       )}
                     </div>
@@ -1784,14 +1810,12 @@ export function PaymentManagement({
                           {newPayment.amount.toLocaleString()}
                         </p>
                         <p className="mt-1 text-xs">
-                          Saldo restante: $
-                          {remainingBalance.toLocaleString()}
+                          Saldo restante: ${remainingBalance.toLocaleString()}
                         </p>
-                         {shouldAskNextInstallmentDue &&
+                        {shouldAskNextInstallmentDue &&
                           newPayment.nextInstallmentDue && (
                             <p className="text-xs text-muted-foreground">
-                              Próximo vencimiento:
-                              {" "}
+                              Próximo vencimiento:{" "}
                               {newPayment.nextInstallmentDue}
                             </p>
                           )}
@@ -1977,7 +2001,7 @@ export function PaymentManagement({
                 <SelectItem value="current_year">Año actual</SelectItem>
               </SelectContent>
             </Select>
-             <Select
+            <Select
               value={referenceFilter}
               onValueChange={(value) =>
                 setReferenceFilter(value as ReferenceFilterOption)
@@ -1991,7 +2015,7 @@ export function PaymentManagement({
                 <SelectItem value="new_plan">Plan nuevo</SelectItem>
                 <SelectItem value="existing_plan">Plan existente</SelectItem>
                 <SelectItem value="product">Producto</SelectItem>
-                 <SelectItem value="custom_plan">Plan personalizado</SelectItem>
+                <SelectItem value="custom_plan">Plan personalizado</SelectItem>
               </SelectContent>
             </Select>
             <Select
@@ -2050,11 +2074,10 @@ export function PaymentManagement({
                     ? insight.balancePending
                     : null;
                 const balanceValue = insightBalance ?? fallbackBalance ?? null;
-                const isPlanPayment =
-                  !payment.type || payment.type === "plan";
+                const isPlanPayment = !payment.type || payment.type === "plan";
                 const isCustomPlanPayment = payment.type === "custom_plan";
                 const hasPendingInstallment =
-                   isPlanPayment && (balanceValue ?? 0) > 0;
+                  isPlanPayment && (balanceValue ?? 0) > 0;
                 const nextInstallmentDueRaw =
                   insight?.nextInstallmentDue ??
                   member?.next_installment_due ??
@@ -2083,9 +2106,12 @@ export function PaymentManagement({
                 const nextInstallmentDueDisplay = hasPendingInstallment
                   ? formattedNextDue ?? "Sin definir"
                   : "No corresponde";
+                const detailDescription = isCustomPlanPayment
+                  ? stripCustomPlanMarker(payment.description)
+                  : payment.description;
                 const detailLabel = isPlanPayment
                   ? payment.plan
-                  : payment.plan ?? payment.description;
+                  : payment.plan ?? detailDescription;
                 const rawDetailAmount = isPlanPayment
                   ? insight?.planPrice ?? member?.plan_price ?? payment.amount
                   : payment.amount;
@@ -2115,7 +2141,7 @@ export function PaymentManagement({
                       {payment.card_brand ? ` - ${payment.card_brand}` : ""}
                     </TableCell>
                     <TableCell>
-                       {isPlanPayment ? (
+                      {isPlanPayment ? (
                         insight?.isInstallment ? (
                           <Badge variant="secondary">Sí</Badge>
                         ) : (
@@ -2141,7 +2167,7 @@ export function PaymentManagement({
                       )}
                     </TableCell>
                     <TableCell>
-                       {isPlanPayment && balanceValue !== null ? (
+                      {isPlanPayment && balanceValue !== null ? (
                         <span className={dueStatusClass}>
                           {nextInstallmentDueDisplay}
                         </span>
@@ -2156,7 +2182,7 @@ export function PaymentManagement({
                         ? "Plan"
                         : payment.type || "Plan"}
                     </TableCell>
-                    
+
                     <TableCell>
                       <div className="flex gap-2">
                         <Button

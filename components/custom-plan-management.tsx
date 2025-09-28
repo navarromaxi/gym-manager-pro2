@@ -2,6 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { supabase, Member, CustomPlan, Payment } from "@/lib/supabase";
+import {
+  ensureCustomPlanMarker,
+  stripCustomPlanMarker,
+  isPaymentLinkedToCustomPlan,
+} from "@/lib/custom-plan-payments";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -489,6 +494,12 @@ export function CustomPlanManagement({
     }
 
     const paymentId = `${gymId}_payment_${Date.now()}`;
+    const baseDescription =
+      newPlan.payment_description ||
+      (newPlan.installments > 1
+        ? `Pago en ${newPlan.installments} cuotas. Próximo vencimiento: ${newPlan.next_installment_due}`
+        : "");
+    const paymentDescription = ensureCustomPlanMarker(baseDescription, id);
     const payment: Payment = {
       id: paymentId,
       gym_id: gymId,
@@ -509,12 +520,7 @@ export function CustomPlanManagement({
           ? newPlan.card_installments
           : undefined,
       type: "custom_plan",
-      description:
-        newPlan.payment_description ||
-        (newPlan.installments > 1
-          ? `Pago en ${newPlan.installments} cuotas. Próximo vencimiento: ${newPlan.next_installment_due}`
-          : undefined),
-      plan_id: id,
+      description: paymentDescription,
     };
 
     const { error: paymentError } = await supabase
@@ -535,7 +541,7 @@ export function CustomPlanManagement({
   const handleOpenEditDialog = (plan: CustomPlan) => {
     const member = members.find((m) => m.id === plan.member_id);
     const relatedPayments = payments
-      .filter((payment) => payment.plan_id === plan.id)
+      .filter((payment) => isPaymentLinkedToCustomPlan(payment, plan.id))
       .sort((a, b) => {
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
@@ -574,7 +580,7 @@ export function CustomPlanManagement({
       payment_method: latestPayment?.method || "",
       card_brand: latestPayment?.card_brand || "",
       card_installments: latestPayment?.card_installments ?? 1,
-      payment_description: latestPayment?.description || "",
+      payment_description: stripCustomPlanMarker(latestPayment?.description),
     });
     setEditMemberSearch(member ? member.name : plan.member_name);
     setEditPaymentId(latestPayment?.id ?? null);
@@ -656,11 +662,15 @@ export function CustomPlanManagement({
         "Tarjeta de Débito",
       ].includes(editPlanForm.payment_method || "");
 
-      const description = editPlanForm.payment_description
+      const baseDescription = editPlanForm.payment_description
         ? editPlanForm.payment_description
         : editPlanForm.installments > 1
         ? `Pago en ${editPlanForm.installments} cuotas. Próximo vencimiento: ${editPlanForm.next_installment_due}`
-        : null;
+        : "";
+      const paymentDescription = ensureCustomPlanMarker(
+        baseDescription,
+        editingPlan.id
+      );
 
       const paymentUpdatePayload: Partial<Payment> & {
         card_brand?: string | null;
@@ -681,8 +691,7 @@ export function CustomPlanManagement({
           editPlanForm.payment_method === "Tarjeta de Crédito"
             ? editPlanForm.card_installments
             : null,
-        description,
-        plan_id: editingPlan.id,
+        description: paymentDescription,
       };
 
       const { error: paymentError } = await supabase
@@ -708,11 +717,10 @@ export function CustomPlanManagement({
                   start_date: editPlanForm.start_date,
                   plan: editPlanForm.name,
                   method: paymentUpdatePayload.method ?? payment.method,
-                  plan_id: editingPlan.id,
                   card_brand: paymentUpdatePayload.card_brand ?? undefined,
                   card_installments:
                     paymentUpdatePayload.card_installments ?? undefined,
-                  description: paymentUpdatePayload.description ?? undefined,
+                  description: paymentDescription,
                 }
               : payment
           )
@@ -799,6 +807,13 @@ export function CustomPlanManagement({
     }
 
     const paymentId = `${gymId}_payment_${Date.now()}`;
+    const baseDescription =
+      renewPlan.payment_description ||
+      (renewPlan.installments > 1
+        ? `Pago en ${renewPlan.installments} cuotas. Próximo vencimiento: ${renewPlan.next_installment_due}`
+        : "");
+    const paymentDescription = ensureCustomPlanMarker(baseDescription, id);
+
     const payment: Payment = {
       id: paymentId,
       gym_id: gymId,
@@ -819,12 +834,7 @@ export function CustomPlanManagement({
           ? renewPlan.card_installments
           : undefined,
       type: "custom_plan",
-      description:
-        renewPlan.payment_description ||
-        (renewPlan.installments > 1
-          ? `Pago en ${renewPlan.installments} cuotas. Próximo vencimiento: ${renewPlan.next_installment_due}`
-          : undefined),
-      plan_id: id,
+      description: paymentDescription,
     };
 
     const { error: paymentError } = await supabase
