@@ -562,7 +562,7 @@ const isWithinPeriod = (date: Date) => {
     (sum, record) => sum + getOneTimeAmount(record),
     0
   );
-  const totalIncome = totalPaymentsIncome + totalOneTimeExpectedAmount;
+  const totalIncome = totalPaymentsIncome;
   const totalExpenseAmount = filteredExpenses.reduce(
     (sum, e) => sum + e.amount,
     0
@@ -842,14 +842,7 @@ const isWithinPeriod = (date: Date) => {
     {} as Record<string, number>
   );
 
-  for (const record of filteredOneTimeExpected) {
-    const method = getOneTimePaymentMethod(record);
-    paymentMethodDistribution[method] =
-      (paymentMethodDistribution[method] || 0) + 1;
-  }
-
-  const totalPaymentCount =
-    filteredPayments.length + filteredOneTimeExpected.length;
+   const totalPaymentCount = filteredPayments.length;
 
   const creditCardPayments = filteredPayments.filter(
     (p) => p.method === "Tarjeta de Crédito"
@@ -1061,21 +1054,7 @@ const isWithinPeriod = (date: Date) => {
       );
     });
 
-    const monthOneTimeExpected = oneTimePayments.filter((record) => {
-      const estimatedRaw = getOneTimeEstimatedDate(record);
-       if (!estimatedRaw) return false;
-      const estimatedDate = toLocalDate(estimatedRaw);
-      if (Number.isNaN(estimatedDate.getTime())) return false;
-      if (estimatedDate.getTime() > todayMid.getTime()) return false;
-      return (
-        estimatedDate.getMonth() === month &&
-        estimatedDate.getFullYear() === year
-      );
-    });
-    const monthOneTimeIncome = monthOneTimeExpected.reduce(
-      (sum, record) => sum + getOneTimeAmount(record),
-      0
-    );
+    
     const monthPaymentsIncome = monthPayments.reduce(
       (sum, p) => sum + p.amount,
       0
@@ -1086,7 +1065,7 @@ const isWithinPeriod = (date: Date) => {
         month: "short",
         year: "numeric",
       }),
-      income: monthPaymentsIncome + monthOneTimeIncome,
+      income: monthPaymentsIncome,
     };
   }).reverse();
 
