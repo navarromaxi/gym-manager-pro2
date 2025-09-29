@@ -129,6 +129,22 @@ const toLocalDate = (iso: string) => {
   return new Date(year, month - 1, day);
 };
 
+const parseOptionalISODate = (iso?: string | null) => {
+  if (!iso) return null;
+  const parts = iso.split("-");
+  if (parts.length !== 3) return null;
+  const [yearStr, monthStr, dayStr] = parts;
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+    return null;
+  }
+  const date = new Date(year, month - 1, day);
+  date.setHours(0, 0, 0, 0);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 const getRealStatus = (m: Member): "active" | "expired" | "inactive" => {
   const today = new Date();
   const next = toLocalDate(m.next_payment);
@@ -287,7 +303,7 @@ export default function GymManagementSystem() {
         supabase
           .from("one_time_payments")
           .select(
-            "id, gym_id, full_name, phone, source, amount, description, visit_date, estimated_payment_date, created_at"
+            "id, gym_id, full_name, phone, source, amount, description, visit_date, estimated_payment_date, payment_method, created_at"
           )
           .eq("gym_id", gymId)
           .order("visit_date", { ascending: false }),
@@ -547,7 +563,10 @@ export default function GymManagementSystem() {
     const month = reference.getMonth();
     const year = reference.getFullYear();
 
-    const income = payments.reduce((sum, payment) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const planIncome = payments.reduce((sum, payment) => {
       const paymentDate = toLocalDate(payment.date);
       if (
         paymentDate.getMonth() === month &&
@@ -557,6 +576,25 @@ export default function GymManagementSystem() {
       }
       return sum;
     }, 0);
+
+     const oneTimeIncome = oneTimePayments.reduce((sum, record) => {
+      const estimatedDate = parseOptionalISODate(record.estimated_payment_date);
+      if (!estimatedDate) {
+        return sum;
+      }
+      if (estimatedDate.getTime() > today.getTime()) {
+        return sum;
+      }
+      if (
+        estimatedDate.getMonth() === month &&
+        estimatedDate.getFullYear() === year
+      ) {
+        return sum + (record.amount ?? 0);
+      }
+      return sum;
+    }, 0);
+
+    const income = planIncome + oneTimeIncome;
 
     const expensesTotal = expenses.reduce((sum, expense) => {
       const expenseDate = toLocalDate(expense.date);
@@ -574,7 +612,7 @@ export default function GymManagementSystem() {
       monthlyExpenses: expensesTotal,
       monthlyProfit: income - expensesTotal,
     };
-  }, [payments, expenses]);
+  }, [payments, expenses, oneTimePayments]);
 
   const hasMoreProspectsOnServer =
     typeof prospectsTotal === "number"

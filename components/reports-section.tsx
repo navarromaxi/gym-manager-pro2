@@ -174,6 +174,8 @@ interface OneTimePaymentRecord {
   visitDate?: string | null;
   estimated_payment_date?: string | null;
   estimatedPaymentDate?: string | null;
+  payment_method?: string | null;
+  paymentMethod?: string | null;
   created_at?: string | null;
   createdAt?: string | null;
 }
@@ -182,6 +184,8 @@ type OneTimeSourceTotals = Record<
   "TuPase" | "PaseLibre" | "Otros" | "total",
   { count: number; amount: number }
 >;
+
+const DEFAULT_ONE_TIME_METHOD = "Transferencia";
 interface ReportsSectionProps {
   members: Member[];
   payments: Payment[];
@@ -369,6 +373,14 @@ const getOneTimeAmount = (record: OneTimePaymentRecord) => {
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
+};
+
+const getOneTimePaymentMethod = (record: OneTimePaymentRecord) => {
+  const method = pick(record as any, "payment_method", "paymentMethod");
+  if (typeof method === "string" && method.trim().length > 0) {
+    return method;
+  }
+  return DEFAULT_ONE_TIME_METHOD;
 };
 
 const categorizeOneTimeSource = (source: string) => {
@@ -822,10 +834,22 @@ const isWithinPeriod = (date: Date) => {
       return a.source.localeCompare(b.source);
     });
 
-  const paymentMethodDistribution = filteredPayments.reduce((acc, payment) => {
-    acc[payment.method] = (acc[payment.method] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const paymentMethodDistribution = filteredPayments.reduce(
+    (acc, payment) => {
+      acc[payment.method] = (acc[payment.method] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+
+  for (const record of filteredOneTimeExpected) {
+    const method = getOneTimePaymentMethod(record);
+    paymentMethodDistribution[method] =
+      (paymentMethodDistribution[method] || 0) + 1;
+  }
+
+  const totalPaymentCount =
+    filteredPayments.length + filteredOneTimeExpected.length;
 
   const creditCardPayments = filteredPayments.filter(
     (p) => p.method === "Tarjeta de Crédito"
@@ -1578,7 +1602,7 @@ const isWithinPeriod = (date: Date) => {
               </div>
               <div className="text-sm text-muted-foreground">Ingresos</div>
               <div className="text-xs text-muted-foreground">
-                {filteredPayments.length} pagos
+                {totalPaymentCount} pagos
               </div>
             </div>
             <div className="text-center p-4 bg-red-50 rounded-lg">
@@ -1804,8 +1828,8 @@ const isWithinPeriod = (date: Date) => {
                         {count} pagos
                       </span>
                       <Badge variant="outline">
-                        {filteredPayments.length > 0
-                          ? Math.round((count / filteredPayments.length) * 100)
+                         {totalPaymentCount > 0
+                          ? Math.round((count / totalPaymentCount) * 100)
                           : 0}
                         %
                       </Badge>

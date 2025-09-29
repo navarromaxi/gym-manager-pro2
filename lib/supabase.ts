@@ -141,6 +141,7 @@ export interface OneTimePayment {
   description?: string | null
   visit_date: string
   estimated_payment_date: string
+  payment_method?: string | null
   created_at?: string | null
 }
 

@@ -63,6 +63,8 @@ const SOURCE_OPTIONS: { value: SourceOption; label: string }[] = [
   { value: "Otro", label: "Otro diferente" },
 ];
 
+const DEFAULT_PAYMENT_METHOD = "Transferencia";
+
 const ONE_TIME_PAGE_SIZE = 10;
 const todayISO = () => new Date().toISOString().split("T")[0];
 
@@ -362,6 +364,7 @@ export function OneTimePaymentManagement({
       description: newRecord.description.trim() || null,
       visit_date: newRecord.visitDate,
       estimated_payment_date: newRecord.estimatedPaymentDate,
+      payment_method: DEFAULT_PAYMENT_METHOD,
     };
 
     if (!payload.full_name) {
@@ -431,6 +434,7 @@ export function OneTimePaymentManagement({
       description: editRecordData.description.trim() || null,
       visit_date: editRecordData.visitDate,
       estimated_payment_date: editRecordData.estimatedPaymentDate,
+      payment_method: DEFAULT_PAYMENT_METHOD,
     };
 
     if (!payload.full_name) {
