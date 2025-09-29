@@ -5,8 +5,8 @@ import { supabase } from "./supabase";
 export type ContractTableName = "plan_contracts" | "plan_contract";
 
 const CONTRACT_TABLE_CANDIDATES: ContractTableName[] = [
-  "plan_contracts",
   "plan_contract",
+  "plan_contracts",
 ];
 
 const isMissingTableError = (error: PostgrestError | null) => {
@@ -21,18 +21,30 @@ const isMissingTableError = (error: PostgrestError | null) => {
 };
 
 export const detectContractTable = async (): Promise<ContractTableName | null> => {
-  for (const table of CONTRACT_TABLE_CANDIDATES) {
-    const { error } = await supabase
-      .from(table)
-      .select("id", { head: true })
-      .limit(1);
+  const { data, error } = await supabase
+    .from("information_schema.tables")
+    .select("table_name")
+    .eq("table_schema", "public")
+    .in("table_name", CONTRACT_TABLE_CANDIDATES);
 
-    if (!error) {
-      return table;
+    if (error) {
+    if (!isMissingTableError(error)) {
+      console.warn(
+        "Error while looking up contract table candidates in information_schema:",
+        error,
+      );
     }
 
-    if (!isMissingTableError(error)) {
-      console.warn(`Error verifying contract table "${table}":`, error);
+     return null;
+  }
+
+  const tables = new Set<ContractTableName>(
+    data?.map((table) => table.table_name as ContractTableName) ?? [],
+  );
+
+  for (const table of CONTRACT_TABLE_CANDIDATES) {
+    if (tables.has(table)) {
+      return table;
     }
   }
 
