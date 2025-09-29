@@ -1125,15 +1125,37 @@ export function MemberManagement({
                 )}
                 <div className="grid gap-2 md:col-span-2 lg:col-span-3">
                   <Label htmlFor="description">Descripción</Label>
-                  <Input
+                   <Textarea
                     id="description"
                     value={newMember.description}
                     onChange={(e) =>
-                      setNewMember({
-                        ...newMember,
-                        description: e.target.value,
-                      })
+                      setNewMember((prev) => ({
+                        ...prev,
+                        description: e.currentTarget.value,
+                      }))
                     }
+                     onKeyDown={(e) => {
+                      if (e.key === "Tab" && !e.shiftKey) {
+                        e.preventDefault();
+                        const textarea = e.currentTarget;
+                        const { selectionStart, selectionEnd, value } = textarea;
+                        const newValue =
+                          value.slice(0, selectionStart) +
+                          "\n" +
+                          value.slice(selectionEnd);
+                        setNewMember((prev) => ({
+                          ...prev,
+                          description: newValue,
+                        }));
+                        requestAnimationFrame(() => {
+                          const cursorPosition = selectionStart + 1;
+                          textarea.selectionStart = cursorPosition;
+                          textarea.selectionEnd = cursorPosition;
+                        });
+                      }
+                    }}
+                    placeholder="Notas adicionales del socio"
+                    className="min-h-[160px] resize-none"
                   />
                 </div>
               </div>
