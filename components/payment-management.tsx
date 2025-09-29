@@ -33,7 +33,13 @@ import {
 } from "@/components/ui/table";
 import { Plus, Search, DollarSign, Edit, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import type { Member, Payment, Plan, PlanContract } from "@/lib/supabase";
+import type {
+  Member,
+  Payment,
+  Plan,
+  PlanContract,
+  CustomPlan,
+} from "@/lib/supabase";
 import {
   ensureCustomPlanMarker,
   stripCustomPlanMarker,
@@ -48,6 +54,7 @@ interface PaymentManagementProps {
   setMembers: Dispatch<SetStateAction<Member[]>>;
   plans: Plan[];
   gymId: string;
+  customPlans: CustomPlan[];
 }
 
 interface PaymentInsight {
@@ -80,6 +87,7 @@ export function PaymentManagement({
   setMembers,
   plans = [],
   gymId,
+  customPlans = [],
 }: PaymentManagementProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -124,6 +132,14 @@ export function PaymentManagement({
     null
   );
   const [visibleCount, setVisibleCount] = useState(PAYMENTS_PER_BATCH);
+
+  const customPlansById = useMemo(() => {
+    const map = new Map<string, CustomPlan>();
+    customPlans.forEach((plan) => {
+      map.set(plan.id, plan);
+    });
+    return map;
+  }, [customPlans]);
 
   useEffect(() => {
     const checkTable = async () => {
@@ -2076,6 +2092,14 @@ export function PaymentManagement({
                 const balanceValue = insightBalance ?? fallbackBalance ?? null;
                 const isPlanPayment = !payment.type || payment.type === "plan";
                 const isCustomPlanPayment = payment.type === "custom_plan";
+                 const customPlanId = isCustomPlanPayment
+                  ? payment.plan_id ||
+                    extractCustomPlanIdFromDescription(payment.description)
+                  : null;
+                const relatedCustomPlan =
+                  customPlanId ? customPlansById.get(customPlanId) ?? null : null;
+                const customPlanEndDate = relatedCustomPlan?.end_date ?? null;
+                const formattedCustomPlanDue = formatDueDate(customPlanEndDate);
                 const hasPendingInstallment =
                   isPlanPayment && (balanceValue ?? 0) > 0;
                 const nextInstallmentDueRaw =
@@ -2106,6 +2130,22 @@ export function PaymentManagement({
                 const nextInstallmentDueDisplay = hasPendingInstallment
                   ? formattedNextDue ?? "Sin definir"
                   : "No corresponde";
+                  let dueCellContent = (
+                  <span className="text-muted-foreground">-</span>
+                );
+                if (isPlanPayment && balanceValue !== null) {
+                  dueCellContent = (
+                    <span className={dueStatusClass}>
+                      {nextInstallmentDueDisplay}
+                    </span>
+                  );
+                } else if (isCustomPlanPayment) {
+                  dueCellContent = (
+                    <span className="text-muted-foreground">
+                      {formattedCustomPlanDue ?? "Sin fecha definida"}
+                    </span>
+                  );
+                }
                 const detailDescription = isCustomPlanPayment
                   ? stripCustomPlanMarker(payment.description)
                   : payment.description;
@@ -2166,15 +2206,7 @@ export function PaymentManagement({
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      {isPlanPayment && balanceValue !== null ? (
-                        <span className={dueStatusClass}>
-                          {nextInstallmentDueDisplay}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
+                   <TableCell>{dueCellContent}</TableCell>
                     <TableCell className="capitalize">
                       {isCustomPlanPayment
                         ? "Plan personalizado"

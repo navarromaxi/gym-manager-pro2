@@ -518,6 +518,7 @@ const isWithinPeriod = (date: Date) => {
       if (!estimatedDate) return false;
       const parsed = toLocalDate(estimatedDate);
       if (Number.isNaN(parsed.getTime())) return false;
+      if (parsed.getTime() > todayMid.getTime()) return false;
       return isWithinPeriod(parsed);
     });
 
@@ -1038,12 +1039,13 @@ const isWithinPeriod = (date: Date) => {
 
     const monthOneTimeExpected = oneTimePayments.filter((record) => {
       const estimatedRaw = getOneTimeEstimatedDate(record);
-      const referenceRaw = estimatedRaw ?? getOneTimeVisitDate(record);
-      if (!referenceRaw) return false;
-      const referenceDate = toLocalDate(referenceRaw);
+       if (!estimatedRaw) return false;
+      const estimatedDate = toLocalDate(estimatedRaw);
+      if (Number.isNaN(estimatedDate.getTime())) return false;
+      if (estimatedDate.getTime() > todayMid.getTime()) return false;
       return (
-        referenceDate.getMonth() === month &&
-        referenceDate.getFullYear() === year
+        estimatedDate.getMonth() === month &&
+        estimatedDate.getFullYear() === year
       );
     });
     const monthOneTimeIncome = monthOneTimeExpected.reduce(

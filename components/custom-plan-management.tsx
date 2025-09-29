@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase, Member, CustomPlan, Payment } from "@/lib/supabase";
 import {
   ensureCustomPlanMarker,
@@ -84,6 +84,8 @@ type PlanFormState = {
   payment_description: string;
 };
 
+const PLANS_PER_BATCH = 10;
+
 const createEmptyPlanForm = (): PlanFormState => ({
   member_id: "",
   name: "Personalizado",
@@ -126,6 +128,7 @@ export function CustomPlanManagement({
     createEmptyPlanForm()
   );
   const [renewMemberSearch, setRenewMemberSearch] = useState("");
+  const [visiblePlanCount, setVisiblePlanCount] = useState(PLANS_PER_BATCH);
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -285,6 +288,24 @@ export function CustomPlanManagement({
     if (!dateB) return -1;
     return dateA.getTime() - dateB.getTime();
   });
+
+  useEffect(() => {
+    setVisiblePlanCount(PLANS_PER_BATCH);
+  }, [searchTerm, statusFilter, customPlans]);
+
+  const visiblePlans = useMemo(() => {
+    if (!sortedPlans.length) return [];
+    const limit = Math.min(visiblePlanCount, sortedPlans.length);
+    return sortedPlans.slice(0, limit);
+  }, [sortedPlans, visiblePlanCount]);
+
+  const canLoadMorePlans = visiblePlanCount < sortedPlans.length;
+
+  const handleLoadMorePlans = () => {
+    setVisiblePlanCount((prev) =>
+      Math.min(prev + PLANS_PER_BATCH, sortedPlans.length)
+    );
+  };
 
   const filteredMembers = useMemo(() => {
     const normalizedSearch = memberSearch.trim().toLowerCase();
@@ -2068,7 +2089,7 @@ export function CustomPlanManagement({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedPlans.map((plan) => (
+                  {visiblePlans.map((plan) => (
                     <TableRow key={plan.id} className="hover:bg-muted/40">
                       <TableCell className="align-top">
                         <div className="font-medium text-sm text-foreground">
@@ -2177,6 +2198,28 @@ export function CustomPlanManagement({
               </Table>
             </div>
           </ScrollArea>
+           <div className="flex flex-col gap-3 border-t px-6 py-4 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-muted-foreground">
+              {sortedPlans.length > 0 && (
+                <>
+                  Mostrando <strong>{visiblePlans.length}</strong> de {" "}
+                  <strong>{sortedPlans.length}</strong> planes listados
+                </>
+              )}
+            </div>
+            {canLoadMorePlans && (
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLoadMorePlans}
+                >
+                  Cargar más
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

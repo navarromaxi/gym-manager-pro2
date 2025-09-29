@@ -968,6 +968,7 @@ export default function GymManagementSystem() {
             setMembers={setMembers}
             plans={plans}
             gymId={gymData?.id || ""}
+            customPlans={customPlans}
           />
         )}
         {activeTab === "prospects" && (
