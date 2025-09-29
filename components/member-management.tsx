@@ -203,10 +203,9 @@ export function MemberManagement({
     "TARJETA D",
     "MERCADO PAGO",
   ];
-  const isCardPayment = [
-    "Tarjeta de Crédito",
-    "Tarjeta de Débito",
-  ].includes(newMember.paymentMethod);
+  const isCardPayment = ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
+    newMember.paymentMethod
+  );
   const [contractTable, setContractTable] = useState<ContractTableName | null>(
     null
   );
@@ -759,7 +758,6 @@ export function MemberManagement({
       alert("No se pudo marcar como contactado.");
     }
   };
-  
 
   const expiringMembers = getExpiringMembers();
   const expiredMembers = getExpiredMembers();
@@ -1082,7 +1080,7 @@ export function MemberManagement({
                     </SelectContent>
                   </Select>
                 </div>
-                 {isCardPayment && (
+                {isCardPayment && (
                   <div className="grid gap-2">
                     <Label>Tipo de Tarjeta</Label>
                     <Select
@@ -1105,7 +1103,7 @@ export function MemberManagement({
                   </div>
                 )}
                 {newMember.paymentMethod === "Tarjeta de Crédito" && (
-                   <div className="grid gap-2">
+                  <div className="grid gap-2">
                     <Label htmlFor="cardInstallments">
                       Número de cuotas en la tarjeta
                     </Label>
@@ -1125,20 +1123,22 @@ export function MemberManagement({
                 )}
                 <div className="grid gap-2 md:col-span-2 lg:col-span-3">
                   <Label htmlFor="description">Descripción</Label>
-                   <Textarea
+                  <Textarea
                     id="description"
                     value={newMember.description}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const { value } = e.target
                       setNewMember((prev) => ({
                         ...prev,
-                        description: e.currentTarget.value,
+                        description: value,
                       }))
-                    }
-                     onKeyDown={(e) => {
+                    }}
+                    onKeyDown={(e) => {
                       if (e.key === "Tab" && !e.shiftKey) {
                         e.preventDefault();
                         const textarea = e.currentTarget;
-                        const { selectionStart, selectionEnd, value } = textarea;
+                        const { selectionStart, selectionEnd, value } =
+                          textarea;
                         const newValue =
                           value.slice(0, selectionStart) +
                           "\n" +
