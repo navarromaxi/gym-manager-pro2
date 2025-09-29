@@ -523,9 +523,14 @@ export function CustomPlanManagement({
       description: paymentDescription,
     };
 
+    const paymentRecord: Payment = {
+      ...payment,
+      type: "plan",
+    };
+
     const { error: paymentError } = await supabase
       .from("payments")
-      .insert([payment]);
+      .insert([paymentRecord]);
     if (paymentError) {
       console.error("Error al registrar pago de personalizado:", paymentError);
     } else {
@@ -837,9 +842,14 @@ export function CustomPlanManagement({
       description: paymentDescription,
     };
 
+    const paymentRecord: Payment = {
+      ...payment,
+      type: "plan",
+    };
+
     const { error: paymentError } = await supabase
       .from("payments")
-      .insert([payment]);
+      .insert([paymentRecord]);
     if (paymentError) {
       console.error("Error al registrar pago de renovación:", paymentError);
     } else {

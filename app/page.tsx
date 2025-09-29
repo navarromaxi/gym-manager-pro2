@@ -118,6 +118,7 @@ import type {
   CustomPlan,
   OneTimePayment,
 } from "@/lib/supabase";
+import { normalizeCustomPlanPayments } from "@/lib/custom-plan-payments";
 
 const NEW_PROSPECT_STATUSES: Prospect["status"][] = ["averiguador"];
 const PROSPECTS_PAGE_SIZE = 10;
@@ -328,7 +329,10 @@ export default function GymManagementSystem() {
       }
 
       setMembers(membersData || []);
-      setPayments(paymentsData || []);
+      const normalizedPayments = normalizeCustomPlanPayments(
+        (paymentsData ?? []) as Payment[]
+      );
+      setPayments(normalizedPayments);
       setExpenses(expensesData || []);
       const normalizedProspects = (prospectsData ?? []).map(
         (prospect: any) => ({

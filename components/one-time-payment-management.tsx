@@ -43,6 +43,15 @@ interface OneTimePaymentManagementProps {
 
 type SourceOption = "TuPase" | "PaseLibre" | "Otro";
 
+type TimeFilterOption =
+  | "all"
+  | "current_month"
+  | "previous_month"
+  | "last_3_months"
+  | "last_6_months"
+  | "current_year"
+  | "previous_year";
+
 type SourceTotals = Record<
   "TuPase" | "PaseLibre" | "Otros" | "total",
   { count: number; amount: number }
@@ -118,6 +127,7 @@ export function OneTimePaymentManagement({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceOption | "all">("all");
+  const [timeFilter, setTimeFilter] = useState<TimeFilterOption>("all");
   const [editingRecord, setEditingRecord] = useState<OneTimePayment | null>(
     null
   );
@@ -130,7 +140,7 @@ export function OneTimePaymentManagement({
     description: "",
     visitDate: todayISO(),
     estimatedPaymentDate: todayISO(),
-    amount: "",
+    amount: "150",
   });
 
   const [editRecordData, setEditRecordData] = useState({
@@ -141,7 +151,7 @@ export function OneTimePaymentManagement({
     description: "",
     visitDate: todayISO(),
     estimatedPaymentDate: todayISO(),
-    amount: "",
+    amount: "150",
   });
 
   const resetNewRecord = () => {
@@ -166,6 +176,89 @@ export function OneTimePaymentManagement({
   const filteredRecords = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
     return sortedRecords.filter((record) => {
+      if (timeFilter !== "all") {
+        const visitDate = new Date(record.visit_date + "T00:00:00");
+        visitDate.setHours(0, 0, 0, 0);
+
+        if (Number.isNaN(visitDate.getTime())) {
+          return false;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const startOfMonth = (date: Date) =>
+          new Date(date.getFullYear(), date.getMonth(), 1);
+        const endOfMonth = (date: Date) =>
+          new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+
+        const startOfYear = (date: Date) => new Date(date.getFullYear(), 0, 1);
+        const endOfYear = (date: Date) =>
+          new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
+
+        let rangeStart: Date | null = null;
+        let rangeEnd: Date | null = null;
+
+        switch (timeFilter) {
+          case "current_month":
+            rangeStart = startOfMonth(today);
+            rangeEnd = endOfMonth(today);
+            break;
+          case "previous_month": {
+            const previousMonth = new Date(
+              today.getFullYear(),
+              today.getMonth() - 1,
+              1
+            );
+            rangeStart = startOfMonth(previousMonth);
+            rangeEnd = endOfMonth(previousMonth);
+            break;
+          }
+          case "last_3_months": {
+            const start = new Date(
+              today.getFullYear(),
+              today.getMonth() - 2,
+              1
+            );
+            rangeStart = startOfMonth(start);
+            rangeEnd = endOfMonth(today);
+            break;
+          }
+          case "last_6_months": {
+            const start = new Date(
+              today.getFullYear(),
+              today.getMonth() - 5,
+              1
+            );
+            rangeStart = startOfMonth(start);
+            rangeEnd = endOfMonth(today);
+            break;
+          }
+          case "current_year":
+            rangeStart = startOfYear(today);
+            rangeEnd = endOfYear(today);
+            break;
+          case "previous_year": {
+            const prevYear = new Date(
+              today.getFullYear() - 1,
+              today.getMonth(),
+              1
+            );
+            rangeStart = startOfYear(prevYear);
+            rangeEnd = endOfYear(prevYear);
+            break;
+          }
+          default:
+            break;
+        }
+
+        if (rangeStart && rangeEnd) {
+          if (visitDate < rangeStart || visitDate > rangeEnd) {
+            return false;
+          }
+        }
+      }
+
       if (sourceFilter !== "all" && record.source !== sourceFilter) {
         if (
           !(
@@ -191,10 +284,10 @@ export function OneTimePaymentManagement({
 
       return haystack.includes(normalizedSearch);
     });
-  }, [sortedRecords, searchTerm, sourceFilter]);
+  }, [sortedRecords, searchTerm, sourceFilter, timeFilter]);
   useEffect(() => {
     setVisibleCount(ONE_TIME_PAGE_SIZE);
-  }, [searchTerm, sourceFilter]);
+  }, [searchTerm, sourceFilter, timeFilter]);
 
   const visibleRecords = useMemo(() => {
     return filteredRecords.slice(0, visibleCount);
@@ -445,18 +538,44 @@ export function OneTimePaymentManagement({
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Filtrar por período</Label>
+              <Select
+                value={timeFilter}
+                onValueChange={(value) =>
+                  setTimeFilter(value as TimeFilterOption)
+                }
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Todo el historial" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todo el historial</SelectItem>
+                  <SelectItem value="current_month">Mes actual</SelectItem>
+                  <SelectItem value="previous_month">Mes anterior</SelectItem>
+                  <SelectItem value="last_3_months">Últimos 3 meses</SelectItem>
+                  <SelectItem value="last_6_months">Últimos 6 meses</SelectItem>
+                  <SelectItem value="current_year">Año actual</SelectItem>
+                  <SelectItem value="previous_year">Año anterior</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex flex-col justify-end gap-2 md:items-end">
               <div className="flex flex-wrap gap-2">
                 <Badge variant="outline">
-                  Total: {totalsBySource.total.count} · {" "}
+                  Total: {totalsBySource.total.count} ·{" "}
                   {formatCurrency(totalsBySource.total.amount)}
                 </Badge>
                 <Badge variant="secondary">
-                   PaseLibre: {totalsBySource.PaseLibre.count} · {" "}
+                  TuPase: {totalsBySource.TuPase.count} ·{" "}
+                  {formatCurrency(totalsBySource.TuPase.amount)}
+                </Badge>
+                <Badge variant="secondary">
+                  PaseLibre: {totalsBySource.PaseLibre.count} ·{" "}
                   {formatCurrency(totalsBySource.PaseLibre.amount)}
                 </Badge>
                 <Badge variant="secondary">
-                  Otros: {totalsBySource.Otros.count} · {" "}
+                  Otros: {totalsBySource.Otros.count} ·{" "}
                   {formatCurrency(totalsBySource.Otros.amount)}
                 </Badge>
               </div>
@@ -491,11 +610,11 @@ export function OneTimePaymentManagement({
                       <Calendar className="h-3 w-3" />
                       {formatDate(record.estimated_payment_date)}
                     </Badge>
-                     <p className="mt-2 text-sm font-semibold text-emerald-600">
-                    {record.amount !== null && record.amount !== undefined
-                      ? formatCurrency(record.amount)
-                      : "-"}
-                  </p>
+                    <p className="mt-2 text-sm font-semibold text-emerald-600">
+                      {record.amount !== null && record.amount !== undefined
+                        ? formatCurrency(record.amount)
+                        : "-"}
+                    </p>
                   </div>
                   {record.description && (
                     <p className="mt-2 text-sm text-muted-foreground">
@@ -528,79 +647,83 @@ export function OneTimePaymentManagement({
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Teléfono</TableHead>
-                    <TableHead>Origen</TableHead>
-                    <TableHead>Uso del pase</TableHead>
-                    <TableHead>Pago estimado</TableHead>
-                    <TableHead>Monto</TableHead>
-                    <TableHead>Descripción</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                   {visibleRecords.map((record) => {
-                    const amountDisplay =
-                      record.amount !== null && record.amount !== undefined
-                        ? formatCurrency(record.amount)
-                        : "-";
-
-                    return (
-                    <TableRow key={record.id}>
-                      <TableCell className="font-medium">
-                        {record.full_name}
-                      </TableCell>
-                      <TableCell>{record.phone || "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{record.source}</Badge>
-                      </TableCell>
-                      <TableCell>{formatDate(record.visit_date)}</TableCell>
-                      <TableCell>
-                        {formatDate(record.estimated_payment_date)}
-                      </TableCell>
-                      <TableCell className="font-semibold text-emerald-600">
-                        {amountDisplay}
-                      </TableCell>
-                      <TableCell className="max-w-[16rem] truncate">
-                        {record.description || "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleEditRecord(record)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            onClick={() => handleDeleteRecord(record)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Teléfono</TableHead>
+                      <TableHead>Origen</TableHead>
+                      <TableHead>Uso del pase</TableHead>
+                      <TableHead>Pago estimado</TableHead>
+                      <TableHead>Monto</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
-                  );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="text-sm text-muted-foreground">
-                Mostrando <strong>{visibleRecords.length}</strong> de{" "}
-                <strong>{filteredRecords.length}</strong> visitas
+                  </TableHeader>
+                  <TableBody>
+                    {visibleRecords.map((record) => {
+                      const amountDisplay =
+                        record.amount !== null && record.amount !== undefined
+                          ? formatCurrency(record.amount)
+                          : "-";
+
+                      return (
+                        <TableRow key={record.id}>
+                          <TableCell className="font-medium">
+                            {record.full_name}
+                          </TableCell>
+                          <TableCell>{record.phone || "-"}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{record.source}</Badge>
+                          </TableCell>
+                          <TableCell>{formatDate(record.visit_date)}</TableCell>
+                          <TableCell>
+                            {formatDate(record.estimated_payment_date)}
+                          </TableCell>
+                          <TableCell className="font-semibold text-emerald-600">
+                            {amountDisplay}
+                          </TableCell>
+                          <TableCell className="max-w-[16rem] truncate">
+                            {record.description || "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => handleEditRecord(record)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                onClick={() => handleDeleteRecord(record)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
-              {canLoadMore && (
-                <Button variant="outline" size="sm" onClick={handleLoadMoreRecords}>
-                  Cargar más visitas
-                </Button>
-              )}
-            </div>
-          </>
+              <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Mostrando <strong>{visibleRecords.length}</strong> de{" "}
+                  <strong>{filteredRecords.length}</strong> visitas
+                </div>
+                {canLoadMore && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLoadMoreRecords}
+                  >
+                    Cargar más visitas
+                  </Button>
+                )}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -849,7 +972,7 @@ export function OneTimePaymentManagement({
                 }
               />
             </div>
-             <div className="grid gap-2">
+            <div className="grid gap-2">
               <Label htmlFor="editAmount">Monto a cobrar</Label>
               <Input
                 id="editAmount"

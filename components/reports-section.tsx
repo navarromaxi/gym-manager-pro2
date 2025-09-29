@@ -2018,7 +2018,7 @@ const isWithinPeriod = (date: Date) => {
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-lg border p-3">
               <p className="text-sm text-muted-foreground">
-                Visitas registradas
+                Visitas registradas en el mes(se cobran al mes siguiente.)
               </p>
               <p className="text-2xl font-bold">{totalOneTimeVisits}</p>
               <p className="text-xs text-muted-foreground">
