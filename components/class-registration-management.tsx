@@ -158,35 +158,54 @@ export function ClassRegistrationManagement({
     setFeedback(null);
 
     try {
-      const { data, error } = await supabase
-        .from("class_sessions")
-        .insert({
-          gym_id: gymId,
+      const response = await fetch("/api/class-sessions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          gymId,
           title: formState.title.trim(),
           date: formState.date,
-          start_time: formState.start_time,
+          startTime: formState.start_time,
           capacity: formState.capacity,
           notes: formState.notes.trim() || null,
-        })
-        .select()
-        .single();
+        }),
+      });
 
-      if (error) throw error;
+      const payload = (await response.json().catch(() => null)) as
+        | { data: ClassSession; error?: string }
+        | { error?: string }
+        | null;
 
-      if (data) {
-        setSessions([...sessions, data as ClassSession]);
-        setFeedback({
-          type: "success",
-          message: "Clase creada correctamente.",
-        });
-        resetForm();
+      if (!response.ok) {
+        const error = payload && "error" in payload ? payload.error : undefined;
+        throw new Error(
+          error || "No se pudo crear la clase. Intenta nuevamente más tarde."
+        );
       }
+
+      if (!payload || !("data" in payload)) {
+        throw new Error(
+          "No se pudo crear la clase. Intenta nuevamente más tarde."
+        );
+      }
+      const { data } = payload;
+
+      setSessions([...sessions, data]);
+      setFeedback({
+        type: "success",
+        message: "Clase creada correctamente.",
+      });
+      resetForm();
     } catch (error) {
       console.error("Error creando la clase", error);
       setFeedback({
         type: "error",
         message:
-          "No se pudo crear la clase. Revisa la conexión e intenta nuevamente.",
+          error instanceof Error
+            ? error.message
+            : "No se pudo crear la clase. Revisa la conexión e intenta nuevamente.",
       });
     } finally {
       setCreating(false);
