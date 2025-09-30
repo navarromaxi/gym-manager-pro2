@@ -94,6 +94,15 @@ function PublicClassRegistrationPageContent({ params }: PageProps) {
 
   useEffect(() => {
     const fetchData = async () => {
+       if (!gymId) {
+        setLoadError(
+          "El enlace utilizado no es válido. Revisa la dirección e inténtalo nuevamente."
+        );
+        setSessions([]);
+        setRegistrations([]);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setLoadError(null);
       try {
