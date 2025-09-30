@@ -153,3 +153,24 @@ export interface Product {
   price: number
   is_active: boolean
 }
+
+export interface ClassSession {
+  id: string
+  gym_id: string
+  title: string
+  date: string
+  start_time: string
+  capacity: number
+  notes?: string | null
+  created_at?: string | null
+}
+
+export interface ClassRegistration {
+  id: string
+  session_id: string
+  gym_id: string
+  full_name: string
+  email?: string | null
+  phone?: string | null
+  created_at?: string | null
+}

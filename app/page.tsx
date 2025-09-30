@@ -97,6 +97,14 @@ const RoutineManagement = dynamic(
   { ssr: false }
 );
 
+const ClassRegistrationManagement = dynamic(
+  () =>
+    import("@/components/class-registration-management").then(
+      (m) => m.ClassRegistrationManagement
+    ),
+  { ssr: false }
+);
+
 const InactiveManagement = dynamic(
   () =>
     import("@/components/inactive-management").then(
@@ -117,6 +125,8 @@ import type {
   Activity,
   CustomPlan,
   OneTimePayment,
+  ClassSession,
+  ClassRegistration,
 } from "@/lib/supabase";
 import { normalizeCustomPlanPayments } from "@/lib/custom-plan-payments";
 import {
@@ -235,6 +245,10 @@ export default function GymManagementSystem() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [customPlans, setCustomPlans] = useState<CustomPlan[]>([]);
   const [oneTimePayments, setOneTimePayments] = useState<OneTimePayment[]>([]);
+  const [classSessions, setClassSessions] = useState<ClassSession[]>([]);
+  const [classRegistrations, setClassRegistrations] = useState<
+    ClassRegistration[]
+  >([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [gymData, setGymData] = useState<{
     name: string;
@@ -284,6 +298,8 @@ export default function GymManagementSystem() {
     setActivities([]);
     setCustomPlans([]);
     setOneTimePayments([]);
+    setClassSessions([]);
+    setClassRegistrations([]);
   };
 
   // CARGAR DATOS DESDE SUPABASE
@@ -306,6 +322,8 @@ export default function GymManagementSystem() {
         { data: activitiesData, error: activitiesError },
         { data: customPlansData, error: customPlansError },
         { data: oneTimePaymentsData, error: oneTimePaymentsError },
+        { data: classSessionsData, error: classSessionsError },
+        { data: classRegistrationsData, error: classRegistrationsError },
       ] = await Promise.all([
         supabase
           .from("members")
@@ -364,6 +382,20 @@ export default function GymManagementSystem() {
           )
           .eq("gym_id", gymId)
           .order("visit_date", { ascending: false }),
+          supabase
+          .from("class_sessions")
+          .select(
+            "id, gym_id, title, date, start_time, capacity, notes, created_at"
+          )
+          .eq("gym_id", gymId)
+          .order("date", { ascending: true })
+          .order("start_time", { ascending: true }),
+        supabase
+          .from("class_registrations")
+          .select(
+            "id, session_id, gym_id, full_name, email, phone, created_at"
+          )
+          .eq("gym_id", gymId),
       ]);
 
       if (membersError) {
@@ -401,6 +433,17 @@ export default function GymManagementSystem() {
         console.error("Error cargando pagos únicos:", oneTimePaymentsError);
       }
 
+      if (classSessionsError) {
+        console.error("Error cargando clases registradas:", classSessionsError);
+      }
+
+      if (classRegistrationsError) {
+        console.error(
+          "Error cargando inscripciones a clases:",
+          classRegistrationsError
+        );
+      }
+
       setMembers(membersData || []);
       const normalizedPayments = normalizeCustomPlanPayments(
         (paymentsData ?? []) as Payment[]
@@ -428,6 +471,8 @@ export default function GymManagementSystem() {
       setActivities(activitiesData || []);
       setCustomPlans(customPlansData || []);
       setOneTimePayments(oneTimePaymentsData || []);
+      setClassSessions(classSessionsData || []);
+      setClassRegistrations(classRegistrationsData || []);
 
       console.log("Datos cargados:", {
         members: membersData?.length || 0,
@@ -436,6 +481,8 @@ export default function GymManagementSystem() {
         activities: activitiesData?.length || 0,
         customPlans: customPlansData?.length || 0,
         oneTimePayments: oneTimePaymentsData?.length || 0,
+        classSessions: classSessionsData?.length || 0,
+        classRegistrations: classRegistrationsData?.length || 0,
       });
     } catch (error) {
       console.error("Error cargando datos:", error);
@@ -443,6 +490,36 @@ export default function GymManagementSystem() {
       setLoading(false);
     }
   };
+
+  const reloadClassData = async () => {
+    if (!gymData?.id) return;
+
+    const [sessionsResponse, registrationsResponse] = await Promise.all([
+      supabase
+        .from("class_sessions")
+        .select(
+          "id, gym_id, title, date, start_time, capacity, notes, created_at"
+        )
+        .eq("gym_id", gymData.id)
+        .order("date", { ascending: true })
+        .order("start_time", { ascending: true }),
+      supabase
+        .from("class_registrations")
+        .select(
+          "id, session_id, gym_id, full_name, email, phone, created_at"
+        )
+        .eq("gym_id", gymData.id),
+    ]);
+
+    if (sessionsResponse.error) throw sessionsResponse.error;
+    if (registrationsResponse.error) throw registrationsResponse.error;
+
+    setClassSessions((sessionsResponse.data ?? []) as ClassSession[]);
+    setClassRegistrations(
+      (registrationsResponse.data ?? []) as ClassRegistration[]
+    );
+  };
+
 
   const loadMoreProspects = async () => {
     if (!gymData?.id) return;
@@ -1006,6 +1083,7 @@ export default function GymManagementSystem() {
               { id: "plans", label: "Planes" },
               { id: "custom_plans", label: "Personalizados" },
               { id: "one_time_payments", label: "Pago único" },
+              { id: "class_registrations", label: "Clases" },
               { id: "activities", label: "Actividades" },
               { id: "routines", label: "Rutinas" },
               { id: "expenses", label: "Gastos" },
@@ -1127,6 +1205,16 @@ export default function GymManagementSystem() {
             activities={activities}
             setActivities={setActivities}
             gymId={gymData?.id || ""}
+          />
+        )}
+        {activeTab === "class_registrations" && (
+          <ClassRegistrationManagement
+            gymId={gymData?.id || ""}
+            sessions={classSessions}
+            setSessions={setClassSessions}
+            registrations={classRegistrations}
+            setRegistrations={setClassRegistrations}
+            onReload={reloadClassData}
           />
         )}
         {activeTab === "routines" && gymData?.id && (
