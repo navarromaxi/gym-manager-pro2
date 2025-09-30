@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Calendar, Clock, Users } from "lucide-react";
 
@@ -44,7 +44,7 @@ interface PageProps {
   };
 }
 
-export default function PublicClassRegistrationPage({ params }: PageProps) {
+function PublicClassRegistrationPageContent({ params }: PageProps) {
   const { gymId } = params;
   const searchParams = useSearchParams();
   const [sessions, setSessions] = useState<ClassSession[]>([]);
@@ -53,9 +53,8 @@ export default function PublicClassRegistrationPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string>("");
-  const [formState, setFormState] = useState<RegistrationFormState>(
-    INITIAL_FORM_STATE
-  );
+  const [formState, setFormState] =
+    useState<RegistrationFormState>(INITIAL_FORM_STATE);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -87,7 +86,10 @@ export default function PublicClassRegistrationPage({ params }: PageProps) {
     ? registrationsBySession.get(selectedSession.id) ?? []
     : [];
   const spotsLeft = selectedSession
-    ? Math.max(selectedSession.capacity - selectedSessionRegistrations.length, 0)
+    ? Math.max(
+        selectedSession.capacity - selectedSessionRegistrations.length,
+        0
+      )
     : 0;
 
   useEffect(() => {
@@ -111,11 +113,7 @@ export default function PublicClassRegistrationPage({ params }: PageProps) {
                 "id, session_id, gym_id, full_name, email, phone, created_at"
               )
               .eq("gym_id", gymId),
-            supabase
-              .from("gyms")
-              .select("name")
-              .eq("id", gymId)
-              .maybeSingle(),
+            supabase.from("gyms").select("name").eq("id", gymId).maybeSingle(),
           ]);
 
         if (sessionsResponse.error) throw sessionsResponse.error;
@@ -149,7 +147,10 @@ export default function PublicClassRegistrationPage({ params }: PageProps) {
     }
 
     const sessionFromQuery = searchParams?.get("clase");
-    if (sessionFromQuery && sortedSessions.some((s) => s.id === sessionFromQuery)) {
+    if (
+      sessionFromQuery &&
+      sortedSessions.some((s) => s.id === sessionFromQuery)
+    ) {
       setSelectedSessionId(sessionFromQuery);
       return;
     }
@@ -250,7 +251,8 @@ export default function PublicClassRegistrationPage({ params }: PageProps) {
             {gymName ? `${gymName} - Clases especiales` : "Reserva tu clase"}
           </h1>
           <p className="text-muted-foreground">
-            Elegí la clase que quieres tomar y deja tus datos para asegurar tu lugar.
+            Elegí la clase que quieres tomar y deja tus datos para asegurar tu
+            lugar.
           </p>
         </header>
 
@@ -276,8 +278,8 @@ export default function PublicClassRegistrationPage({ params }: PageProps) {
         ) : sortedSessions.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center text-muted-foreground">
-              Todavía no hay clases disponibles para reservar. Consulta nuevamente más
-              tarde.
+              Todavía no hay clases disponibles para reservar. Consulta
+              nuevamente más tarde.
             </CardContent>
           </Card>
         ) : (
@@ -294,7 +296,8 @@ export default function PublicClassRegistrationPage({ params }: PageProps) {
               <CardHeader>
                 <CardTitle>Reserva tu lugar</CardTitle>
                 <CardDescription>
-                  Elige una clase y completa tus datos. Recibirás confirmación inmediata.
+                  Elige una clase y completa tus datos. Recibirás confirmación
+                  inmediata.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -312,10 +315,15 @@ export default function PublicClassRegistrationPage({ params }: PageProps) {
                         {sortedSessions.map((session) => {
                           const count =
                             registrationsBySession.get(session.id)?.length ?? 0;
-                          const available = Math.max(session.capacity - count, 0);
+                          const available = Math.max(
+                            session.capacity - count,
+                            0
+                          );
                           const label = `${new Date(
                             `${session.date}T00:00:00`
-                          ).toLocaleDateString()} • ${session.start_time} hs • ${available} libres`;
+                          ).toLocaleDateString()} • ${
+                            session.start_time
+                          } hs • ${available} libres`;
                           return (
                             <SelectItem key={session.id} value={session.id}>
                               {session.title}
@@ -334,7 +342,9 @@ export default function PublicClassRegistrationPage({ params }: PageProps) {
                       <div className="flex flex-wrap gap-4">
                         <span className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
-                          {new Date(`${selectedSession.date}T00:00:00`).toLocaleDateString()}
+                          {new Date(
+                            `${selectedSession.date}T00:00:00`
+                          ).toLocaleDateString()}
                         </span>
                         <span className="flex items-center gap-2">
                           <Clock className="h-4 w-4" />
@@ -344,7 +354,9 @@ export default function PublicClassRegistrationPage({ params }: PageProps) {
                           <Users className="h-4 w-4" />
                           {selectedSession.capacity} cupos
                         </span>
-                        <Badge variant={spotsLeft > 0 ? "secondary" : "destructive"}>
+                        <Badge
+                          variant={spotsLeft > 0 ? "secondary" : "destructive"}
+                        >
                           {spotsLeft > 0
                             ? `${spotsLeft} lugares disponibles`
                             : "Sin cupos"}
@@ -395,7 +407,11 @@ export default function PublicClassRegistrationPage({ params }: PageProps) {
                     </div>
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={submitting || spotsLeft <= 0}>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={submitting || spotsLeft <= 0}
+                  >
                     {spotsLeft <= 0
                       ? "Sin cupos disponibles"
                       : submitting
@@ -409,5 +425,27 @@ export default function PublicClassRegistrationPage({ params }: PageProps) {
         )}
       </div>
     </div>
+  );
+}
+
+function PublicClassRegistrationFallback() {
+  return (
+    <div className="min-h-screen bg-gray-100 py-10">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4">
+        <Card>
+          <CardContent className="p-6 text-center text-muted-foreground">
+            Cargando página…
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+export default function PublicClassRegistrationPage({ params }: PageProps) {
+  return (
+    <Suspense fallback={<PublicClassRegistrationFallback />}>
+      <PublicClassRegistrationPageContent params={params} />
+    </Suspense>
   );
 }
