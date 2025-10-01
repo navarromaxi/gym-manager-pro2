@@ -341,27 +341,18 @@ function PublicClassRegistrationPageContent() {
             </div>
             <p className="text-sm uppercase tracking-wide text-gray-500">
               {gymName
-                ? `Sistema de reservas de ${gymName}`
+                ? `Sistema de reservas ${gymName}`
                 : "Sistema de reservas del gimnasio"}
             </p>
           </div>
           <h1 className="text-3xl font-bold text-gray-900">
-            {gymName ? `${gymName} - Clases especiales` : "Reserva tu clase"}
+            {gymName ? `${gymName}` : "Reserva tu clase"}
           </h1>
           <p className="text-muted-foreground">
             Elegí la clase que quieres tomar y deja tus datos para asegurar tu
             lugar.
           </p>
         </header>
-
-        <Alert>
-          <AlertDescription>
-            Este enlace funciona para todos los socios del gimnasio. Aquí verán
-            la lista completa de clases disponibles y podrán elegir su horario.
-            Si llegan mediante un enlace directo con el parámetro "clase",
-            seleccionaremos esa clase automáticamente.
-          </AlertDescription>
-        </Alert>
 
         {loading ? (
           <Card>
