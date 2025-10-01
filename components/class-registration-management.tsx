@@ -192,7 +192,7 @@ export function ClassRegistrationManagement({
       }
       const { data } = payload;
 
-      setSessions([...sessions, data]);
+      setSessions((prev) => [...prev, data]);
       setFeedback({
         type: "success",
         message: "Clase creada correctamente.",
@@ -222,32 +222,40 @@ export function ClassRegistrationManagement({
 
     setDeletingId(sessionId);
     try {
-      const { error: deleteRegistrationsError } = await supabase
-        .from("class_registrations")
-        .delete()
-        .eq("session_id", sessionId)
-        .eq("gym_id", gymId);
+       const response = await fetch("/api/class-sessions", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          gymId,
+          sessionId,
+        }),
+      });
 
-      if (deleteRegistrationsError) throw deleteRegistrationsError;
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        const message = payload?.error;
+        throw new Error(
+          message ||
+            "No se pudo eliminar la clase. Verifica la conexión e intenta nuevamente."
+        );
+      }
 
-      const { error } = await supabase
-        .from("class_sessions")
-        .delete()
-        .eq("id", sessionId)
-        .eq("gym_id", gymId);
-
-      if (error) throw error;
-
-      setSessions(sessions.filter((session) => session.id !== sessionId));
-      setRegistrations(
-        registrations.filter((registration) => registration.session_id !== sessionId)
+      setSessions((prev) => prev.filter((session) => session.id !== sessionId));
+      setRegistrations((prev) =>
+        prev.filter((registration) => registration.session_id !== sessionId)
       );
     } catch (error) {
       console.error("Error eliminando la clase", error);
       setFeedback({
         type: "error",
         message:
-          "No se pudo eliminar la clase. Verifica la conexión e intenta nuevamente.",
+          error instanceof Error
+            ? error.message
+            : "No se pudo eliminar la clase. Verifica la conexión e intenta nuevamente.",
       });
     } finally {
       setDeletingId(null);

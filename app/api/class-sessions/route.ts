@@ -12,6 +12,11 @@ const createSessionSchema = z.object({
   notes: z.string().nullable().optional(),
 });
 
+const deleteSessionSchema = z.object({
+  gymId: z.string().min(1, "El identificador del gimnasio es obligatorio"),
+  sessionId: z.string().min(1, "El identificador de la clase es obligatorio"),
+});
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -74,6 +79,80 @@ export async function POST(request: Request) {
       {
         error:
           "Ocurrió un error inesperado al crear la clase. Intenta nuevamente más tarde.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json().catch(() => null);
+    const parsed = deleteSessionSchema.safeParse({
+      gymId: body?.gymId,
+      sessionId: body?.sessionId,
+    });
+
+    if (!parsed.success) {
+      const message = parsed.error.issues.map((issue) => issue.message).join(" ");
+      return NextResponse.json(
+        {
+          error:
+            message ||
+            "Los datos enviados para eliminar la clase no son válidos.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createClient();
+
+    const { error: registrationsError } = await supabase
+      .from("class_registrations")
+      .delete()
+      .eq("session_id", parsed.data.sessionId)
+      .eq("gym_id", parsed.data.gymId);
+
+    if (registrationsError) {
+      console.error("Error deleting class registrations", registrationsError);
+      return NextResponse.json(
+        {
+          error:
+            "No se pudieron eliminar las inscripciones de la clase. Intenta nuevamente más tarde.",
+        },
+        { status: 500 }
+      );
+    }
+
+    const { error: sessionError } = await supabase
+      .from("class_sessions")
+      .delete()
+      .eq("id", parsed.data.sessionId)
+      .eq("gym_id", parsed.data.gymId);
+
+    if (sessionError) {
+      console.error("Error deleting class session", sessionError);
+      return NextResponse.json(
+        {
+          error:
+            "No se pudo eliminar la clase. Intenta nuevamente más tarde.",
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const message = error.issues.map((issue) => issue.message).join(" ");
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    console.error("Unexpected error deleting class session", error);
+    return NextResponse.json(
+      {
+        error:
+          "Ocurrió un error inesperado al eliminar la clase. Intenta nuevamente más tarde.",
       },
       { status: 500 }
     );
