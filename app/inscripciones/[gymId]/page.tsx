@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useParams, useSearchParams } from "next/navigation";
 import { Calendar, Clock, Users } from "lucide-react";
@@ -54,6 +54,7 @@ function PublicClassRegistrationPageContent() {
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [gymLogoUrl, setGymLogoUrl] = useState<string | null>(null);
 
   const registrationsBySession = useMemo(() => {
     const counts = new Map<string, ClassRegistration[]>();
@@ -88,19 +89,22 @@ function PublicClassRegistrationPageContent() {
       )
     : 0;
 
-  useEffect(() => {
-    const fetchData = async () => {
-        if (!gymId) {
+  const fetchData = useCallback(
+    async (showLoading = true) => {
+      if (!gymId) {
         setLoadError(
           "El enlace utilizado no es válido. Revisa la dirección e inténtalo nuevamente."
         );
         setSessions([]);
         setRegistrations([]);
-        setLoading(false);
+        if (showLoading) {
+        setLoading(true);
+      }
         return;
       }
       setLoading(true);
       setLoadError(null);
+
       try {
         const [sessionsResponse, registrationsResponse, gymResponse] =
           await Promise.all([
@@ -120,7 +124,7 @@ function PublicClassRegistrationPageContent() {
               .eq("gym_id", gymId ?? ""),
             supabase
               .from("gyms")
-              .select("name")
+              .select("name, logo_url")
               .eq("id", gymId ?? "")
               .maybeSingle(),
           ]);
@@ -133,8 +137,15 @@ function PublicClassRegistrationPageContent() {
           (registrationsResponse.data ?? []) as ClassRegistration[]
         );
 
+        if (gymResponse?.error) throw gymResponse.error;
+
         if (gymResponse.data?.name) {
           setGymName(gymResponse.data.name);
+        }
+        if (gymResponse.data?.logo_url) {
+          setGymLogoUrl(gymResponse.data.logo_url);
+        } else {
+          setGymLogoUrl(null);
         }
       } catch (fetchError) {
         console.error("Error cargando la información", fetchError);
@@ -144,10 +155,69 @@ function PublicClassRegistrationPageContent() {
       } finally {
         setLoading(false);
       }
+      },
+    [gymId]
+  );
+
+  useEffect(() => {
+    fetchData(true);
+  }, [fetchData]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        fetchData(false);
+      }
     };
 
-    fetchData();
-  }, [gymId]);
+    window.addEventListener("focus", handleVisibility);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("focus", handleVisibility);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+
+
+     }, [fetchData]);
+
+  useEffect(() => {
+    if (!gymId) {
+      return;
+    }
+
+    const registrationsChannel = supabase
+      .channel(`public:class_registrations:${gymId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "class_registrations",
+          filter: `gym_id=eq.${gymId}`,
+        },
+        () => fetchData(false)
+      )
+      .subscribe();
+
+    const sessionsChannel = supabase
+      .channel(`public:class_sessions:${gymId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "class_sessions",
+          filter: `gym_id=eq.${gymId}`,
+        },
+        () => fetchData(false)
+      )
+      .subscribe();
+      return () => {
+      supabase.removeChannel(registrationsChannel);
+      supabase.removeChannel(sessionsChannel);
+    };
+  }, [fetchData, gymId]);
 
   useEffect(() => {
     if (sortedSessions.length === 0) {
@@ -256,12 +326,17 @@ function PublicClassRegistrationPageContent() {
           <div className="flex flex-col items-center gap-2">
             <div className="relative h-16 w-16">
               <Image
-                src="/logos/demo-gym-logo.svg"
-                alt="Logo del gimnasio"
+                src={gymLogoUrl ?? "/logos/demo-gym-logo.svg"}
+                alt={
+                  gymName
+                    ? `Logo del gimnasio ${gymName}`
+                    : "Logo del gimnasio"
+                }
                 fill
                 sizes="64px"
                 className="object-contain"
                 priority
+                unoptimized={Boolean(gymLogoUrl)}
               />
             </div>
             <p className="text-sm uppercase tracking-wide text-gray-500">
