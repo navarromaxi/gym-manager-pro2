@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { Calendar, Clock, Users } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
@@ -38,14 +38,8 @@ const INITIAL_FORM_STATE: RegistrationFormState = {
   phone: "",
 };
 
-interface PageProps {
-  params: {
-    gymId: string;
-  };
-}
-
-function PublicClassRegistrationPageContent({ params }: PageProps) {
-  const { gymId } = params;
+function PublicClassRegistrationPageContent() {
+  const { gymId } = useParams<{ gymId?: string }>();
   const searchParams = useSearchParams();
   const [sessions, setSessions] = useState<ClassSession[]>([]);
   const [registrations, setRegistrations] = useState<ClassRegistration[]>([]);
@@ -113,7 +107,7 @@ function PublicClassRegistrationPageContent({ params }: PageProps) {
               .select(
                 "id, gym_id, title, date, start_time, capacity, notes, created_at"
               )
-              .eq("gym_id", gymId)
+              .eq("gym_id", gymId ?? "")
               .order("date", { ascending: true })
               .order("start_time", { ascending: true }),
             supabase
@@ -121,8 +115,12 @@ function PublicClassRegistrationPageContent({ params }: PageProps) {
               .select(
                 "id, session_id, gym_id, full_name, email, phone, created_at"
               )
-              .eq("gym_id", gymId),
-            supabase.from("gyms").select("name").eq("id", gymId).maybeSingle(),
+              .eq("gym_id", gymId ?? ""),
+            supabase
+              .from("gyms")
+              .select("name")
+              .eq("id", gymId ?? "")
+              .maybeSingle(),
           ]);
 
         if (sessionsResponse.error) throw sessionsResponse.error;
@@ -206,7 +204,7 @@ function PublicClassRegistrationPageContent({ params }: PageProps) {
         .from("class_registrations")
         .select("id", { count: "exact", head: true })
         .eq("session_id", selectedSession.id)
-        .eq("gym_id", gymId);
+        .eq("gym_id", gymId ?? "");
 
       if (countError) throw countError;
 
@@ -219,7 +217,7 @@ function PublicClassRegistrationPageContent({ params }: PageProps) {
         .from("class_registrations")
         .insert({
           session_id: selectedSession.id,
-          gym_id: gymId,
+          gym_id: gymId ?? "",
           full_name: formState.fullName.trim(),
           email: formState.email.trim() || null,
           phone: formState.phone.trim() || null,
@@ -451,10 +449,10 @@ function PublicClassRegistrationFallback() {
   );
 }
 
-export default function PublicClassRegistrationPage({ params }: PageProps) {
+export default function PublicClassRegistrationPage() {
   return (
     <Suspense fallback={<PublicClassRegistrationFallback />}>
-      <PublicClassRegistrationPageContent params={params} />
+      <PublicClassRegistrationPageContent />
     </Suspense>
   );
 }
