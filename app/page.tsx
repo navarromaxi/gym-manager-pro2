@@ -1073,7 +1073,7 @@ export default function GymManagementSystem() {
       {/* Navigation */}
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:gap-8">
+          <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:gap-3 lg:gap-4">
             {[
               { id: "dashboard", label: "Dashboard" },
               { id: "members", label: "Socios" },

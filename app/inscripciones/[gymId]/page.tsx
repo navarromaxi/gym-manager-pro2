@@ -341,7 +341,7 @@ function PublicClassRegistrationPageContent() {
             </div>
             <p className="text-sm uppercase tracking-wide text-gray-500">
               {gymName
-                ? `Sistema de reservas ${gymName}`
+                ? `Sistema de reservas`
                 : "Sistema de reservas del gimnasio"}
             </p>
           </div>
