@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useParams, useSearchParams } from "next/navigation";
 import { Calendar, Clock, Users } from "lucide-react";
 
@@ -39,7 +40,8 @@ const INITIAL_FORM_STATE: RegistrationFormState = {
 };
 
 function PublicClassRegistrationPageContent() {
-  const { gymId } = useParams<{ gymId?: string }>();
+  const params = useParams<{ gymId: string }>();
+  const gymId = params?.gymId;
   const searchParams = useSearchParams();
   const [sessions, setSessions] = useState<ClassSession[]>([]);
   const [registrations, setRegistrations] = useState<ClassRegistration[]>([]);
@@ -88,7 +90,7 @@ function PublicClassRegistrationPageContent() {
 
   useEffect(() => {
     const fetchData = async () => {
-       if (!gymId) {
+        if (!gymId) {
         setLoadError(
           "El enlace utilizado no es válido. Revisa la dirección e inténtalo nuevamente."
         );
@@ -250,10 +252,24 @@ function PublicClassRegistrationPageContent() {
   return (
     <div className="min-h-screen bg-gray-100 py-10">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4">
-        <header className="text-center space-y-2">
-          <p className="text-sm uppercase tracking-wide text-gray-500">
-            Sistema de reservas del gimnasio
-          </p>
+        <header className="text-center space-y-3">
+          <div className="flex flex-col items-center gap-2">
+            <div className="relative h-16 w-16">
+              <Image
+                src="/logos/demo-gym-logo.svg"
+                alt="Logo del gimnasio"
+                fill
+                sizes="64px"
+                className="object-contain"
+                priority
+              />
+            </div>
+            <p className="text-sm uppercase tracking-wide text-gray-500">
+              {gymName
+                ? `Sistema de reservas de ${gymName}`
+                : "Sistema de reservas del gimnasio"}
+            </p>
+          </div>
           <h1 className="text-3xl font-bold text-gray-900">
             {gymName ? `${gymName} - Clases especiales` : "Reserva tu clase"}
           </h1>
