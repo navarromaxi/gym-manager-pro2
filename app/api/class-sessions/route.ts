@@ -107,10 +107,37 @@ export async function DELETE(request: Request) {
 
     const supabase = createClient();
 
+    const { data: sessionToDelete, error: lookupError } = await supabase
+      .from("class_sessions")
+      .select("id")
+      .eq("id", parsed.data.sessionId)
+      .eq("gym_id", parsed.data.gymId)
+      .maybeSingle();
+
+    if (lookupError) {
+      console.error("Error fetching class session before deletion", lookupError);
+      return NextResponse.json(
+        {
+          error:
+            "No se pudo validar la clase a eliminar. Intenta nuevamente más tarde.",
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!sessionToDelete) {
+      return NextResponse.json(
+        {
+          error: "La clase no existe o ya fue eliminada.",
+        },
+        { status: 404 }
+      );
+    }
+
     const { error: registrationsError } = await supabase
       .from("class_registrations")
       .delete()
-      .eq("session_id", parsed.data.sessionId)
+      .eq("session_id", sessionToDelete.id)
       .eq("gym_id", parsed.data.gymId);
 
     if (registrationsError) {
@@ -124,20 +151,30 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const { error: sessionError } = await supabase
+    const sessionDeleteResponse = await supabase
       .from("class_sessions")
       .delete()
-      .eq("id", parsed.data.sessionId)
-      .eq("gym_id", parsed.data.gymId);
+       .eq("id", sessionToDelete.id)
+      .eq("gym_id", parsed.data.gymId)
+      .select("id")
+      .maybeSingle();
 
-    if (sessionError) {
-      console.error("Error deleting class session", sessionError);
+     if (sessionDeleteResponse.error) {
+      console.error("Error deleting class session", sessionDeleteResponse.error);
       return NextResponse.json(
         {
           error:
             "No se pudo eliminar la clase. Intenta nuevamente más tarde.",
         },
         { status: 500 }
+      );
+    }
+     if (!sessionDeleteResponse.data) {
+      return NextResponse.json(
+        {
+          error: "No se encontró la clase para eliminar.",
+        },
+        { status: 404 }
       );
     }
 

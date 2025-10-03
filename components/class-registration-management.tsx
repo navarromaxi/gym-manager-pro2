@@ -114,6 +114,40 @@ export function ClassRegistrationManagement({
     return map;
   }, [registrations]);
 
+  const fetchLatestData = async () => {
+    if (!gymId) return;
+
+    if (onReload) {
+      await onReload();
+      return;
+    }
+
+    const [sessionsResponse, registrationsResponse] = await Promise.all([
+      supabase
+        .from("class_sessions")
+        .select(
+          "id, gym_id, title, date, start_time, capacity, notes, created_at"
+        )
+        .eq("gym_id", gymId)
+        .order("date", { ascending: true })
+        .order("start_time", { ascending: true }),
+      supabase
+        .from("class_registrations")
+        .select(
+          "id, session_id, gym_id, full_name, email, phone, created_at"
+        )
+        .eq("gym_id", gymId),
+    ]);
+
+    if (sessionsResponse.error) throw sessionsResponse.error;
+    if (registrationsResponse.error) throw registrationsResponse.error;
+
+    setSessions((sessionsResponse.data ?? []) as ClassSession[]);
+    setRegistrations(
+      (registrationsResponse.data ?? []) as ClassRegistration[]
+    );
+  };
+
   const handleChange = (
     field: keyof ClassSessionFormState,
     value: string
@@ -220,6 +254,8 @@ export function ClassRegistrationManagement({
     );
     if (!confirmDelete) return;
 
+    const previousSessions = sessions;
+    const previousRegistrations = registrations;
     setDeletingId(sessionId);
     try {
        const response = await fetch("/api/class-sessions", {
@@ -248,6 +284,18 @@ export function ClassRegistrationManagement({
       setRegistrations((prev) =>
         prev.filter((registration) => registration.session_id !== sessionId)
       );
+       try {
+        await fetchLatestData();
+      } catch (refreshError) {
+        console.error("Error recargando las clases tras eliminar", refreshError);
+        setSessions(previousSessions);
+        setRegistrations(previousRegistrations);
+        throw refreshError;
+      }
+      setFeedback({
+        type: "success",
+        message: "Clase eliminada correctamente.",
+      });
     } catch (error) {
       console.error("Error eliminando la clase", error);
       setFeedback({
@@ -303,25 +351,7 @@ export function ClassRegistrationManagement({
 
     setRefreshing(true);
     try {
-      if (onReload) {
-        await onReload();
-      } else {
-        const [{ data: sessionsData }, { data: registrationsData }] = await Promise.all([
-          supabase
-            .from("class_sessions")
-            .select("id, gym_id, title, date, start_time, capacity, notes, created_at")
-            .eq("gym_id", gymId)
-            .order("date", { ascending: true })
-            .order("start_time", { ascending: true }),
-          supabase
-            .from("class_registrations")
-            .select("id, session_id, gym_id, full_name, email, phone, created_at")
-            .eq("gym_id", gymId),
-        ]);
-
-        setSessions((sessionsData ?? []) as ClassSession[]);
-        setRegistrations((registrationsData ?? []) as ClassRegistration[]);
-      }
+      await fetchLatestData();
     } catch (error) {
       console.error("Error actualizando las clases", error);
       setFeedback({
