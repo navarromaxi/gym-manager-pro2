@@ -31,7 +31,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Search, CalendarClock, X } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Search,
+  CalendarClock,
+  X,
+  AlertTriangle,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
 import { detectContractTable } from "@/lib/contract-table";
@@ -213,6 +221,27 @@ export function MemberManagement({
   const [visibleCount, setVisibleCount] = useState(MEMBERS_PER_BATCH);
   const [dismissedCustomPlanAlertIds, setDismissedCustomPlanAlertIds] =
     useState<string[]>([]);
+    const [dismissedLongPlanMemberIds, setDismissedLongPlanMemberIds] =
+    useState<string[]>([]);
+
+  const planById = useMemo(() => {
+    const map = new Map<string, Plan>();
+    for (const plan of plans) {
+      map.set(plan.id, plan);
+    }
+    return map;
+  }, [plans]);
+
+  const planByName = useMemo(() => {
+    const map = new Map<string, Plan>();
+    for (const plan of plans) {
+      const key = plan.name?.trim().toLowerCase();
+      if (key) {
+        map.set(key, plan);
+      }
+    }
+    return map;
+  }, [plans]);
 
   const latestCustomPlanByMember = useMemo(() => {
     const map = new Map<string, CustomPlan>();
@@ -789,6 +818,100 @@ export function MemberManagement({
   const handleDismissCustomPlanAlert = useCallback((planId: string) => {
     setDismissedCustomPlanAlertIds((prev) =>
       prev.includes(planId) ? prev : [...prev, planId]
+    );
+  }, []);
+
+  const longTermPlanFollowUps = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const latestPlanPaymentByMember = new Map<
+      string,
+      { payment: Payment; startDate: Date }
+    >();
+
+    for (const payment of payments) {
+      if (payment.type !== "plan" || !payment.start_date) continue;
+      const startDate = toLocalDate(payment.start_date);
+      if (Number.isNaN(startDate.getTime())) continue;
+
+      const existing = latestPlanPaymentByMember.get(payment.member_id);
+      if (!existing || startDate.getTime() > existing.startDate.getTime()) {
+        latestPlanPaymentByMember.set(payment.member_id, {
+          payment,
+          startDate,
+        });
+      }
+    }
+
+    const alerts: {
+      memberId: string;
+      memberName: string;
+      planName: string;
+      daysSinceStart: number;
+    }[] = [];
+
+    for (const [memberId, { payment, startDate }] of latestPlanPaymentByMember) {
+      const member = members.find((m) => m.id === memberId);
+      if (!member) continue;
+
+      const normalizedPlanName = payment.plan?.trim().toLowerCase();
+      const memberPlanName = member.plan?.trim().toLowerCase();
+      const plan =
+        (payment.plan_id && planById.get(payment.plan_id)) ||
+        (normalizedPlanName && planByName.get(normalizedPlanName)) ||
+        (memberPlanName && planByName.get(memberPlanName));
+
+      if (!plan) continue;
+
+      let qualifies = false;
+      if (plan.duration_type === "months") {
+        qualifies = plan.duration >= 5;
+      } else if (plan.duration_type === "years") {
+        qualifies = plan.duration * 12 >= 5;
+      } else if (plan.duration_type === "days") {
+        qualifies = plan.duration >= 150;
+      }
+
+      if (!qualifies) continue;
+
+      const startDateIso = payment.start_date;
+      if (!startDateIso) continue;
+
+      const planEndDateIso = calculatePlanEndDate(startDateIso, plan);
+      const planEndDate = planEndDateIso
+        ? toLocalDate(planEndDateIso)
+        : new Date(NaN);
+      if (Number.isNaN(planEndDate.getTime())) continue;
+      if (planEndDate.getTime() < today.getTime()) continue;
+
+      const daysSinceStart = Math.floor(
+        (today.getTime() - startDate.getTime()) / 86400000
+      );
+      if (daysSinceStart < 120) continue;
+
+      alerts.push({
+        memberId,
+        memberName: member.name || "Socio",
+        planName: plan.name,
+        daysSinceStart,
+      });
+    }
+
+    return alerts.sort((a, b) => b.daysSinceStart - a.daysSinceStart);
+  }, [payments, members, planById, planByName]);
+
+  const visibleLongTermPlanFollowUps = useMemo(
+    () =>
+      longTermPlanFollowUps.filter(
+        (alert) => !dismissedLongPlanMemberIds.includes(alert.memberId)
+      ),
+    [longTermPlanFollowUps, dismissedLongPlanMemberIds]
+  );
+
+  const handleDismissLongPlanAlert = useCallback((memberId: string) => {
+    setDismissedLongPlanMemberIds((prev) =>
+      prev.includes(memberId) ? prev : [...prev, memberId]
     );
   }, []);
 
@@ -1632,6 +1755,34 @@ export function MemberManagement({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+       {visibleLongTermPlanFollowUps.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2">
+          {visibleLongTermPlanFollowUps.map((alert) => (
+            <div
+              key={alert.memberId}
+              className="flex items-start gap-3 rounded-md border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800 shadow-lg"
+            >
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-sky-600" />
+              <div className="flex-1">
+                <p className="font-semibold">
+                  Debes contactar a {alert.memberName}
+                </p>
+                <p className="text-xs text-sky-700">
+                  Su plan {alert.planName} ya cumplió 120 días. Alerta de seguimiento.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDismissLongPlanAlert(alert.memberId)}
+                className="ml-2 text-sky-600 transition hover:text-sky-800"
+                aria-label={`Descartar alerta de seguimiento para ${alert.memberName}`}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
