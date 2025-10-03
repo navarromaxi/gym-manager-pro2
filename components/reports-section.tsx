@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -27,7 +28,7 @@ import {
 } from "@/components/ui/table";
 import {
   Download,
-  Calendar,
+  Calendar as CalendarIcon,
   Users,
   DollarSign,
   TrendingUp,
@@ -36,6 +37,7 @@ import {
   RefreshCw,
   UserCheck,
 } from "lucide-react";
+import { DateRange } from "react-day-picker";
 import { PieChart, Pie } from "recharts";
 import {
   ChartContainer,
@@ -44,6 +46,8 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from "@/components/ui/chart";
+import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
 interface Member {
   id: string;
   name: string;
@@ -274,6 +278,14 @@ type DerivedMember = Member & {
   _next: Date | null;
 };
 
+type TimeFilterOption =
+  | "current_month"
+  | "previous_month"
+  | "last_6_months"
+  | "current_year"
+  | "last_year"
+  | "custom";
+
 export function ReportsSection({
   members,
   payments,
@@ -283,8 +295,28 @@ export function ReportsSection({
   oneTimePayments,
   gymName,
 }: ReportsSectionProps) {
-  const [timeFilter, setTimeFilter] = useState("current_month");
+  const [timeFilter, setTimeFilter] = useState<TimeFilterOption>("current_month");
+  const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const currentDate = new Date();
+
+   const handleTimeFilterChange = (value: string) => {
+    const nextFilter = value as TimeFilterOption;
+    setTimeFilter(nextFilter);
+  };
+
+  const handleCustomRangeSelect = (range?: DateRange) => {
+    setCustomRange(range);
+    if (range?.from || range?.to) {
+      setTimeFilter("custom");
+    }
+  };
+
+  const handleClearCustomRange = () => {
+    setCustomRange(undefined);
+    setTimeFilter("current_month");
+  };
+
+  const hasCustomRange = Boolean(customRange?.from || customRange?.to);
 
   /** =================== Estado REAL (misma lógica que MemberManagement) =================== */
 // Normaliza "YYYY-MM-DD" a medianoche local (evita desfase por UTC)
@@ -502,7 +534,16 @@ const overdueMembers = membersWithDerived.filter((m) => m.derivedStatus === "exp
         periodEnd = endOfMonth(year, 11);
         break;
       }
-       default:
+       case "custom": {
+        if (customRange?.from) {
+          periodStart = toLocalMidnight(customRange.from);
+        }
+        if (customRange?.to) {
+          periodEnd = toLocalMidnight(customRange.to);
+        }
+        break;
+      }
+      default:
         periodStart = null;
         periodEnd = null;
     }
@@ -1069,6 +1110,23 @@ const isWithinPeriod = (date: Date) => {
     };
   }).reverse();
 
+  const customRangeLabel = useMemo(() => {
+    if (customRange?.from && customRange?.to) {
+      const from = toLocalMidnight(customRange.from).toLocaleDateString("es-ES");
+      const to = toLocalMidnight(customRange.to).toLocaleDateString("es-ES");
+      return `${from} - ${to}`;
+    }
+    if (customRange?.from) {
+      const from = toLocalMidnight(customRange.from).toLocaleDateString("es-ES");
+      return `Desde ${from}`;
+    }
+    if (customRange?.to) {
+      const to = toLocalMidnight(customRange.to).toLocaleDateString("es-ES");
+      return `Hasta ${to}`;
+    }
+    return "Período Personalizado";
+  }, [customRange]);
+
   const getTimeFilterLabel = () => {
     switch (timeFilter) {
       case "current_month":
@@ -1081,6 +1139,8 @@ const isWithinPeriod = (date: Date) => {
         return "Año Actual";
       case "last_year":
         return "Año Anterior";
+        case "custom":
+        return customRangeLabel;
       default:
         return "Período Seleccionado";
     }
@@ -1545,8 +1605,8 @@ const isWithinPeriod = (date: Date) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4 items-center">
-            <Select value={timeFilter} onValueChange={setTimeFilter}>
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={timeFilter} onValueChange={handleTimeFilterChange}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Seleccionar período" />
               </SelectTrigger>
@@ -1556,8 +1616,42 @@ const isWithinPeriod = (date: Date) => {
                 <SelectItem value="last_6_months">Últimos 6 Meses</SelectItem>
                 <SelectItem value="current_year">Año Actual</SelectItem>
                 <SelectItem value="last_year">Año Anterior</SelectItem>
+                 <SelectItem value="custom">Personalizado</SelectItem>
               </SelectContent>
             </Select>
+             <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[260px] justify-start text-left font-normal",
+                    !hasCustomRange && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {hasCustomRange ? customRangeLabel : "Seleccionar rango"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  numberOfMonths={2}
+                  selected={customRange}
+                  onSelect={handleCustomRangeSelect}
+                />
+              </PopoverContent>
+            </Popover>
+            {hasCustomRange ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={handleClearCustomRange}
+              >
+                Limpiar
+              </Button>
+            ) : null}
             <span className="text-sm text-muted-foreground">
               Mostrando datos de: <strong>{getTimeFilterLabel()}</strong>
             </span>
@@ -2121,7 +2215,7 @@ const isWithinPeriod = (date: Date) => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <Calendar className="mr-2 h-5 w-5" />
+             <CalendarIcon className="mr-2 h-5 w-5" />
               Próximos Vencimientos
             </CardTitle>
           </CardHeader>
