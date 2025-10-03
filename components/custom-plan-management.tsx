@@ -1031,6 +1031,9 @@ export function CustomPlanManagement({
                       <SelectItem value="1">1</SelectItem>
                       <SelectItem value="2">2</SelectItem>
                       <SelectItem value="3">3</SelectItem>
+                      <SelectItem value="4">4</SelectItem>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="6">6</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1385,6 +1388,9 @@ export function CustomPlanManagement({
                       <SelectItem value="1">1</SelectItem>
                       <SelectItem value="2">2</SelectItem>
                       <SelectItem value="3">3</SelectItem>
+                      <SelectItem value="4">4</SelectItem>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="6">6</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1735,6 +1741,9 @@ export function CustomPlanManagement({
                     <SelectItem value="1">1</SelectItem>
                     <SelectItem value="2">2</SelectItem>
                     <SelectItem value="3">3</SelectItem>
+                    <SelectItem value="4">4</SelectItem>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="6">6</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2198,11 +2207,11 @@ export function CustomPlanManagement({
               </Table>
             </div>
           </ScrollArea>
-           <div className="flex flex-col gap-3 border-t px-6 py-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 border-t px-6 py-4 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-muted-foreground">
               {sortedPlans.length > 0 && (
                 <>
-                  Mostrando <strong>{visiblePlans.length}</strong> de {" "}
+                  Mostrando <strong>{visiblePlans.length}</strong> de{" "}
                   <strong>{sortedPlans.length}</strong> planes listados
                 </>
               )}
