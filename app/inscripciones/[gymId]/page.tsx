@@ -272,35 +272,43 @@ function PublicClassRegistrationPageContent() {
     setSubmitting(true);
 
     try {
-      const { count: currentCount, error: countError } = await supabase
-        .from("class_registrations")
-        .select("id", { count: "exact", head: true })
-        .eq("session_id", selectedSession.id)
-        .eq("gym_id", gymId ?? "");
+      const response = await fetch("/api/class-registrations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sessionId: selectedSession.id,
+          gymId,
+          fullName: formState.fullName.trim(),
+          email: formState.email.trim() || null,
+          phone: formState.phone.trim() || null,
+        }),
+      });
 
-      if (countError) throw countError;
-
-      if ((currentCount ?? 0) >= selectedSession.capacity) {
-        setFormError("Esta clase ya alcanzó su cupo máximo.");
+      if (response.status === 409) {
+        const errorData = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        setFormError(
+          errorData?.error ?? "Esta clase ya alcanzó su cupo máximo."
+        );
         return;
       }
 
-      const { data, error: insertError } = await supabase
-        .from("class_registrations")
-        .insert({
-          session_id: selectedSession.id,
-          gym_id: gymId ?? "",
-          full_name: formState.fullName.trim(),
-          email: formState.email.trim() || null,
-          phone: formState.phone.trim() || null,
-        })
-        .select()
-        .single();
+       if (!response.ok) {
+        const errorData = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(errorData?.error ?? "Error registrando la clase");
+      }
 
-      if (insertError) throw insertError;
+      const { registration } = (await response.json()) as {
+        registration: ClassRegistration;
+      };
 
-      if (data) {
-        setRegistrations((prev) => [...prev, data as ClassRegistration]);
+      if (registration) {
+        setRegistrations((prev) => [...prev, registration]);
       }
 
       setSuccessMessage(
@@ -311,9 +319,13 @@ function PublicClassRegistrationPageContent() {
       setFormState(INITIAL_FORM_STATE);
     } catch (submitError) {
       console.error("Error registrando al socio", submitError);
-      setFormError(
-        "No pudimos registrar tu lugar. Intenta nuevamente en unos segundos."
-      );
+      if (submitError instanceof Error && submitError.message) {
+        setFormError(submitError.message);
+      } else {
+        setFormError(
+          "No pudimos registrar tu lugar. Intenta nuevamente en unos segundos."
+        );
+      }
     } finally {
       setSubmitting(false);
     }
