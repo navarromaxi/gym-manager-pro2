@@ -62,6 +62,17 @@ const ReportsSection = dynamic<any>(
   { ssr: false }
 );
 
+const InvoiceManagement = dynamic(
+  () =>
+    import("@/components/invoice-management").then(
+      (m) => m.InvoiceManagement
+    ),
+  {
+    ssr: false,
+    loading: () => <div className="p-4 text-sm">Cargando facturas…</div>,
+  }
+);
+
 const PlanManagement = dynamic<any>(
   () => import("@/components/plan-management").then((m) => m.PlanManagement),
   { ssr: false }
@@ -127,7 +138,10 @@ import type {
   OneTimePayment,
   ClassSession,
   ClassRegistration,
+  Invoice,
+  GymInvoiceConfig,
 } from "@/lib/supabase";
+import { mapGymInvoiceConfig } from "@/lib/supabase";
 import { normalizeCustomPlanPayments } from "@/lib/custom-plan-payments";
 import {
   buildOneTimePaymentMarker,
@@ -249,11 +263,13 @@ export default function GymManagementSystem() {
   const [classRegistrations, setClassRegistrations] = useState<
     ClassRegistration[]
   >([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [gymData, setGymData] = useState<{
     name: string;
     id: string;
     logo_url?: string | null;
+    invoiceConfig?: GymInvoiceConfig | null;
   } | null>(null);
   const [memberFilter, setMemberFilter] = useState("all");
   const [loading, setLoading] = useState(false);
@@ -266,21 +282,38 @@ export default function GymManagementSystem() {
     ? sanitizeGymName(gymData.name)
     : DEFAULT_GYM_NAME;
 
-  const handleLogin = (data: { name: string; id: string }) => {
-    setGymData(data);
-    setIsAuthenticated(true);
+  const handleLogin = (data: {
+    name: string;
+    id: string;
+    logo_url?: string | null;
+    invoiceConfig?: GymInvoiceConfig | null;
+  }) => {
+    setGymData({
+      name: data.name,
+      id: data.id,
+      logo_url: data.logo_url ?? null,
+      invoiceConfig: data.invoiceConfig ?? null,
+    });
 
     supabase
       .from("gyms")
-      .select("logo_url")
+      .select(
+        "logo_url, invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado"
+      )
       .eq("id", data.id)
       .single()
       .then(({ data: gym }) => {
-        if (gym?.logo_url) {
-          setGymData((prev) =>
-            prev ? { ...prev, logo_url: gym.logo_url } : prev
-          );
+        if (!gym) {
+          return;
         }
+        setGymData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            logo_url: gym.logo_url ?? prev.logo_url ?? null,
+            invoiceConfig: mapGymInvoiceConfig(gym as any),
+          };
+        });
       });
   };
 
@@ -300,6 +333,7 @@ export default function GymManagementSystem() {
     setOneTimePayments([]);
     setClassSessions([]);
     setClassRegistrations([]);
+    setInvoices([]);
   };
 
   // CARGAR DATOS DESDE SUPABASE
@@ -316,6 +350,7 @@ export default function GymManagementSystem() {
       const [
         { data: membersData, error: membersError },
         { data: paymentsData, error: paymentsError },
+        { data: invoicesData, error: invoicesError },
         { data: expensesData, error: expensesError },
         { data: prospectsData, error: prospectsError, count: prospectsCount },
         { data: plansData, error: plansError },
@@ -340,6 +375,14 @@ export default function GymManagementSystem() {
           )
           .eq("gym_id", gymId)
           .order("date", { ascending: false }),
+          supabase
+          .from("invoices")
+          .select(
+            "id, gym_id, payment_id, member_id, member_name, total, currency, status, invoice_number, invoice_series, external_invoice_id, environment, typecfe, issued_at, due_date, request_payload, response_payload, created_at, updated_at"
+          )
+          .eq("gym_id", gymId)
+          .order("issued_at", { ascending: false, nullsLast: false })
+          .order("created_at", { ascending: false, nullsLast: false }),
         supabase
           .from("expenses")
           .select(
@@ -410,6 +453,10 @@ export default function GymManagementSystem() {
         console.error("Error cargando gastos:", expensesError);
       }
 
+      if (invoicesError) {
+        console.error("Error cargando facturas:", invoicesError);
+      }
+
       if (prospectsError) {
         console.error("Error cargando interesados:", prospectsError);
       }
@@ -453,6 +500,7 @@ export default function GymManagementSystem() {
         oneTimePaymentsData || []
       );
       setPayments(mergedPayments);
+      setInvoices((invoicesData ?? []) as Invoice[]);
       setExpenses(expensesData || []);
       const normalizedProspects = (prospectsData ?? []).map(
         (prospect: any) => ({
@@ -481,6 +529,7 @@ export default function GymManagementSystem() {
         activities: activitiesData?.length || 0,
         customPlans: customPlansData?.length || 0,
         oneTimePayments: oneTimePaymentsData?.length || 0,
+        invoices: invoicesData?.length || 0,
         classSessions: classSessionsData?.length || 0,
         classRegistrations: classRegistrationsData?.length || 0,
       });
@@ -1088,6 +1137,7 @@ export default function GymManagementSystem() {
               { id: "routines", label: "Rutinas" },
               { id: "expenses", label: "Gastos" },
               { id: "reports", label: "Reportes" },
+              { id: "invoices", label: "Facturas" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1132,6 +1182,9 @@ export default function GymManagementSystem() {
             plans={plans}
             gymId={gymData?.id || ""}
             customPlans={customPlans}
+            invoices={invoices}
+            setInvoices={setInvoices}
+            gymInvoiceConfig={gymData?.invoiceConfig ?? null}
           />
         )}
         {activeTab === "prospects" && (
@@ -1173,6 +1226,14 @@ export default function GymManagementSystem() {
             customPlans={customPlans}
             oneTimePayments={oneTimePayments}
             gymName={gymData?.name || ""}
+          />
+        )}
+        {activeTab === "invoices" && (
+          <InvoiceManagement
+            invoices={invoices}
+            setInvoices={setInvoices}
+            payments={payments}
+            gymId={gymData?.id || ""}
           />
         )}
         {activeTab === "plans" && (

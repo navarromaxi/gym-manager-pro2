@@ -18,6 +18,68 @@ export const supabase = createClient(
   }
 );
 
+// === Tipos de apoyo ===
+export interface GymInvoiceConfig {
+  userId?: string | null
+  companyId?: string | null
+  branchCode?: string | null
+  branchId?: string | null
+  environment?: string | null
+  customerId?: string | null
+  series?: string | null
+  currency?: string | null
+  cotizacion?: number | null
+  typecfe?: number | null
+  tipoTraslado?: number | null
+}
+
+export interface Gym extends GymInvoiceConfig {
+  id: string
+  name: string
+  logo_url?: string | null
+  subscription?: string | null
+}
+
+const parseOptionalString = (value: unknown): string | null => {
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value) : null
+  }
+  return null
+}
+
+const parseOptionalNumber = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    const parsed = Number(trimmed)
+    return Number.isNaN(parsed) ? null : parsed
+  }
+  return null
+}
+
+export const mapGymInvoiceConfig = (
+  row: Partial<Record<string, any>>
+): GymInvoiceConfig => ({
+  userId: parseOptionalString(row.invoice_user_id),
+  companyId: parseOptionalString(row.invoice_company_id),
+  branchCode: parseOptionalString(row.invoice_branch_code),
+  branchId: parseOptionalString(row.invoice_branch_id),
+  environment: parseOptionalString(row.invoice_environment),
+  customerId: parseOptionalString(row.invoice_customer_id),
+  series: parseOptionalString(row.invoice_series),
+  currency: parseOptionalString(row.invoice_currency),
+  cotizacion: parseOptionalNumber(row.invoice_cotizacion),
+  typecfe: parseOptionalNumber(row.invoice_typecfe),
+  tipoTraslado: parseOptionalNumber(row.invoice_tipo_traslado),
+})
+
 // Tipos para TypeScript
 export interface Member {
   id: string
@@ -58,6 +120,27 @@ export interface Payment {
   plan_id?: string
 }
 
+export interface Invoice {
+  id: string
+  gym_id: string
+  payment_id: string
+  member_id?: string | null
+  member_name: string
+  total: number
+  currency: string
+  status: string
+  invoice_number?: string | null
+  invoice_series?: string | null
+  external_invoice_id?: string | null
+  environment?: string | null
+  typecfe?: number | null
+  issued_at: string
+  due_date?: string | null
+  request_payload?: Record<string, any> | null
+  response_payload?: Record<string, any> | null
+  created_at?: string | null
+  updated_at?: string | null
+}
 export interface Expense {
   id: string
   gym_id: string

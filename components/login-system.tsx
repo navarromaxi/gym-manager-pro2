@@ -127,7 +127,11 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
 "use client";
 
 import type React from "react";
-import { supabase } from "@/lib/supabase";
+import {
+  supabase,
+  mapGymInvoiceConfig,
+  type GymInvoiceConfig,
+} from "@/lib/supabase";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -137,7 +141,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Building2, Lock, User } from "lucide-react";
 
 interface LoginSystemProps {
-  onLogin: (gymData: { name: string; id: string }) => void;
+   onLogin: (gymData: {
+    name: string;
+    id: string;
+    logo_url?: string | null;
+    invoiceConfig?: GymInvoiceConfig | null;
+  }) => void;
 }
 
 export function LoginSystem({ onLogin }: LoginSystemProps) {
@@ -165,7 +174,9 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
       // 2) Traer el gimnasio vinculado al usuario logueado
       const { data: gym, error: gymErr } = await supabase
         .from("gyms")
-        .select("*")
+        .select(
+          "id, name, subscription, logo_url, invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado"
+        )
         .eq("user_id", user.id)
         .single();
 
@@ -177,6 +188,8 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
       if (gym.subscription !== "active" && gym.subscription !== "trial") {
         throw new Error("Tu suscripción ha expirado.");
       }
+
+      const invoiceConfig: GymInvoiceConfig = mapGymInvoiceConfig(gym as any);
 
       // 4) Guardar el id del gimnasio en los metadatos del usuario
       let { error: updateError } = await supabase.auth.updateUser({
@@ -209,7 +222,12 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
 
       // 6) Continuar: usar el id de gym (text) para filtrar en toda la app
       
-      onLogin({ name: gym.name, id: gym.id });
+      onLogin({
+        name: gym.name,
+        id: gym.id,
+        logo_url: gym.logo_url ?? null,
+        invoiceConfig,
+      });
     } catch (err: any) {
       setError(err.message ?? "Error al iniciar sesión.");
     } finally {
