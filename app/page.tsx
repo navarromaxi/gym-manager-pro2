@@ -294,6 +294,7 @@ export default function GymManagementSystem() {
       logo_url: data.logo_url ?? null,
       invoiceConfig: data.invoiceConfig ?? null,
     });
+    setIsAuthenticated(true);
 
     supabase
       .from("gyms")
@@ -381,8 +382,8 @@ export default function GymManagementSystem() {
             "id, gym_id, payment_id, member_id, member_name, total, currency, status, invoice_number, invoice_series, external_invoice_id, environment, typecfe, issued_at, due_date, request_payload, response_payload, created_at, updated_at"
           )
           .eq("gym_id", gymId)
-          .order("issued_at", { ascending: false, nullsLast: false })
-          .order("created_at", { ascending: false, nullsLast: false }),
+          .order("issued_at", { ascending: false, nullsFirst: false })
+          .order("created_at", { ascending: false, nullsFirst: false }),
         supabase
           .from("expenses")
           .select(

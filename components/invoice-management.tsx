@@ -137,8 +137,8 @@ export function InvoiceManagement({
           "id, gym_id, payment_id, member_id, member_name, total, currency, status, invoice_number, invoice_series, external_invoice_id, environment, typecfe, issued_at, due_date, request_payload, response_payload, created_at, updated_at"
         )
         .eq("gym_id", gymId)
-        .order("issued_at", { ascending: false, nullsLast: false })
-        .order("created_at", { ascending: false, nullsLast: false });
+        .order("issued_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false, nullsFirst: false });
 
       if (error) {
         throw error;
