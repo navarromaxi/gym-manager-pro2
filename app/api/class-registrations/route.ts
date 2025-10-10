@@ -57,6 +57,31 @@ export async function POST(request: Request) {
       );
     }
 
+    const sessionDateTimeRaw = `${session.date}T${session.start_time}`;
+    const sessionDateTimeNormalized =
+      sessionDateTimeRaw.length === 16
+        ? `${sessionDateTimeRaw}:00`
+        : sessionDateTimeRaw;
+    const sessionStart = new Date(sessionDateTimeNormalized);
+
+    if (!Number.isNaN(sessionStart.getTime())) {
+      if (sessionStart.getTime() <= Date.now()) {
+        return NextResponse.json(
+          {
+            error:
+              "Usted no se ha podido anotar a esta clase, la misma ya ha iniciado.",
+          },
+          { status: 409 }
+        );
+      }
+    } else {
+      console.warn(
+        "No se pudo interpretar la fecha y hora de la clase",
+        session.date,
+        session.start_time
+      );
+    }
+    
     const { count: registrationsCount, error: countError } = await supabase
       .from("class_registrations")
       .select("id", { head: true, count: "exact" })

@@ -55,6 +55,7 @@ function PublicClassRegistrationPageContent() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [gymLogoUrl, setGymLogoUrl] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
 
   const registrationsBySession = useMemo(() => {
     const counts = new Map<string, ClassRegistration[]>();
@@ -88,22 +89,47 @@ function PublicClassRegistrationPageContent() {
         0
       )
     : 0;
+    const selectedSessionStart = useMemo(() => {
+    if (!selectedSession) {
+      return null;
+    }
+    const rawDateTime = `${selectedSession.date}T${selectedSession.start_time}`;
+    const normalizedDateTime =
+      rawDateTime.length === 16 ? `${rawDateTime}:00` : rawDateTime;
+    const parsedDate = new Date(normalizedDateTime);
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+  }, [selectedSession]);
+  const hasSelectedSessionStarted = useMemo(() => {
+    if (!selectedSessionStart) {
+      return false;
+    }
+    return selectedSessionStart.getTime() <= now.getTime();
+  }, [selectedSessionStart, now]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNow(new Date());
+    }, 30_000);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   const fetchData = useCallback(
     async (showLoading = true) => {
+      if (showLoading) {
+        setLoading(true);
+      }
+      setLoadError(null);
+
       if (!gymId) {
         setLoadError(
           "El enlace utilizado no es válido. Revisa la dirección e inténtalo nuevamente."
         );
         setSessions([]);
         setRegistrations([]);
-        if (showLoading) {
-        setLoading(true);
-      }
+        setLoading(false);
         return;
       }
-      setLoading(true);
-      setLoadError(null);
 
       try {
         const [sessionsResponse, registrationsResponse, gymResponse] =
@@ -155,7 +181,7 @@ function PublicClassRegistrationPageContent() {
       } finally {
         setLoading(false);
       }
-      },
+    },
     [gymId]
   );
 
@@ -179,7 +205,7 @@ function PublicClassRegistrationPageContent() {
     };
 
 
-     }, [fetchData]);
+  }, [fetchData]);
 
   useEffect(() => {
     if (!gymId) {
@@ -261,6 +287,13 @@ function PublicClassRegistrationPageContent() {
 
     if (!selectedSession) {
       setFormError("Selecciona una clase para continuar.");
+      return;
+    }
+
+    if (hasSelectedSessionStarted) {
+      setFormError(
+        "Usted no se ha podido anotar a esta clase, la misma ya ha iniciado."
+      );
       return;
     }
 
@@ -385,23 +418,17 @@ function PublicClassRegistrationPageContent() {
           </Card>
         ) : (
           <>
-            {(successMessage || formError) && (
-              <Alert variant={formError ? "destructive" : "default"}>
-                <AlertDescription>
-                  {formError ? formError : successMessage}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Reserva tu lugar</CardTitle>
-                <CardDescription>
+             <Card className="border-none shadow-lg">
+              <CardHeader className="space-y-2 text-center md:text-left">
+                <CardTitle className="text-2xl font-semibold text-gray-900">
+                  Reserva tu lugar
+                </CardTitle>
+                <CardDescription className="text-sm text-muted-foreground">
                   Elige una clase y completa tus datos. Recibirás confirmación
                   inmediata.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 pb-6 pt-0 sm:px-6">
                 <form className="space-y-6" onSubmit={handleSubmit}>
                   <div className="space-y-2">
                     <Label>Clase</Label>
@@ -439,7 +466,7 @@ function PublicClassRegistrationPageContent() {
                   </div>
 
                   {selectedSession && (
-                    <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground space-y-2">
+                    <div className="space-y-3 rounded-xl border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
                       <div className="flex flex-wrap gap-4">
                         <span className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
@@ -456,9 +483,15 @@ function PublicClassRegistrationPageContent() {
                           {selectedSession.capacity} cupos
                         </span>
                         <Badge
-                          variant={spotsLeft > 0 ? "secondary" : "destructive"}
+                           variant={
+                            hasSelectedSessionStarted || spotsLeft <= 0
+                              ? "destructive"
+                              : "secondary"
+                          }
                         >
-                          {spotsLeft > 0
+                          {hasSelectedSessionStarted
+                            ? "Clase iniciada"
+                            : spotsLeft > 0
                             ? `${spotsLeft} lugares disponibles`
                             : "Sin cupos"}
                         </Badge>
@@ -467,6 +500,14 @@ function PublicClassRegistrationPageContent() {
                         <p className="whitespace-pre-wrap">
                           {selectedSession.notes}
                         </p>
+                      )}
+                       {hasSelectedSessionStarted && (
+                        <Alert variant="destructive">
+                          <AlertDescription className="text-sm">
+                            Usted no se ha podido anotar a esta clase, la misma
+                            ya ha iniciado.
+                          </AlertDescription>
+                        </Alert>
                       )}
                     </div>
                   )}
@@ -508,12 +549,24 @@ function PublicClassRegistrationPageContent() {
                     </div>
                   </div>
 
+                   {(formError || successMessage) && (
+                    <Alert variant={formError ? "destructive" : "default"}>
+                      <AlertDescription>
+                        {formError ? formError : successMessage}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   <Button
                     type="submit"
                     className="w-full"
-                    disabled={submitting || spotsLeft <= 0}
+                    disabled={
+                      submitting || spotsLeft <= 0 || hasSelectedSessionStarted
+                    }
                   >
-                    {spotsLeft <= 0
+                   {hasSelectedSessionStarted
+                      ? "Clase iniciada"
+                      : spotsLeft <= 0
                       ? "Sin cupos disponibles"
                       : submitting
                       ? "Registrando…"
