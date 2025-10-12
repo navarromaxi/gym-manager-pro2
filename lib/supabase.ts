@@ -24,6 +24,7 @@ export interface GymInvoiceConfig {
   companyId?: string | null
   branchCode?: string | null
   branchId?: string | null
+  rutneg?: string | null
   environment?: string | null
   customerId?: string | null
   series?: string | null
@@ -71,6 +72,7 @@ export const mapGymInvoiceConfig = (
   companyId: parseOptionalString(row.invoice_company_id),
   branchCode: parseOptionalString(row.invoice_branch_code),
   branchId: parseOptionalString(row.invoice_branch_id),
+  rutneg: parseOptionalString(row.invoice_rutneg),
   environment: parseOptionalString(row.invoice_environment),
   customerId: parseOptionalString(row.invoice_customer_id),
   series: parseOptionalString(row.invoice_series),

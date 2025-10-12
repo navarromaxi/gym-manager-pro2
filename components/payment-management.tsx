@@ -208,6 +208,10 @@ const buildDefaultInvoiceForm = (
   const defaultCotizacion = toNumberOrNull(gymConfig?.cotizacion) ?? 1;
   const defaultTypecfe = toNumberOrNull(gymConfig?.typecfe) ?? 111;
   const defaultTipoTraslado = toNumberOrNull(gymConfig?.tipoTraslado) ?? 1;
+  const defaultRutneg =
+    typeof gymConfig?.rutneg === "string" && gymConfig.rutneg.trim().length > 0
+      ? gymConfig.rutneg.trim()
+      : "";
 
   return {
     facturareferencia: payment.id,
@@ -228,7 +232,7 @@ const buildDefaultInvoiceForm = (
     periodohasta: periodEnd,
     clicountry: "UY",
     nomneg: payment.member_name || "Socio",
-    rutneg: "",
+    rutneg: defaultRutneg,
     dirneg: "",
     cityneg: "",
     stateneg: "",

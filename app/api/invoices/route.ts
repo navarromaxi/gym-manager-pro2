@@ -33,6 +33,7 @@ type ResolvedCredentials = {
   cotizacion: number | null;
   typecfe: number | null;
   tipoTraslado: number | null;
+  rutneg: string | null;
 };
 
 const buildFacturaPayload = (
@@ -147,7 +148,7 @@ export async function POST(request: Request) {
     const { data: gymConfigRow, error: gymConfigError } = await supabase
       .from("gyms")
       .select(
-        "invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_password, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado"
+        "invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_password, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado, invoice_rutneg"
       )
       .eq("id", gymId)
       .maybeSingle();
@@ -196,6 +197,7 @@ export async function POST(request: Request) {
       cotizacion: parseOptionalNumber(gymConfigRow?.invoice_cotizacion),
       typecfe: parseOptionalNumber(gymConfigRow?.invoice_typecfe),
       tipoTraslado: parseOptionalNumber(gymConfigRow?.invoice_tipo_traslado),
+      rutneg: parseOptionalString(gymConfigRow?.invoice_rutneg),
     };
 
     const missingCredentials = REQUIRED_CREDENTIALS.filter(
@@ -262,7 +264,10 @@ export async function POST(request: Request) {
       periodohasta: invoice.periodohasta ?? "",
       clicountry: invoice.clicountry ?? "UY",
       nomneg: invoice.nomneg ?? memberName ?? "Cliente",
-      rutneg: invoice.rutneg ?? "",
+      rutneg:
+        typeof invoice.rutneg === "string" && invoice.rutneg.trim().length > 0
+          ? invoice.rutneg
+          : resolvedCredentials.rutneg ?? "",
       dirneg: invoice.dirneg ?? "",
       cityneg: invoice.cityneg ?? "",
       stateneg: invoice.stateneg ?? "",

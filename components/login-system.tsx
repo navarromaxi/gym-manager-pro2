@@ -175,7 +175,7 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
       const { data: gym, error: gymErr } = await supabase
         .from("gyms")
         .select(
-          "id, name, subscription, logo_url, invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado"
+          "id, name, subscription, logo_url, invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado, invoice_rutneg"
         )
         .eq("user_id", user.id)
         .single();
