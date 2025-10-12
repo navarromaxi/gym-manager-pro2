@@ -93,6 +93,12 @@ const normalizeEnvironment = (value: string | null | undefined) => {
   return normalized === "PROD" || normalized === "TEST" ? normalized : null;
 };
 
+const sanitizeDateString = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
 type CredentialKey = "userId" | "companyId" | "branchCode" | "branchId" | "password";
 
 const REQUIRED_CREDENTIALS: { key: CredentialKey; label: string }[] = [
@@ -217,6 +223,10 @@ export async function POST(request: Request) {
       );
     }
 
+    const today = new Date().toISOString().split("T")[0];
+    const invoiceIssueDate = sanitizeDateString(invoice.fechafacturacion);
+    const invoiceDueDate = sanitizeDateString(invoice.fechavencimiento);
+
     const defaults: InvoicePayload = {
       userid: resolvedCredentials.userId!,
       empresaid: resolvedCredentials.companyId!,
@@ -235,9 +245,8 @@ export async function POST(request: Request) {
         invoice.seriereferencia.trim().length > 0
           ? invoice.seriereferencia
           : resolvedCredentials.series ?? "A-A-A",
-      fechavencimiento: invoice.fechavencimiento ?? "",
-      fechafacturacion:
-        invoice.fechafacturacion ?? new Date().toISOString().split("T")[0],
+      fechavencimiento: invoiceDueDate ?? "",
+      fechafacturacion: invoiceIssueDate ?? today,
       moneda:
         typeof invoice.moneda === "string" && invoice.moneda.trim().length > 0
           ? invoice.moneda
@@ -354,14 +363,8 @@ export async function POST(request: Request) {
         typeof invoice.typecfe === "number" && Number.isFinite(invoice.typecfe)
           ? invoice.typecfe
           : resolvedCredentials.typecfe ?? 111,
-      issued_at:
-        (typeof invoice.fechafacturacion === "string"
-          ? invoice.fechafacturacion
-          : null) ?? new Date().toISOString().split("T")[0],
-      due_date:
-        typeof invoice.fechavencimiento === "string"
-          ? invoice.fechavencimiento
-          : null,
+      issued_at: invoiceIssueDate ?? today,
+      due_date: invoiceDueDate,
       request_payload: payload,
       response_payload: parsedResponse ?? { raw: rawResponse },
     };

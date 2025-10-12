@@ -1133,7 +1133,7 @@ export default function GymManagementSystem() {
               { id: "plans", label: "Planes" },
               { id: "custom_plans", label: "Personalizados" },
               { id: "one_time_payments", label: "Pago único" },
-              { id: "class_registrations", label: "Clases" },
+              { id: "class_registrations", label: "Clases/Evento" },
               { id: "activities", label: "Actividades" },
               { id: "routines", label: "Rutinas" },
               { id: "expenses", label: "Gastos" },
