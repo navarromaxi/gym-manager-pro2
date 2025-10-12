@@ -183,7 +183,7 @@ const buildInvoiceLineFromPayment = (payment: Payment) => {
     ? amount.toFixed(2)
     : Number(payment.amount || 0).toFixed(2);
 
-  return `${safeDescription}<col/>${unitPrice}<col/>0<col/>0<col/>0<col/>${safeDescription}<col/>1<col/>unidad,`;
+  return `${safeDescription}</col/>${unitPrice}</col/>0</col/>0</col/>0</col/>${safeDescription}</col/>1</col/>unidad`;
 };
 
 const buildDefaultInvoiceForm = (

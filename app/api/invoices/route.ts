@@ -144,7 +144,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const sanitizedLineas = String(invoice.lineas ?? "").trim();
+    let sanitizedLineas = String(invoice.lineas ?? "");
+    sanitizedLineas = sanitizedLineas.replace(/<\s*col\s*\/>/gi, "</col/>");
+    sanitizedLineas = sanitizedLineas.trim().replace(/,+$/, "");
+    sanitizedLineas = sanitizedLineas.trim();
     if (!sanitizedLineas) {
       return NextResponse.json(
         {
