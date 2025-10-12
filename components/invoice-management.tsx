@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,10 +23,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { RefreshCcw, FileText } from "lucide-react";
+import { RefreshCcw, FileText, Download } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import type { Invoice, Payment } from "@/lib/supabase";
+import {
+  buildInvoicePdfFileName,
+  findInvoicePdfSource,
+} from "@/lib/invoice-pdf";
 
 interface InvoiceManagementProps {
   invoices: Invoice[];
@@ -80,6 +84,8 @@ export function InvoiceManagement({
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const filteredInvoices = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -159,6 +165,78 @@ export function InvoiceManagement({
     if (!selectedInvoice) return null;
     return payments.find((payment) => payment.id === selectedInvoice.payment_id);
   }, [selectedInvoice, payments]);
+
+  const detectedPdfSource = useMemo(() => {
+    if (!selectedInvoice?.response_payload) {
+      return null;
+    }
+    return findInvoicePdfSource(selectedInvoice.response_payload);
+  }, [selectedInvoice]);
+
+  const canDownloadPdf = Boolean(selectedInvoice?.response_payload);
+
+  useEffect(() => {
+    setDownloadError(null);
+    setIsDownloadingPdf(false);
+  }, [selectedInvoice?.id]);
+
+  const handleDownloadPdf = async () => {
+    if (!selectedInvoice) return;
+
+    setIsDownloadingPdf(true);
+    setDownloadError(null);
+
+    try {
+      const response = await fetch(
+        `/api/invoices/${selectedInvoice.id}/pdf`,
+        {
+          method: "GET",
+        }
+      );
+
+      if (!response.ok) {
+        let errorMessage =
+          "No pudimos descargar el PDF de la factura. Intenta nuevamente.";
+        try {
+          const payload = await response.json();
+          if (payload?.error) {
+            errorMessage = payload.error;
+          }
+        } catch (parseError) {
+          console.error("Error parsing PDF download response", parseError);
+        }
+        throw new Error(errorMessage);
+      }
+
+      const blob = await response.blob();
+      const fallbackFileName = buildInvoicePdfFileName(
+        selectedInvoice.invoice_number,
+        selectedInvoice.invoice_series,
+        selectedInvoice.id
+      );
+      const resolvedFileName =
+        response.headers.get("X-Invoice-Filename") || fallbackFileName;
+
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = resolvedFileName;
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading invoice PDF", error);
+      setDownloadError(
+        error instanceof Error
+          ? error.message
+          : "Ocurrió un error inesperado al descargar la factura."
+      );
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -385,10 +463,36 @@ export function InvoiceManagement({
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setIsDetailOpen(false)}>
-              Cerrar
-            </Button>
+           <DialogFooter className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="w-full text-left text-sm text-muted-foreground sm:w-auto">
+              {downloadError ? (
+                <span className="text-red-600">{downloadError}</span>
+              ) : selectedInvoice?.response_payload && !detectedPdfSource ? (
+                <span>
+                  No encontramos un enlace al PDF todavía. Si ya fue emitido, intenta
+                  nuevamente en unos minutos.
+                </span>
+              ) : null}
+            </div>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="default"
+                onClick={handleDownloadPdf}
+                disabled={isDownloadingPdf || !canDownloadPdf}
+                className="inline-flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                {isDownloadingPdf ? "Descargando…" : "Descargar PDF"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDetailOpen(false)}
+              >
+                Cerrar
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
