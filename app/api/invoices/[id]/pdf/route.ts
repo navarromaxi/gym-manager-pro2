@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
+import { Buffer } from "node:buffer";
 
 import { buildInvoicePdfFileName, findInvoicePdfSource } from "@/lib/invoice-pdf";
 import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
-const decodeBase64Pdf = (value: string): Buffer | null => {
+const toArrayBuffer = (buffer: Buffer) =>
+  buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+
+const decodeBase64Pdf = (value: string): ArrayBuffer | null => {
   const trimmed = value.trim();
   if (!trimmed) return null;
 
@@ -13,7 +17,8 @@ const decodeBase64Pdf = (value: string): Buffer | null => {
     const [, base64] = trimmed.split(",", 2);
     if (!base64) return null;
     try {
-      return Buffer.from(base64, "base64");
+      const buffer = Buffer.from(base64, "base64");
+      return toArrayBuffer(buffer);
     } catch (error) {
       console.error("Error decoding data URL PDF", error);
       return null;
@@ -24,7 +29,8 @@ const decodeBase64Pdf = (value: string): Buffer | null => {
     const sanitized = trimmed.replace(/\s+/g, "");
     if (/^[A-Za-z0-9+/=]+$/.test(sanitized)) {
       try {
-        return Buffer.from(sanitized, "base64");
+        const buffer = Buffer.from(sanitized, "base64");
+        return toArrayBuffer(buffer);
       } catch (error) {
         console.error("Error decoding base64 PDF", error);
         return null;
@@ -35,15 +41,14 @@ const decodeBase64Pdf = (value: string): Buffer | null => {
   return null;
 };
 
-const fetchRemotePdf = async (url: string) => {
+const fetchRemotePdf = async (url: string): Promise<ArrayBuffer | null> => {
   try {
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) {
       console.error("Remote PDF responded with status", response.status, url);
       return null;
     }
-    const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    return await response.arrayBuffer();
   } catch (error) {
     console.error("Error fetching remote PDF", error);
     return null;
@@ -100,9 +105,11 @@ export async function GET(
     );
   }
 
-  const pdfBuffer = decodeBase64Pdf(pdfSource) ?? (await fetchRemotePdf(pdfSource));
+   const pdfBuffer: ArrayBuffer | null =
+    decodeBase64Pdf(pdfSource) ?? (await fetchRemotePdf(pdfSource));
 
-  if (!pdfBuffer || pdfBuffer.length === 0) {
+
+    if (!pdfBuffer || pdfBuffer.byteLength === 0) {
     return NextResponse.json(
       {
         error:
