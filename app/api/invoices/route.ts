@@ -33,11 +33,13 @@ type ResolvedCredentials = {
   cotizacion: number | null;
   typecfe: number | null;
   tipoTraslado: number | null;
+  paymentType: number | null;
   rutneg: string | null;
   dirneg: string | null;
   cityneg: string | null;
   stateneg: string | null;
   addinfoneg: string | null;
+  facturaext: string | null;
 };
 
 const buildFacturaPayload = (
@@ -158,7 +160,7 @@ export async function POST(request: Request) {
     const { data: gymConfigRow, error: gymConfigError } = await supabase
       .from("gyms")
       .select(
-         "invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_password, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado, invoice_rutneg, invoice_dirneg, invoice_cityneg, invoice_stateneg, invoice_addinfoneg"
+         "invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_password, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado, invoice_payment_type, invoice_rutneg, invoice_dirneg, invoice_cityneg, invoice_stateneg, invoice_addinfoneg, invoice_facturaext"
       )
       .eq("id", gymId)
       .maybeSingle();
@@ -207,11 +209,13 @@ export async function POST(request: Request) {
       cotizacion: parseOptionalNumber(gymConfigRow?.invoice_cotizacion),
       typecfe: parseOptionalNumber(gymConfigRow?.invoice_typecfe),
       tipoTraslado: parseOptionalNumber(gymConfigRow?.invoice_tipo_traslado),
+      paymentType: parseOptionalNumber(gymConfigRow?.invoice_payment_type),
       rutneg: parseOptionalString(gymConfigRow?.invoice_rutneg),
       dirneg: parseOptionalString(gymConfigRow?.invoice_dirneg),
       cityneg: parseOptionalString(gymConfigRow?.invoice_cityneg),
       stateneg: parseOptionalString(gymConfigRow?.invoice_stateneg),
       addinfoneg: parseOptionalString(gymConfigRow?.invoice_addinfoneg),
+      facturaext: parseOptionalString(gymConfigRow?.invoice_facturaext),
     };
 
     const missingCredentials = REQUIRED_CREDENTIALS.filter(
@@ -265,7 +269,7 @@ export async function POST(request: Request) {
         typeof invoice.payment_type === "number" &&
         Number.isFinite(invoice.payment_type)
           ? invoice.payment_type
-          : 1,
+          : resolvedCredentials.paymentType ?? 1,
       cotizacion:
         typeof invoice.cotizacion === "number" &&
         Number.isFinite(invoice.cotizacion)
@@ -311,7 +315,12 @@ export async function POST(request: Request) {
         invoice.environment.trim().length > 0
           ? invoice.environment
           : resolvedCredentials.environment ?? FACTURA_LIVE_DEFAULT_ENVIRONMENT,
-      facturaext: invoice.facturaext ?? paymentId,
+      facturaext:
+        typeof invoice.facturaext === "string" && invoice.facturaext.trim().length > 0
+          ? invoice.facturaext
+          : typeof invoice.facturaext === "number" && Number.isFinite(invoice.facturaext)
+          ? String(invoice.facturaext)
+          : resolvedCredentials.facturaext ?? paymentId,
       TipoTraslado:
         typeof invoice.TipoTraslado === "number" &&
         Number.isFinite(invoice.TipoTraslado)
