@@ -34,6 +34,10 @@ type ResolvedCredentials = {
   typecfe: number | null;
   tipoTraslado: number | null;
   rutneg: string | null;
+  dirneg: string | null;
+  cityneg: string | null;
+  stateneg: string | null;
+  addinfoneg: string | null;
 };
 
 const buildFacturaPayload = (
@@ -154,7 +158,7 @@ export async function POST(request: Request) {
     const { data: gymConfigRow, error: gymConfigError } = await supabase
       .from("gyms")
       .select(
-        "invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_password, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado, invoice_rutneg"
+         "invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_password, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado, invoice_rutneg, invoice_dirneg, invoice_cityneg, invoice_stateneg, invoice_addinfoneg"
       )
       .eq("id", gymId)
       .maybeSingle();
@@ -204,6 +208,10 @@ export async function POST(request: Request) {
       typecfe: parseOptionalNumber(gymConfigRow?.invoice_typecfe),
       tipoTraslado: parseOptionalNumber(gymConfigRow?.invoice_tipo_traslado),
       rutneg: parseOptionalString(gymConfigRow?.invoice_rutneg),
+      dirneg: parseOptionalString(gymConfigRow?.invoice_dirneg),
+      cityneg: parseOptionalString(gymConfigRow?.invoice_cityneg),
+      stateneg: parseOptionalString(gymConfigRow?.invoice_stateneg),
+      addinfoneg: parseOptionalString(gymConfigRow?.invoice_addinfoneg),
     };
 
     const missingCredentials = REQUIRED_CREDENTIALS.filter(
@@ -277,10 +285,24 @@ export async function POST(request: Request) {
         typeof invoice.rutneg === "string" && invoice.rutneg.trim().length > 0
           ? invoice.rutneg
           : resolvedCredentials.rutneg ?? "",
-      dirneg: invoice.dirneg ?? "",
-      cityneg: invoice.cityneg ?? "",
-      stateneg: invoice.stateneg ?? "",
-      addinfoneg: invoice.addinfoneg ?? "",
+      dirneg:
+        typeof invoice.dirneg === "string" && invoice.dirneg.trim().length > 0
+          ? invoice.dirneg
+          : resolvedCredentials.dirneg ?? "",
+      cityneg:
+        typeof invoice.cityneg === "string" && invoice.cityneg.trim().length > 0
+          ? invoice.cityneg
+          : resolvedCredentials.cityneg ?? "",
+      stateneg:
+        typeof invoice.stateneg === "string" &&
+        invoice.stateneg.trim().length > 0
+          ? invoice.stateneg
+          : resolvedCredentials.stateneg ?? "",
+      addinfoneg:
+        typeof invoice.addinfoneg === "string" &&
+        invoice.addinfoneg.trim().length > 0
+          ? invoice.addinfoneg
+          : resolvedCredentials.addinfoneg ?? "",
       lineas: sanitizedLineas,
       indicadorfacturacion: invoice.indicadorfacturacion ?? "",
       typedoc: invoice.typedoc ?? 2,

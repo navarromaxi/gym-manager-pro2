@@ -157,6 +157,9 @@ const toNumberOrNull = (
 const sanitizeInvoiceText = (value: string) =>
   value.replace(/<col\/>/g, " ").replace(/\s+/g, " ").trim();
 
+const sanitizeConfigString = (value: string | null | undefined) =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : "";
+
 const mapPaymentMethodToFacturaPaymentType = (method: string | null | undefined) => {
   if (!method) return 1;
   const normalized = method.toLowerCase();
@@ -208,10 +211,11 @@ const buildDefaultInvoiceForm = (
   const defaultCotizacion = toNumberOrNull(gymConfig?.cotizacion) ?? 1;
   const defaultTypecfe = toNumberOrNull(gymConfig?.typecfe) ?? 111;
   const defaultTipoTraslado = toNumberOrNull(gymConfig?.tipoTraslado) ?? 1;
-  const defaultRutneg =
-    typeof gymConfig?.rutneg === "string" && gymConfig.rutneg.trim().length > 0
-      ? gymConfig.rutneg.trim()
-      : "";
+  const defaultRutneg = sanitizeConfigString(gymConfig?.rutneg);
+  const defaultDirneg = sanitizeConfigString(gymConfig?.dirneg);
+  const defaultCityneg = sanitizeConfigString(gymConfig?.cityneg);
+  const defaultStateneg = sanitizeConfigString(gymConfig?.stateneg);
+  const defaultAddinfoneg = sanitizeConfigString(gymConfig?.addinfoneg);
 
   return {
     facturareferencia: payment.id,
@@ -233,10 +237,10 @@ const buildDefaultInvoiceForm = (
     clicountry: "UY",
     nomneg: payment.member_name || "Socio",
     rutneg: defaultRutneg,
-    dirneg: "",
-    cityneg: "",
-    stateneg: "",
-    addinfoneg: "",
+    dirneg: defaultDirneg,
+    cityneg: defaultCityneg,
+    stateneg: defaultStateneg,
+    addinfoneg: defaultAddinfoneg,
     lineas: buildInvoiceLineFromPayment(payment),
     indicadorfacturacion: "",
     typedoc: 2,
