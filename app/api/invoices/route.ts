@@ -332,45 +332,73 @@ export async function POST(request: Request) {
       (parsedResponse?.external_invoice_id as string | undefined) ||
       null;
 
+      const selection =
+      "id, gym_id, payment_id, member_id, member_name, total, currency, status, invoice_number, invoice_series, external_invoice_id, environment, typecfe, issued_at, due_date, request_payload, response_payload, created_at, updated_at";
+
+    const invoiceRecord = {
+      gym_id: gymId,
+      payment_id: paymentId,
+      member_id: memberId ?? null,
+      member_name: memberName ?? "",
+      total: amount,
+      currency:
+        typeof payload.moneda === "string" && payload.moneda.length > 0
+          ? payload.moneda
+          : resolvedCredentials.currency ?? "UYU",
+      status,
+      invoice_number: invoiceNumber,
+      invoice_series: invoiceSeries,
+      external_invoice_id: externalInvoiceId,
+      environment: payload.environment ?? FACTURA_LIVE_DEFAULT_ENVIRONMENT,
+      typecfe:
+        typeof invoice.typecfe === "number" && Number.isFinite(invoice.typecfe)
+          ? invoice.typecfe
+          : resolvedCredentials.typecfe ?? 111,
+      issued_at:
+        (typeof invoice.fechafacturacion === "string"
+          ? invoice.fechafacturacion
+          : null) ?? new Date().toISOString().split("T")[0],
+      due_date:
+        typeof invoice.fechavencimiento === "string"
+          ? invoice.fechavencimiento
+          : null,
+      request_payload: payload,
+      response_payload: parsedResponse ?? { raw: rawResponse },
+    };
+
     const { data: storedInvoice, error: insertError } = await supabase
       .from("invoices")
-      .insert({
-        gym_id: gymId,
-        payment_id: paymentId,
-        member_id: memberId ?? null,
-        member_name: memberName ?? "",
-        total: amount,
-        currency:
-          typeof payload.moneda === "string" && payload.moneda.length > 0
-            ? payload.moneda
-            : resolvedCredentials.currency ?? "UYU",
-        status,
-        invoice_number: invoiceNumber,
-        invoice_series: invoiceSeries,
-        external_invoice_id: externalInvoiceId,
-        environment: payload.environment ?? FACTURA_LIVE_DEFAULT_ENVIRONMENT,
-        typecfe:
-          typeof invoice.typecfe === "number" && Number.isFinite(invoice.typecfe)
-            ? invoice.typecfe
-            : resolvedCredentials.typecfe ?? 111,
-        issued_at:
-          (typeof invoice.fechafacturacion === "string"
-            ? invoice.fechafacturacion
-            : null) ?? new Date().toISOString().split("T")[0],
-        due_date:
-          typeof invoice.fechavencimiento === "string"
-            ? invoice.fechavencimiento
-            : null,
-        request_payload: payload,
-        response_payload: parsedResponse ?? { raw: rawResponse },
-      })
-      .select(
-        "id, gym_id, payment_id, member_id, member_name, total, currency, status, invoice_number, invoice_series, external_invoice_id, environment, typecfe, issued_at, due_date, request_payload, response_payload, created_at, updated_at"
-      )
+      .insert(invoiceRecord)
+      .select(selection)
       .single();
 
     if (insertError) {
       console.error("Error guardando la factura en la base de datos", insertError);
+
+      if (insertError.code === "23505") {
+        const { data: updatedInvoice, error: updateError } = await supabase
+          .from("invoices")
+          .update(invoiceRecord)
+          .eq("gym_id", gymId)
+          .eq("payment_id", paymentId)
+          .select(selection)
+          .single();
+
+        if (!updateError && updatedInvoice) {
+          return NextResponse.json({
+            invoice: updatedInvoice,
+            externalResponse: parsedResponse,
+            rawResponse,
+            reusedExistingInvoice: true,
+          });
+        }
+
+        console.error(
+          "Error actualizando la factura existente tras un conflicto de duplicado",
+          updateError
+        );
+      }
+      
       return NextResponse.json(
         {
           error:
