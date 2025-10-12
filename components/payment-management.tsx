@@ -179,13 +179,18 @@ const buildInvoiceLineFromPayment = (payment: Payment) => {
   ).replace(/,/g, " ");
   const safeDescription = sanitizeInvoiceText(baseDescription);
   const amount = Number(payment.amount ?? 0);
+  const quantity = 1;
+  const formattedQuantity = Number.isInteger(quantity)
+    ? `${quantity.toFixed(1)}`
+    : `${quantity}`;
   const unitPrice = Number.isFinite(amount)
     ? amount.toFixed(2)
     : Number(payment.amount || 0).toFixed(2);
+  const taxIndicator = "3";
+  const unitOfMeasure = "N/A";
 
-  return `${safeDescription}</col/>${unitPrice}</col/>0</col/>0</col/>0</col/>${safeDescription}</col/>1</col/>unidad`;
-};
-
+  return `${safeDescription}</col/>${formattedQuantity}</col/>${unitPrice}</col/>0</col/>0</col/>${safeDescription}</col/>${taxIndicator}</col/>${unitOfMeasure}`;
+}
 const buildDefaultInvoiceForm = (
   payment: Payment,
   environment: string,

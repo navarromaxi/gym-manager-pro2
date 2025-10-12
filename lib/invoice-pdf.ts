@@ -9,6 +9,64 @@ const PDF_KEY_HINTS = [
   "base64",
 ];
 
+const extractPdfUrlFromText = (value: string): string | null => {
+  const pdfUrlMatch = value.match(/https?:\/\/[^\s"']+\.pdf\b/i);
+  if (pdfUrlMatch) {
+    return pdfUrlMatch[0];
+  }
+  return null;
+};
+
+const parseStructuredString = (value: string): unknown => {
+  const attempts = new Set<string>();
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  attempts.add(trimmed);
+
+  if (/%[0-9A-Fa-f]{2}/.test(trimmed)) {
+    try {
+      const decoded = decodeURIComponent(trimmed);
+      if (decoded && decoded !== trimmed) {
+        attempts.add(decoded.trim());
+      }
+    } catch (error) {
+      console.error(
+        "Error decoding URI component while parsing PDF payload",
+        error
+      );
+    }
+  }
+
+  for (const candidate of attempts) {
+    if (
+      (candidate.startsWith("{") && candidate.endsWith("}")) ||
+      (candidate.startsWith("[") && candidate.endsWith("]"))
+    ) {
+      try {
+        return JSON.parse(candidate);
+      } catch (error) {
+        console.error("Error parsing JSON while extracting PDF payload", error);
+      }
+    }
+  }
+
+  if (trimmed.includes("=") && (trimmed.includes("&") || trimmed.includes("\n"))) {
+    const normalized = trimmed.replace(/\n+/g, "&");
+    try {
+      const params = new URLSearchParams(normalized);
+      const entries = Array.from(params.entries());
+      if (entries.length > 0) {
+        return Object.fromEntries(entries);
+      }
+    } catch (error) {
+      console.error("Error parsing query params while extracting PDF payload", error);
+    }
+  }
+
+  return null;
+};
+
 const isLikelyPdfString = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -41,8 +99,16 @@ const searchPdfString = (
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (!trimmed) return null;
+    const embeddedUrl = extractPdfUrlFromText(trimmed);
+    if (embeddedUrl) {
+      return embeddedUrl;
+    }
     if (isLikelyPdfString(trimmed)) {
       return trimmed;
+    }
+    const structured = parseStructuredString(trimmed);
+    if (structured) {
+      return searchPdfString(structured, seen, currentKey);
     }
     if (currentKey) {
       const normalizedKey = currentKey.toLowerCase();
@@ -94,7 +160,7 @@ const searchPdfString = (
 };
 
 export const findInvoicePdfSource = (payload: unknown): string | null => {
-  if (!payload || typeof payload !== "object") {
+   if (payload === null || payload === undefined) {
     return null;
   }
   return searchPdfString(payload, new WeakSet());
