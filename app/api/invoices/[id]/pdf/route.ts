@@ -6,8 +6,11 @@ import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
-const toArrayBuffer = (buffer: Buffer) =>
-  buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+const toArrayBuffer = (buffer: Buffer): ArrayBuffer =>
+  buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength
+  ) as ArrayBuffer;
 
 const decodeBase64Pdf = (value: string): ArrayBuffer | null => {
   const trimmed = value.trim();
@@ -55,11 +58,10 @@ const fetchRemotePdf = async (url: string): Promise<ArrayBuffer | null> => {
   }
 };
 
-export async function GET(
-  _request: Request,
-  context: { params: { id?: string } }
-) {
-  const invoiceId = context.params.id;
+type RouteContext = { params: Promise<{ id?: string }> };
+
+export async function GET(_request: Request, context: RouteContext) {
+  const { id: invoiceId } = await context.params;
 
   if (!invoiceId) {
     return NextResponse.json(
@@ -108,8 +110,17 @@ export async function GET(
    const pdfBuffer: ArrayBuffer | null =
     decodeBase64Pdf(pdfSource) ?? (await fetchRemotePdf(pdfSource));
 
+    if (!pdfBuffer) {
+    return NextResponse.json(
+      {
+        error:
+          "No pudimos descargar el PDF de la factura. Intenta nuevamente en unos minutos.",
+      },
+      { status: 502 }
+    );
+  }
 
-    if (!pdfBuffer || pdfBuffer.byteLength === 0) {
+    if (pdfBuffer.byteLength === 0) {
     return NextResponse.json(
       {
         error:
