@@ -129,8 +129,35 @@ interface InvoiceFormState {
   TipoTraslado: number;
 }
 
+const normalizeFacturaEnvironment = (
+  value: string | null | undefined
+): "PROD" | "TEST" | null => {
+  if (!value) return null;
+
+  const normalized = value.trim().toUpperCase();
+
+  if (["PROD", "PRODUCCION", "PRODUCCIÓN", "PRODUCTION"].includes(normalized)) {
+    return "PROD";
+  }
+
+  if (
+    [
+      "TEST",
+      "HOMOLOGACION",
+      "HOMOLOGACIÓN",
+      "HOMOLOGA",
+      "HOMO",
+    ].includes(normalized)
+  ) {
+    return "TEST";
+  }
+
+  return null;
+};
+
 const FACTURA_LIVE_DEFAULT_ENVIRONMENT =
-  process.env.NEXT_PUBLIC_FACTURA_LIVE_ENVIRONMENT || "TEST";
+  normalizeFacturaEnvironment(process.env.NEXT_PUBLIC_FACTURA_LIVE_ENVIRONMENT) ||
+  "TEST";
 
 const hasConfigValue = (value: unknown) => {
   if (value === null || value === undefined) return false;
@@ -323,14 +350,10 @@ export function PaymentManagement({
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [invoiceSuccess, setInvoiceSuccess] = useState<string | null>(null);
   const facturaEnvironment = (() => {
-    const env = gymInvoiceConfig?.environment;
-    if (!env) {
-      return FACTURA_LIVE_DEFAULT_ENVIRONMENT;
-    }
-    const normalized = env.trim().toUpperCase();
-    return normalized === "PROD" || normalized === "TEST"
-      ? normalized
-      : FACTURA_LIVE_DEFAULT_ENVIRONMENT;
+    const normalized = normalizeFacturaEnvironment(
+      gymInvoiceConfig?.environment
+    );
+    return normalized ?? FACTURA_LIVE_DEFAULT_ENVIRONMENT;
   })();
 
   const customPlansById = useMemo(() => {

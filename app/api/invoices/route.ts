@@ -2,9 +2,21 @@ import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase-server";
 
-const FACTURA_LIVE_ENDPOINT =
-  process.env.FACTURA_LIVE_ENDPOINT?.trim() ||
+const FACTURA_LIVE_BASE_ENDPOINT = process.env.FACTURA_LIVE_ENDPOINT?.trim();
+const FACTURA_LIVE_TEST_ENDPOINT =
+  process.env.FACTURA_LIVE_TEST_ENDPOINT?.trim() ||
+  (FACTURA_LIVE_BASE_ENDPOINT &&
+  FACTURA_LIVE_BASE_ENDPOINT.toLowerCase().includes("test")
+    ? FACTURA_LIVE_BASE_ENDPOINT
+    : undefined) ||
   "https://www.facturalive.com/api/envia-factura_test.php";
+  const FACTURA_LIVE_PROD_ENDPOINT =
+  process.env.FACTURA_LIVE_PROD_ENDPOINT?.trim() ||
+  (FACTURA_LIVE_BASE_ENDPOINT &&
+  !FACTURA_LIVE_BASE_ENDPOINT.toLowerCase().includes("test")
+    ? FACTURA_LIVE_BASE_ENDPOINT
+    : undefined) ||
+  "https://www.facturalive.com/api/envia-factura.php";
 
 const FACTURA_LIVE_USER_ID = process.env.FACTURA_LIVE_USER_ID?.trim() || "1021";
 const FACTURA_LIVE_COMPANY_ID =
@@ -15,8 +27,7 @@ const FACTURA_LIVE_BRANCH_ID =
   process.env.FACTURA_LIVE_BRANCH_ID?.trim() || "287";
 const FACTURA_LIVE_PASSWORD =
   process.env.FACTURA_LIVE_PASSWORD?.trim() || "picoton";
-const FACTURA_LIVE_DEFAULT_ENVIRONMENT =
-  process.env.FACTURA_LIVE_ENVIRONMENT?.trim() || "TEST";
+const rawDefaultEnvironment = process.env.FACTURA_LIVE_ENVIRONMENT?.trim();
 
 type InvoicePayload = Record<string, string | number | undefined | null>;
 
@@ -79,6 +90,12 @@ type ResolvedCredentials = {
   addinfoneg: string | null;
   facturaext: string | null;
 };
+
+
+const resolveFacturaEndpoint = (environment: string | null | undefined) =>
+  environment === "PROD"
+    ? FACTURA_LIVE_PROD_ENDPOINT
+    : FACTURA_LIVE_TEST_ENDPOINT;
 
 const buildFacturaPayload = (
   invoice: InvoicePayload,
@@ -145,9 +162,29 @@ const parseOptionalNumber = (value: unknown): number | null => {
 
 const normalizeEnvironment = (value: string | null | undefined) => {
   if (!value) return null;
+
   const normalized = value.trim().toUpperCase();
-  return normalized === "PROD" || normalized === "TEST" ? normalized : null;
+   if (["PROD", "PRODUCCION", "PRODUCCIÓN", "PRODUCTION"].includes(normalized)) {
+    return "PROD";
+  }
+
+  if (
+    [
+      "TEST",
+      "HOMOLOGACION",
+      "HOMOLOGACIÓN",
+      "HOMOLOGA",
+      "HOMO",
+    ].includes(normalized)
+  ) {
+    return "TEST";
+  }
+
+  return null;
 };
+
+const FACTURA_LIVE_DEFAULT_ENVIRONMENT =
+  normalizeEnvironment(rawDefaultEnvironment) ?? "TEST";
 
 const sanitizeDateString = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
@@ -292,6 +329,14 @@ export async function POST(request: Request) {
     const invoiceIssueDate = sanitizeDateString(invoice.fechafacturacion);
     const invoiceDueDate = sanitizeDateString(invoice.fechavencimiento);
 
+    const invoiceEnvironmentOverride = normalizeEnvironment(
+      parseOptionalString(invoice.environment)
+    );
+    const effectiveEnvironment =
+      invoiceEnvironmentOverride ||
+      resolvedCredentials.environment ||
+      FACTURA_LIVE_DEFAULT_ENVIRONMENT;
+
     const defaults: InvoicePayload = {
       userid: resolvedCredentials.userId!,
       empresaid: resolvedCredentials.companyId!,
@@ -363,11 +408,7 @@ export async function POST(request: Request) {
       lineas: sanitizedLineas,
       indicadorfacturacion: invoice.indicadorfacturacion ?? "",
       typedoc: invoice.typedoc ?? 2,
-      environment:
-        typeof invoice.environment === "string" &&
-        invoice.environment.trim().length > 0
-          ? invoice.environment
-          : resolvedCredentials.environment ?? FACTURA_LIVE_DEFAULT_ENVIRONMENT,
+      environment: effectiveEnvironment,
       facturaext:
         typeof invoice.facturaext === "string" && invoice.facturaext.trim().length > 0
           ? invoice.facturaext
@@ -382,13 +423,15 @@ export async function POST(request: Request) {
     };
 
     const payload = buildFacturaPayload(invoice, defaults);
+    const facturaEndpoint = resolveFacturaEndpoint(effectiveEnvironment);
     const payloadForStorage: Record<string, string> = { ...payload };
     if (typeof payloadForStorage.password === "string") {
       payloadForStorage.password = "<hidden>";
     }
+    payloadForStorage.endpoint = facturaEndpoint;
 
     const encoded = new URLSearchParams(payload);
-    const externalResponse = await fetch(FACTURA_LIVE_ENDPOINT, {
+    const externalResponse = await fetch(facturaEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -405,6 +448,7 @@ export async function POST(request: Request) {
           error:
             "FACTURALIVE no devolvió contenido. Revisa las credenciales y la configuración enviada porque el servicio no confirmó la emisión.",
           rawResponse,
+          endpoint: facturaEndpoint,
         },
         { status: 502 }
       );
@@ -412,8 +456,8 @@ export async function POST(request: Request) {
 
     const responsePayload =
       parsedResponse && typeof parsedResponse === "object"
-        ? { raw: rawResponse, parsed: parsedResponse }
-        : { raw: rawResponse };
+        ? { raw: rawResponse, parsed: parsedResponse, endpoint: facturaEndpoint }
+        : { raw: rawResponse, endpoint: facturaEndpoint };
 
     if (!externalResponse.ok) {
       return NextResponse.json(
@@ -421,6 +465,7 @@ export async function POST(request: Request) {
           error:
             "El servicio de facturación devolvió un error. Intenta nuevamente en unos minutos.",
           rawResponse,
+          endpoint: facturaEndpoint,
         },
         { status: 502 }
       );
@@ -462,7 +507,7 @@ export async function POST(request: Request) {
       invoice_number: invoiceNumber,
       invoice_series: invoiceSeries,
       external_invoice_id: externalInvoiceId,
-      environment: payload.environment ?? FACTURA_LIVE_DEFAULT_ENVIRONMENT,
+      environment: effectiveEnvironment,
       typecfe:
         typeof invoice.typecfe === "number" && Number.isFinite(invoice.typecfe)
           ? invoice.typecfe
@@ -497,6 +542,7 @@ export async function POST(request: Request) {
             externalResponse: responsePayload,
             rawResponse,
             reusedExistingInvoice: true,
+            endpoint: facturaEndpoint,
           });
         }
 
@@ -512,6 +558,7 @@ export async function POST(request: Request) {
             "La factura fue emitida pero no pudo guardarse. Revisa la solapa de Facturas más tarde.",
           rawResponse,
           externalResponse: responsePayload,
+          endpoint: facturaEndpoint,
         },
         { status: 500 }
       );
@@ -521,6 +568,7 @@ export async function POST(request: Request) {
       invoice: storedInvoice,
       externalResponse: responsePayload,
       rawResponse,
+      endpoint: facturaEndpoint,
     });
   } catch (error) {
     console.error("Error inesperado al emitir factura", error);
