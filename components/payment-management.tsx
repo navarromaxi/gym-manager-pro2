@@ -198,6 +198,57 @@ const mapPaymentMethodToFacturaPaymentType = (method: string | null | undefined)
   return 1;
 };
 
+const buildInvoiceErrorDetails = (payload: unknown): string | null => {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const details: string[] = [];
+
+  const missing = Array.isArray(record.missing)
+    ? record.missing.filter((value) => typeof value === "string")
+    : [];
+
+  if (missing.length > 0) {
+    details.push(`Campos faltantes: ${missing.join(", ")}`);
+  }
+
+  const endpoint = typeof record.endpoint === "string" ? record.endpoint : null;
+  if (endpoint) {
+    details.push(`Endpoint: ${endpoint}`);
+  }
+
+  const externalResponse = (() => {
+    const response = record.externalResponse as unknown;
+    if (response && typeof response === "object") {
+      const responseRecord = response as Record<string, unknown>;
+      if (responseRecord.parsed && typeof responseRecord.parsed === "object") {
+        return responseRecord.parsed;
+      }
+      return response;
+    }
+    return null;
+  })();
+
+  if (externalResponse) {
+    details.push(
+      `Respuesta interpretada:\n${JSON.stringify(externalResponse, null, 2)}`
+    );
+  }
+
+  const rawResponse =
+    typeof record.rawResponse === "string" && record.rawResponse.trim().length > 0
+      ? record.rawResponse.trim()
+      : null;
+
+  if (rawResponse) {
+    details.push(`Respuesta sin procesar:\n${rawResponse}`);
+  }
+
+  return details.length > 0 ? details.join("\n\n") : null;
+};
+
 const buildInvoiceLineFromPayment = (payment: Payment) => {
   const baseDescription = (
     payment.plan?.trim() ||
@@ -347,6 +398,9 @@ export function PaymentManagement({
   const [selectedInvoiceRecord, setSelectedInvoiceRecord] =
     useState<Invoice | null>(null);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
+  const [invoiceErrorDetails, setInvoiceErrorDetails] = useState<string | null>(
+    null
+  );
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [invoiceSuccess, setInvoiceSuccess] = useState<string | null>(null);
   const facturaEnvironment = (() => {
@@ -443,6 +497,7 @@ export function PaymentManagement({
     setInvoiceForm(null);
     setSelectedInvoiceRecord(null);
     setInvoiceError(null);
+    setInvoiceErrorDetails(null);
     setInvoiceSuccess(null);
     setInvoiceDialogMode("create");
     setIsSendingInvoice(false);
@@ -454,6 +509,7 @@ export function PaymentManagement({
   ) => {
     setInvoicePayment(payment);
     setInvoiceError(null);
+    setInvoiceErrorDetails(null);
     setInvoiceSuccess(null);
 
     if (existingInvoice) {
@@ -507,6 +563,7 @@ export function PaymentManagement({
       setInvoiceError(
         "Debes seleccionar un gimnasio antes de emitir facturas."
       );
+      setInvoiceErrorDetails(null);
       return;
     }
 
@@ -514,11 +571,13 @@ export function PaymentManagement({
       setInvoiceError(
         `Completa en Supabase los campos obligatorios (${missingInvoiceConfig.join(", ")}) y la contraseña invoice_password antes de facturar.`
       );
+      setInvoiceErrorDetails(null);
       return;
     }
 
     setIsSendingInvoice(true);
     setInvoiceError(null);
+    setInvoiceErrorDetails(null);
     setInvoiceSuccess(null);
 
     try {
@@ -545,6 +604,7 @@ export function PaymentManagement({
             ? payload.error
             : "No se pudo generar la factura. Intenta nuevamente.";
         setInvoiceError(message);
+        setInvoiceErrorDetails(buildInvoiceErrorDetails(payload));
         return;
       }
 
@@ -566,16 +626,19 @@ export function PaymentManagement({
         setInvoiceDialogMode("view");
         setInvoiceForm(null);
         setInvoiceSuccess("Factura generada correctamente.");
+        setInvoiceErrorDetails(null);
       } else {
         setInvoiceError(
           "La factura se generó, pero no recibimos la confirmación esperada."
         );
+        setInvoiceErrorDetails(buildInvoiceErrorDetails(payload));
       }
     } catch (error) {
       console.error("Error enviando factura", error);
       setInvoiceError(
         "Ocurrió un error inesperado al conectar con el servicio de facturación."
       );
+      setInvoiceErrorDetails(null);
     } finally {
       setIsSendingInvoice(false);
     }
@@ -3311,6 +3374,14 @@ export function PaymentManagement({
               </div>
               {invoiceError && (
                 <p className="text-sm text-red-600">{invoiceError}</p>
+              )}
+              {invoiceErrorDetails && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                  <p className="font-semibold">Detalle técnico</p>
+                  <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words">
+                    {invoiceErrorDetails}
+                  </pre>
+                </div>
               )}
               {invoiceSuccess && (
                 <p className="text-sm text-green-600">{invoiceSuccess}</p>

@@ -10,7 +10,7 @@ const FACTURA_LIVE_TEST_ENDPOINT =
     ? FACTURA_LIVE_BASE_ENDPOINT
     : undefined) ||
   "https://www.facturalive.com/api/envia-factura_test.php";
-  const FACTURA_LIVE_PROD_ENDPOINT =
+const FACTURA_LIVE_PROD_ENDPOINT =
   process.env.FACTURA_LIVE_PROD_ENDPOINT?.trim() ||
   (FACTURA_LIVE_BASE_ENDPOINT &&
   !FACTURA_LIVE_BASE_ENDPOINT.toLowerCase().includes("test")
@@ -135,6 +135,95 @@ const parseFacturaResponse = (raw: string) => {
     return null;
   }
 };
+
+const collectStringValues = (value: unknown): string[] => {
+  if (value === null || value === undefined) return [];
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? [trimmed] : [];
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return [String(value)];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectStringValues(item));
+  }
+
+  if (typeof value === "object") {
+    return Object.values(value).flatMap((item) => collectStringValues(item));
+  }
+
+  return [];
+};
+
+const extractFacturaMessages = (parsed: unknown): string[] => {
+  if (!parsed || typeof parsed !== "object") return [];
+
+  const normalizedEntries = Object.entries(parsed).map(([key, value]) => [
+    key.toLowerCase(),
+    value,
+  ]) as [string, unknown][];
+
+  const interestingKeys = new Set(
+    [
+      "mensaje",
+      "mensajes",
+      "message",
+      "messages",
+      "error",
+      "errors",
+      "detalle",
+      "detalle_error",
+      "descripcion",
+      "descripcion_error",
+      "observaciones",
+      "observacion",
+      "causas",
+      "causa",
+    ].map((value) => value.toLowerCase())
+  );
+
+  const messages = normalizedEntries
+    .filter(([key]) => interestingKeys.has(key))
+    .flatMap(([, value]) => collectStringValues(value))
+    .filter((value, index, array) => array.indexOf(value) === index);
+
+  if (messages.length > 0) {
+    return messages;
+  }
+
+  const statusValue =
+    typeof (parsed as Record<string, unknown>).status === "string"
+      ? (parsed as Record<string, string>).status.trim()
+      : null;
+
+  if (statusValue) {
+    return [`Estado devuelto por FacturaLive: ${statusValue}`];
+  }
+
+  const codeValue =
+    typeof (parsed as Record<string, unknown>).codigo === "string"
+      ? (parsed as Record<string, string>).codigo.trim()
+      : null;
+
+  if (codeValue) {
+    return [`Código devuelto por FacturaLive: ${codeValue}`];
+  }
+
+  return [];
+};
+
+const FACTURA_SUCCESS_KEYWORDS = [
+  "procesado",
+  "aceptado",
+  "aprobado",
+  "ok",
+  "success",
+  "emitido",
+];
 
 const parseOptionalString = (value: unknown): string | null => {
   if (typeof value === "string") {
@@ -475,6 +564,37 @@ export async function POST(request: Request) {
       (parsedResponse?.status as string | undefined) ||
       (parsedResponse?.resultado as string | undefined) ||
       "procesado";
+      const normalizedStatus =
+      typeof status === "string" ? status.trim().toLowerCase() : "";
+    const isSuccessfulStatus =
+      normalizedStatus.length === 0 ||
+      FACTURA_SUCCESS_KEYWORDS.some((keyword) =>
+        normalizedStatus.includes(keyword)
+      );
+
+    if (!isSuccessfulStatus) {
+      const errorMessages = extractFacturaMessages(parsedResponse);
+      const errorMessage =
+        errorMessages.length > 0
+          ? errorMessages.join(". ")
+          : "La factura fue rechazada por FacturaLive. Revisa los datos enviados.";
+
+      console.error("FacturaLive rechazó la factura", {
+        status,
+        parsedResponse,
+        rawResponse,
+      });
+
+      return NextResponse.json(
+        {
+          error: errorMessage,
+          rawResponse,
+          externalResponse: responsePayload,
+          endpoint: facturaEndpoint,
+        },
+        { status: 502 }
+      );
+    }
     const invoiceNumber =
       (parsedResponse?.numeroCFE as string | undefined) ||
       (parsedResponse?.invoice_number as string | undefined) ||
