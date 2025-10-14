@@ -20,6 +20,44 @@ const FACTURA_LIVE_DEFAULT_ENVIRONMENT =
 
 type InvoicePayload = Record<string, string | number | undefined | null>;
 
+const FACTURA_FIELD_ORDER: string[] = [
+  "userid",
+  "customerid",
+  "empresaid",
+  "codsucursal",
+  "sucursal",
+  "facturareferencia",
+  "contnumero",
+  "contserie",
+  "seriereferencia",
+  "fechavencimiento",
+  "fechafacturacion",
+  "moneda",
+  "additionalinfo",
+  "terms_conditions",
+  "payment_type",
+  "cotizacion",
+  "typecfe",
+  "ordencompra",
+  "lugarentrega",
+  "periododesde",
+  "periodohasta",
+  "clicountry",
+  "nomneg",
+  "rutneg",
+  "dirneg",
+  "cityneg",
+  "stateneg",
+  "addinfoneg",
+  "lineas",
+  "indicadorfacturacion",
+  "password",
+  "typedoc",
+  "environment",
+  "facturaext",
+  "TipoTraslado",
+];
+
 type ResolvedCredentials = {
   userId: string | null;
   companyId: string | null;
@@ -46,17 +84,29 @@ const buildFacturaPayload = (
   invoice: InvoicePayload,
   overrides: InvoicePayload
 ) => {
-  const payload: Record<string, string> = {};
+  const merged: InvoicePayload = { ...invoice };
 
-  const append = (key: string, value: string | number | undefined | null) => {
+  Object.entries(overrides).forEach(([key, value]) => {
     if (value === undefined || value === null) {
       return;
     }
-    payload[key] = typeof value === "string" ? value : String(value);
-  };
+    merged[key] = value;
+  });
 
-  Object.entries(invoice).forEach(([key, value]) => append(key, value));
-  Object.entries(overrides).forEach(([key, value]) => append(key, value));
+  const payload: Record<string, string> = {};
+
+  FACTURA_FIELD_ORDER.forEach((field) => {
+    if (!(field in merged)) {
+      return;
+    }
+
+    const value = merged[field];
+    if (value === undefined || value === null) {
+      return;
+    }
+    payload[field] = typeof value === "string" ? value : String(value);
+  });
+
 
   return payload;
 };
@@ -332,6 +382,10 @@ export async function POST(request: Request) {
     };
 
     const payload = buildFacturaPayload(invoice, defaults);
+    const payloadForStorage: Record<string, string> = { ...payload };
+    if (typeof payloadForStorage.password === "string") {
+      payloadForStorage.password = "<hidden>";
+    }
 
     const encoded = new URLSearchParams(payload);
     const externalResponse = await fetch(FACTURA_LIVE_ENDPOINT, {
@@ -399,7 +453,7 @@ export async function POST(request: Request) {
           : resolvedCredentials.typecfe ?? 111,
       issued_at: invoiceIssueDate ?? today,
       due_date: invoiceDueDate,
-      request_payload: payload,
+      request_payload: payloadForStorage,
       response_payload: parsedResponse ?? { raw: rawResponse },
     };
 
