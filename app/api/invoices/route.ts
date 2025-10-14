@@ -399,6 +399,22 @@ export async function POST(request: Request) {
     const rawResponse = await externalResponse.text();
     const parsedResponse = parseFacturaResponse(rawResponse);
 
+    if (!rawResponse || rawResponse.trim().length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "FACTURALIVE no devolvió contenido. Revisa las credenciales y la configuración enviada porque el servicio no confirmó la emisión.",
+          rawResponse,
+        },
+        { status: 502 }
+      );
+    }
+
+    const responsePayload =
+      parsedResponse && typeof parsedResponse === "object"
+        ? { raw: rawResponse, parsed: parsedResponse }
+        : { raw: rawResponse };
+
     if (!externalResponse.ok) {
       return NextResponse.json(
         {
@@ -429,7 +445,7 @@ export async function POST(request: Request) {
       (parsedResponse?.external_invoice_id as string | undefined) ||
       null;
 
-      const selection =
+    const selection =
       "id, gym_id, payment_id, member_id, member_name, total, currency, status, invoice_number, invoice_series, external_invoice_id, environment, typecfe, issued_at, due_date, request_payload, response_payload, created_at, updated_at";
 
     const invoiceRecord = {
@@ -454,7 +470,7 @@ export async function POST(request: Request) {
       issued_at: invoiceIssueDate ?? today,
       due_date: invoiceDueDate,
       request_payload: payloadForStorage,
-      response_payload: parsedResponse ?? { raw: rawResponse },
+      response_payload: responsePayload,
     };
 
     const { data: storedInvoice, error: insertError } = await supabase
@@ -478,7 +494,7 @@ export async function POST(request: Request) {
         if (!updateError && updatedInvoice) {
           return NextResponse.json({
             invoice: updatedInvoice,
-            externalResponse: parsedResponse,
+            externalResponse: responsePayload,
             rawResponse,
             reusedExistingInvoice: true,
           });
@@ -495,7 +511,7 @@ export async function POST(request: Request) {
           error:
             "La factura fue emitida pero no pudo guardarse. Revisa la solapa de Facturas más tarde.",
           rawResponse,
-          externalResponse: parsedResponse,
+          externalResponse: responsePayload,
         },
         { status: 500 }
       );
@@ -503,7 +519,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       invoice: storedInvoice,
-      externalResponse: parsedResponse,
+      externalResponse: responsePayload,
       rawResponse,
     });
   } catch (error) {
