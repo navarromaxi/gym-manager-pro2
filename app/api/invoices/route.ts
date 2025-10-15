@@ -97,6 +97,29 @@ const resolveFacturaEndpoint = (environment: string | null | undefined) =>
     ? FACTURA_LIVE_PROD_ENDPOINT
     : FACTURA_LIVE_TEST_ENDPOINT;
 
+    const shouldIncludeFacturaField = (field: string, value: unknown) => {
+  if (value === undefined || value === null) {
+    return false;
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return false;
+    }
+    if (field === "customerid" && trimmed === "0") {
+      return false;
+    }
+    return true;
+  }
+
+  return false;
+};
+
 const buildFacturaPayload = (
   invoice: InvoicePayload,
   overrides: InvoicePayload
@@ -118,10 +141,11 @@ const buildFacturaPayload = (
     }
 
     const value = merged[field];
-    if (value === undefined || value === null) {
+    if (!shouldIncludeFacturaField(field, value)) {
       return;
     }
-    payload[field] = typeof value === "string" ? value : String(value);
+    payload[field] =
+      typeof value === "string" ? value.trim() : String(value);
   });
 
 
@@ -559,9 +583,13 @@ export async function POST(request: Request) {
     const defaults: InvoicePayload = {
       userid: resolvedCredentials.userId!,
       customerid:
-        typeof invoice.customerid === "number" && Number.isFinite(invoice.customerid)
+        typeof invoice.customerid === "number" &&
+        Number.isFinite(invoice.customerid) &&
+        invoice.customerid > 0
           ? invoice.customerid
-          : resolvedCredentials.customerId ?? 0,
+          : resolvedCredentials.customerId && resolvedCredentials.customerId > 0
+          ? resolvedCredentials.customerId
+          : undefined,
       empresaid: resolvedCredentials.companyId!,
       codsucursal: resolvedCredentials.branchCode!,
       sucursal: resolvedCredentials.branchId!,
@@ -636,9 +664,12 @@ export async function POST(request: Request) {
           : resolvedCredentials.facturaext ?? paymentId,
       TipoTraslado:
         typeof invoice.TipoTraslado === "number" &&
-        Number.isFinite(invoice.TipoTraslado)
+        Number.isFinite(invoice.TipoTraslado) &&
+        invoice.TipoTraslado > 0
           ? invoice.TipoTraslado
-          : resolvedCredentials.tipoTraslado ?? 1,
+          : resolvedCredentials.tipoTraslado && resolvedCredentials.tipoTraslado > 0
+          ? resolvedCredentials.tipoTraslado
+          : undefined,
     };
 
     const payload = buildFacturaPayload(invoice, defaults);
