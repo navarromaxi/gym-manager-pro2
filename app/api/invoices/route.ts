@@ -681,6 +681,20 @@ export async function POST(request: Request) {
     };
 
     const payload = buildFacturaPayload(invoice, defaults);
+
+    if (
+      "customerid" in payload &&
+      payload.customerid !== undefined &&
+      Number(payload.customerid) === 0
+    ) {
+      recordStep(
+        "Customer ID inválido detectado. Eliminando campo para evitar rechazo de FacturaLive",
+        { customerid: payload.customerid },
+        "facturalive"
+      );
+      delete payload.customerid;
+    }
+    
     const facturaEndpoint = resolveFacturaEndpoint(effectiveEnvironment);
     const payloadForStorage: Record<string, string> = { ...payload };
     if (typeof payloadForStorage.password === "string") {
