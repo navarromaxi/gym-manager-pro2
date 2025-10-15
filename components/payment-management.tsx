@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -249,6 +249,100 @@ const buildInvoiceErrorDetails = (payload: unknown): string | null => {
   return details.length > 0 ? details.join("\n\n") : null;
 };
 
+type InvoiceDebugSource = "client" | "server" | "facturalive" | "database";
+
+type InvoiceDebugStep = {
+  at: string;
+  step: string;
+  source: InvoiceDebugSource;
+  data?: unknown;
+};
+
+const SOURCE_LABELS: Record<InvoiceDebugSource, string> = {
+  client: "Cliente",
+  server: "Servidor",
+  facturalive: "FacturaLive",
+  database: "Base de datos",
+};
+
+const extractInvoiceDebugSteps = (payload: unknown): InvoiceDebugStep[] => {
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+
+  const record = payload as Record<string, unknown>;
+  const rawSteps = record.debugSteps;
+
+  if (!Array.isArray(rawSteps)) {
+    return [];
+  }
+
+  return rawSteps
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const entry = item as Record<string, unknown>;
+      const step = typeof entry.step === "string" ? entry.step : null;
+      const at = typeof entry.at === "string" ? entry.at : null;
+      if (!step || !at) {
+        return null;
+      }
+
+      const sourceValue = entry.source;
+      const source: InvoiceDebugSource =
+        sourceValue === "client" ||
+        sourceValue === "server" ||
+        sourceValue === "facturalive" ||
+        sourceValue === "database"
+          ? (sourceValue as InvoiceDebugSource)
+          : "server";
+
+      const result: InvoiceDebugStep = {
+        step,
+        at,
+        source,
+      };
+
+      if ("data" in entry) {
+        result.data = entry.data;
+      }
+
+      return result;
+    })
+    .filter((step): step is InvoiceDebugStep => Boolean(step));
+};
+
+const formatDebugStepData = (data: unknown): string => {
+  if (data === null || data === undefined) {
+    return "";
+  }
+  if (typeof data === "string") {
+    return data;
+  }
+  if (typeof data === "number" || typeof data === "boolean") {
+    return String(data);
+  }
+  try {
+    return JSON.stringify(data, null, 2);
+  } catch (error) {
+    return String(data);
+  }
+};
+
+const formatDebugStepTimestamp = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+};
+
 const buildInvoiceLineFromPayment = (payment: Payment) => {
   const baseDescription = (
     payment.plan?.trim() ||
@@ -401,8 +495,25 @@ export function PaymentManagement({
   const [invoiceErrorDetails, setInvoiceErrorDetails] = useState<string | null>(
     null
   );
+  const [invoiceDebugSteps, setInvoiceDebugSteps] = useState<
+    InvoiceDebugStep[]
+  >([]);
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [invoiceSuccess, setInvoiceSuccess] = useState<string | null>(null);
+  const appendClientDebugStep = useCallback(
+    (step: string, data?: unknown) => {
+      setInvoiceDebugSteps((previous) => [
+        ...previous,
+        {
+          step,
+          at: new Date().toISOString(),
+          source: "client",
+          ...(data !== undefined ? { data } : {}),
+        },
+      ]);
+    },
+    []
+  );
   const facturaEnvironment = (() => {
     const normalized = normalizeFacturaEnvironment(
       gymInvoiceConfig?.environment
@@ -501,6 +612,7 @@ export function PaymentManagement({
     setInvoiceSuccess(null);
     setInvoiceDialogMode("create");
     setIsSendingInvoice(false);
+    setInvoiceDebugSteps([]);
   };
 
   const openInvoiceDialog = (
@@ -511,6 +623,7 @@ export function PaymentManagement({
     setInvoiceError(null);
     setInvoiceErrorDetails(null);
     setInvoiceSuccess(null);
+    setInvoiceDebugSteps([]);
 
     if (existingInvoice) {
       setInvoiceDialogMode("view");
@@ -559,7 +672,24 @@ export function PaymentManagement({
 
   const handleSendInvoice = async () => {
     if (!invoicePayment || !invoiceForm) return;
+
+     const initialStep: InvoiceDebugStep = {
+      step: "Inicio del proceso de facturación desde el cliente",
+      at: new Date().toISOString(),
+      source: "client",
+      data: {
+        gymId,
+        paymentId: invoicePayment.id,
+        memberId: invoicePayment.member_id,
+        amount: invoicePayment.amount,
+      },
+    };
+    setInvoiceDebugSteps([initialStep]);
+
     if (!gymId) {
+      appendClientDebugStep("Proceso detenido: no hay gimnasio seleccionado", {
+        gymId,
+      });
       setInvoiceError(
         "Debes seleccionar un gimnasio antes de emitir facturas."
       );
@@ -568,6 +698,12 @@ export function PaymentManagement({
     }
 
     if (!isInvoiceConfigReady) {
+       appendClientDebugStep(
+        "Proceso detenido: configuración de facturación incompleta",
+        {
+          missing: missingInvoiceConfig,
+        }
+      );
       setInvoiceError(
         `Completa en Supabase los campos obligatorios (${missingInvoiceConfig.join(", ")}) y la contraseña invoice_password antes de facturar.`
       );
@@ -579,6 +715,24 @@ export function PaymentManagement({
     setInvoiceError(null);
     setInvoiceErrorDetails(null);
     setInvoiceSuccess(null);
+
+     const requestPreview = {
+      gymId,
+      paymentId: invoicePayment.id,
+      memberId: invoicePayment.member_id,
+      memberName: invoicePayment.member_name,
+      amount: invoicePayment.amount,
+      invoice: {
+        ...invoiceForm,
+        lineasLength: invoiceForm.lineas?.length ?? 0,
+        lineasPreview: invoiceForm.lineas?.slice(0, 200) ?? "",
+      },
+    };
+
+    appendClientDebugStep("Enviando solicitud al backend /api/invoices", {
+      endpoint: "/api/invoices",
+      payload: requestPreview,
+    });
 
     try {
       const response = await fetch("/api/invoices", {
@@ -596,19 +750,57 @@ export function PaymentManagement({
         }),
       });
 
-      const payload = await response.json();
+      appendClientDebugStep("Respuesta recibida del backend", {
+        status: response.status,
+        ok: response.ok,
+      });
+
+      let payload: unknown = null;
+      try {
+        payload = await response.json();
+        appendClientDebugStep(
+          "Respuesta JSON del backend interpretada correctamente"
+        );
+      } catch (parseError) {
+        appendClientDebugStep(
+          "No se pudo interpretar la respuesta JSON del backend",
+          {
+            error:
+              parseError instanceof Error
+                ? parseError.message
+                : String(parseError),
+          }
+        );
+        setInvoiceError(
+          "No se pudo interpretar la respuesta del servicio de facturación."
+        );
+        setInvoiceErrorDetails(null);
+        return;
+      }
+
+      const serverSteps = extractInvoiceDebugSteps(payload);
+      if (serverSteps.length > 0) {
+        setInvoiceDebugSteps((previous) => [...previous, ...serverSteps]);
+      } else {
+        appendClientDebugStep(
+          "El backend no proporcionó pasos de depuración adicionales"
+        );
+      }
 
       if (!response.ok) {
+        const payloadRecord = payload as Record<string, unknown> | null;
         const message =
-          typeof payload?.error === "string"
-            ? payload.error
+          payloadRecord && typeof payloadRecord.error === "string"
+            ? payloadRecord.error
             : "No se pudo generar la factura. Intenta nuevamente.";
         setInvoiceError(message);
         setInvoiceErrorDetails(buildInvoiceErrorDetails(payload));
         return;
       }
 
-      const newInvoice: Invoice | undefined = payload?.invoice;
+      const payloadRecord = payload as Record<string, unknown> | null;
+      const newInvoice: Invoice | undefined =
+        payloadRecord?.invoice as Invoice | undefined;
       if (newInvoice) {
         setInvoices((prev) => {
           const existingIndex = prev.findIndex(
@@ -626,8 +818,20 @@ export function PaymentManagement({
         setInvoiceDialogMode("view");
         setInvoiceForm(null);
         setInvoiceSuccess("Factura generada correctamente.");
+        const technicalDetails = buildInvoiceErrorDetails(payload);
+        if (technicalDetails) {
+          appendClientDebugStep("Detalle técnico del backend", {
+            technicalDetails,
+          });
+        }
         setInvoiceErrorDetails(null);
+        appendClientDebugStep("Factura registrada correctamente", {
+          invoiceId: newInvoice.id,
+        });
       } else {
+        appendClientDebugStep(
+          "El backend no devolvió el registro de la factura generada"
+        );
         setInvoiceError(
           "La factura se generó, pero no recibimos la confirmación esperada."
         );
@@ -635,6 +839,12 @@ export function PaymentManagement({
       }
     } catch (error) {
       console.error("Error enviando factura", error);
+      appendClientDebugStep(
+        "Error de red o inesperado al contactar al backend",
+        {
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
       setInvoiceError(
         "Ocurrió un error inesperado al conectar con el servicio de facturación."
       );
@@ -2376,7 +2586,7 @@ export function PaymentManagement({
           </DialogContent>
         </Dialog>
       </div>
-      <Alert
+      {/* <Alert
         variant={isInvoiceConfigReady ? "default" : "destructive"}
         className="flex items-start gap-3"
       >
@@ -2415,7 +2625,7 @@ export function PaymentManagement({
             </>
           )}
         </AlertDescription>
-      </Alert>
+      </Alert> */}
 
       {/* Summary Cards - AGREGAR TARJETAS DE MÉTODOS */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -2614,12 +2824,13 @@ export function PaymentManagement({
                 const balanceValue = insightBalance ?? fallbackBalance ?? null;
                 const isPlanPayment = !payment.type || payment.type === "plan";
                 const isCustomPlanPayment = payment.type === "custom_plan";
-                 const customPlanId = isCustomPlanPayment
+                const customPlanId = isCustomPlanPayment
                   ? payment.plan_id ||
                     extractCustomPlanIdFromDescription(payment.description)
                   : null;
-                const relatedCustomPlan =
-                  customPlanId ? customPlansById.get(customPlanId) ?? null : null;
+                const relatedCustomPlan = customPlanId
+                  ? customPlansById.get(customPlanId) ?? null
+                  : null;
                 const customPlanEndDate = relatedCustomPlan?.end_date ?? null;
                 const formattedCustomPlanDue = formatDueDate(customPlanEndDate);
                 const hasPendingInstallment =
@@ -2652,7 +2863,7 @@ export function PaymentManagement({
                 const nextInstallmentDueDisplay = hasPendingInstallment
                   ? formattedNextDue ?? "Sin definir"
                   : "No corresponde";
-                  let dueCellContent = (
+                let dueCellContent = (
                   <span className="text-muted-foreground">-</span>
                 );
                 if (isPlanPayment && balanceValue !== null) {
@@ -2668,7 +2879,7 @@ export function PaymentManagement({
                     </span>
                   );
                 }
-                 const isAutoGeneratedPayment =
+                const isAutoGeneratedPayment =
                   isAutoGeneratedOneTimePayment(payment);
                 const detailDescription = isCustomPlanPayment
                   ? stripCustomPlanMarker(payment.description)
@@ -2687,7 +2898,8 @@ export function PaymentManagement({
                 const detailDisplay = detailLabel?.trim()
                   ? `${detailLabel} - $${formattedDetailAmount}`
                   : `Sin detalle - $${formattedDetailAmount}`;
-                   const relatedInvoice = invoicesByPaymentId.get(payment.id) ?? null;
+                const relatedInvoice =
+                  invoicesByPaymentId.get(payment.id) ?? null;
                 const isProcessingInvoice =
                   isSendingInvoice && invoicePayment?.id === payment.id;
 
@@ -2733,9 +2945,9 @@ export function PaymentManagement({
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                   <TableCell>{dueCellContent}</TableCell>
+                    <TableCell>{dueCellContent}</TableCell>
                     <TableCell className="capitalize">
-                       {isAutoGeneratedPayment
+                      {isAutoGeneratedPayment
                         ? "Pago único"
                         : isCustomPlanPayment
                         ? "Plan personalizado"
@@ -2751,11 +2963,13 @@ export function PaymentManagement({
                         </span>
                       ) : (
                         <div className="flex gap-2">
-                           <Button
+                          <Button
                             variant={relatedInvoice ? "secondary" : "outline"}
                             size="sm"
                             className="inline-flex items-center gap-1"
-                            onClick={() => openInvoiceDialog(payment, relatedInvoice)}
+                            onClick={() =>
+                              openInvoiceDialog(payment, relatedInvoice)
+                            }
                             disabled={
                               isProcessingInvoice ||
                               (!relatedInvoice && !isInvoiceConfigReady)
@@ -2765,7 +2979,9 @@ export function PaymentManagement({
                                 ? "Ver factura generada"
                                 : isInvoiceConfigReady
                                 ? "Facturar este pago"
-                                : `Configura ${missingInvoiceConfig.join(", ")} y la contraseña invoice_password en Supabase para habilitar la facturación.`
+                                : `Configura ${missingInvoiceConfig.join(
+                                    ", "
+                                  )} y la contraseña invoice_password en Supabase para habilitar la facturación.`
                             }
                           >
                             <Receipt className="h-4 w-4" />
@@ -3056,9 +3272,7 @@ export function PaymentManagement({
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="invoice-fecha">
-                    Fecha de facturación
-                  </Label>
+                  <Label htmlFor="invoice-fecha">Fecha de facturación</Label>
                   <Input
                     id="invoice-fecha"
                     type="date"
@@ -3203,10 +3417,7 @@ export function PaymentManagement({
                     id="invoice-facturaext"
                     value={invoiceForm.facturaext}
                     onChange={(event) =>
-                      handleInvoiceFieldChange(
-                        "facturaext",
-                        event.target.value
-                      )
+                      handleInvoiceFieldChange("facturaext", event.target.value)
                     }
                   />
                 </div>
@@ -3281,7 +3492,9 @@ export function PaymentManagement({
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="invoice-stateneg">Departamento / Estado</Label>
+                  <Label htmlFor="invoice-stateneg">
+                    Departamento / Estado
+                  </Label>
                   <Input
                     id="invoice-stateneg"
                     value={invoiceForm.stateneg}
@@ -3302,7 +3515,9 @@ export function PaymentManagement({
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="invoice-addinfoneg">Información adicional cliente</Label>
+                <Label htmlFor="invoice-addinfoneg">
+                  Información adicional cliente
+                </Label>
                 <Textarea
                   id="invoice-addinfoneg"
                   value={invoiceForm.addinfoneg}
@@ -3312,9 +3527,7 @@ export function PaymentManagement({
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="invoice-lineas">
-                  Líneas de la factura
-                </Label>
+                <Label htmlFor="invoice-lineas">Líneas de la factura</Label>
                 <Textarea
                   id="invoice-lineas"
                   value={invoiceForm.lineas}
@@ -3360,7 +3573,9 @@ export function PaymentManagement({
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="invoice-indicador">Indicador de facturación</Label>
+                <Label htmlFor="invoice-indicador">
+                  Indicador de facturación
+                </Label>
                 <Input
                   id="invoice-indicador"
                   value={invoiceForm.indicadorfacturacion}
@@ -3381,6 +3596,30 @@ export function PaymentManagement({
                   <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words">
                     {invoiceErrorDetails}
                   </pre>
+                </div>
+              )}
+              {invoiceDebugSteps.length > 0 && (
+                <div className="rounded-md border border-muted-foreground/20 bg-muted/40 p-3 text-xs text-muted-foreground">
+                  <p className="font-semibold text-foreground">Registro de depuración</p>
+                  <ol className="mt-2 space-y-2">
+                    {invoiceDebugSteps.map((entry, index) => (
+                      <li key={`${entry.at}-${index}`} className="space-y-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium text-foreground">
+                            {index + 1}. [{SOURCE_LABELS[entry.source]}] {entry.step}
+                          </span>
+                          <span className="whitespace-nowrap text-muted-foreground">
+                            {formatDebugStepTimestamp(entry.at)}
+                          </span>
+                        </div>
+                        {entry.data !== undefined && entry.data !== null && (
+                          <pre className="max-h-32 overflow-auto rounded bg-background/70 p-2 text-[11px] leading-relaxed text-muted-foreground">
+                            {formatDebugStepData(entry.data)}
+                          </pre>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
                 </div>
               )}
               {invoiceSuccess && (
@@ -3405,7 +3644,7 @@ export function PaymentManagement({
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Monto</span>
                   <span className="font-semibold text-green-600">
-                    ${selectedInvoiceRecord.total.toLocaleString()} {" "}
+                    ${selectedInvoiceRecord.total.toLocaleString()}{" "}
                     {selectedInvoiceRecord.currency || "UYU"}
                   </span>
                 </div>
@@ -3428,7 +3667,11 @@ export function PaymentManagement({
                     Datos enviados
                   </span>
                   <pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 text-xs">
-                    {JSON.stringify(selectedInvoiceRecord.request_payload ?? {}, null, 2)}
+                    {JSON.stringify(
+                      selectedInvoiceRecord.request_payload ?? {},
+                      null,
+                      2
+                    )}
                   </pre>
                 </div>
                 <div>
@@ -3436,7 +3679,11 @@ export function PaymentManagement({
                     Respuesta del servicio
                   </span>
                   <pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 text-xs">
-                    {JSON.stringify(selectedInvoiceRecord.response_payload ?? {}, null, 2)}
+                    {JSON.stringify(
+                      selectedInvoiceRecord.response_payload ?? {},
+                      null,
+                      2
+                    )}
                   </pre>
                 </div>
               </div>

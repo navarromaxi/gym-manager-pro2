@@ -275,6 +275,36 @@ const normalizeEnvironment = (value: string | null | undefined) => {
 const FACTURA_LIVE_DEFAULT_ENVIRONMENT =
   normalizeEnvironment(rawDefaultEnvironment) ?? "TEST";
 
+  type DebugSource = "server" | "facturalive" | "database";
+
+type DebugStep = {
+  at: string;
+  step: string;
+  source: DebugSource;
+  data?: unknown;
+};
+
+const sanitizeDebugData = (value: unknown): unknown => {
+  if (value === null || value === undefined) return value;
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeDebugData(item));
+  }
+
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => {
+        if (key.toLowerCase().includes("password")) {
+          return [key, "<hidden>"];
+        }
+        return [key, sanitizeDebugData(item)];
+      })
+    );
+  }
+
+  return value;
+};
+
 const sanitizeDateString = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -292,8 +322,54 @@ const REQUIRED_CREDENTIALS: { key: CredentialKey; label: string }[] = [
 ];
 
 export async function POST(request: Request) {
+  const debugSteps: DebugStep[] = [];
+  const recordStep = (
+    step: string,
+    data?: unknown,
+    source: DebugSource = "server"
+  ) => {
+    const entry: DebugStep = {
+      at: new Date().toISOString(),
+      step,
+      source,
+    };
+    if (data !== undefined) {
+      entry.data = sanitizeDebugData(data);
+    }
+    debugSteps.push(entry);
+  };
   try {
-    const body = await request.json();
+    recordStep("Solicitud recibida en el backend de facturación");
+
+    let body: unknown;
+    try {
+      body = await request.json();
+      recordStep("Cuerpo de la solicitud convertido a JSON", {
+        keys:
+          body && typeof body === "object"
+            ? Object.keys(body as Record<string, unknown>)
+            : [],
+      });
+    } catch (parseError) {
+      recordStep(
+        "No se pudo interpretar el cuerpo de la solicitud",
+        {
+          error:
+            parseError instanceof Error
+              ? parseError.message
+              : String(parseError),
+        }
+      );
+      return NextResponse.json(
+        {
+          error:
+            "El servidor no pudo interpretar los datos enviados. Verifica la estructura del pedido.",
+          debugSteps,
+        },
+        { status: 400 }
+      );
+    }
+
     const {
       gymId,
       paymentId,
@@ -308,13 +384,29 @@ export async function POST(request: Request) {
       memberName?: string;
       amount?: number;
       invoice?: InvoicePayload;
-    } = body ?? {};
+    } = (body as Record<string, unknown>) ?? {};
+
+    recordStep("Datos recibidos para facturación", {
+      gymId,
+      paymentId,
+      memberId,
+      amount,
+      hasInvoice: Boolean(invoice),
+    });
 
     if (!gymId || !paymentId || !invoice || typeof amount !== "number") {
+      recordStep("Solicitud rechazada por datos incompletos", {
+        gymId,
+        paymentId,
+        amount,
+        hasInvoice: Boolean(invoice),
+        amountType: typeof amount,
+      });
       return NextResponse.json(
         {
           error:
             "Faltan datos obligatorios para emitir la factura. Verifica la información enviada.",
+          debugSteps,
         },
         { status: 400 }
       );
@@ -324,17 +416,26 @@ export async function POST(request: Request) {
     sanitizedLineas = sanitizedLineas.replace(/<\s*col\s*\/>/gi, "</col/>");
     sanitizedLineas = sanitizedLineas.trim().replace(/,+$/, "");
     sanitizedLineas = sanitizedLineas.trim();
+    recordStep("Líneas sanitizadas", {
+      length: sanitizedLineas.length,
+      preview: sanitizedLineas.slice(0, 200),
+    });
     if (!sanitizedLineas) {
+      recordStep(
+        "Solicitud rechazada: no se encontraron líneas de factura"
+      );
       return NextResponse.json(
         {
           error:
             "No se encontraron ítems para la factura. Asegúrate de completar el detalle de líneas.",
+            debugSteps,
         },
         { status: 400 }
       );
     }
 
     const supabase = createClient();
+    recordStep("Obteniendo configuración de facturación del gimnasio", { gymId });
 
     const { data: gymConfigRow, error: gymConfigError } = await supabase
       .from("gyms")
@@ -349,14 +450,32 @@ export async function POST(request: Request) {
         "Error obteniendo la configuración de facturación del gimnasio",
         gymConfigError
       );
+      recordStep(
+        "Error al obtener la configuración del gimnasio",
+        {
+          message: gymConfigError.message,
+          details: gymConfigError.details,
+          hint: gymConfigError.hint,
+        },
+        "database"
+      );
       return NextResponse.json(
         {
           error:
             "No pudimos obtener las credenciales de facturación del gimnasio. Revisa la configuración en Supabase e intenta nuevamente.",
-        },
+          debugSteps,},
         { status: 500 }
       );
     }
+
+
+
+
+    recordStep(
+      "Configuración del gimnasio obtenida",
+      { gymConfigRow },
+      "database"
+    );
 
     const resolvedCredentials: ResolvedCredentials = {
       userId:
@@ -397,6 +516,10 @@ export async function POST(request: Request) {
       facturaext: parseOptionalString(gymConfigRow?.invoice_facturaext),
     };
 
+    recordStep("Credenciales resueltas para FacturaLive", {
+      resolvedCredentials,
+    });
+
     const missingCredentials = REQUIRED_CREDENTIALS.filter(
       ({ key }) => !resolvedCredentials[key]
     );
@@ -405,10 +528,12 @@ export async function POST(request: Request) {
       const missingLabels = missingCredentials.map(
         (credential) => credential.label
       );
+      recordStep("Faltan credenciales obligatorias", { missing: missingLabels });
       return NextResponse.json(
         {
           error: `Faltan credenciales obligatorias (${missingLabels.join(", ")}) para facturar este gimnasio. Completa la configuración en la tabla gyms de Supabase, incluyendo la contraseña invoice_password.`,
           missing: missingLabels,
+          debugSteps,
         },
         { status: 400 }
       );
@@ -425,6 +550,11 @@ export async function POST(request: Request) {
       invoiceEnvironmentOverride ||
       resolvedCredentials.environment ||
       FACTURA_LIVE_DEFAULT_ENVIRONMENT;
+
+      recordStep("Ambiente de facturación determinado", {
+      invoiceEnvironmentOverride,
+      effectiveEnvironment,
+    });
 
     const defaults: InvoicePayload = {
       userid: resolvedCredentials.userId!,
@@ -519,7 +649,18 @@ export async function POST(request: Request) {
     }
     payloadForStorage.endpoint = facturaEndpoint;
 
+    recordStep(
+      "Payload final armado para FacturaLive",
+      { payload: payloadForStorage },
+      "facturalive"
+    );
     const encoded = new URLSearchParams(payload);
+    recordStep(
+      "Enviando solicitud a FacturaLive",
+      { endpoint: facturaEndpoint },
+      "facturalive"
+    );
+
     const externalResponse = await fetch(facturaEndpoint, {
       method: "POST",
       headers: {
@@ -528,16 +669,43 @@ export async function POST(request: Request) {
       body: encoded.toString(),
     });
 
+    recordStep(
+      "Respuesta HTTP recibida de FacturaLive",
+      { status: externalResponse.status, ok: externalResponse.ok },
+      "facturalive"
+    );
+
     const rawResponse = await externalResponse.text();
+
+     recordStep(
+      "Cuerpo recibido de FacturaLive",
+      {
+        length: rawResponse.length,
+        preview: rawResponse.slice(0, 500),
+      },
+      "facturalive"
+    );
+
     const parsedResponse = parseFacturaResponse(rawResponse);
+    recordStep(
+      "Respuesta de FacturaLive interpretada",
+      { parsedResponse },
+      "facturalive"
+    );
 
     if (!rawResponse || rawResponse.trim().length === 0) {
+       recordStep(
+        "FacturaLive no devolvió contenido",
+        undefined,
+        "facturalive"
+      );
       return NextResponse.json(
         {
           error:
             "FACTURALIVE no devolvió contenido. Revisa las credenciales y la configuración enviada porque el servicio no confirmó la emisión.",
           rawResponse,
           endpoint: facturaEndpoint,
+          debugSteps,
         },
         { status: 502 }
       );
@@ -549,12 +717,18 @@ export async function POST(request: Request) {
         : { raw: rawResponse, endpoint: facturaEndpoint };
 
     if (!externalResponse.ok) {
+      recordStep(
+        "FacturaLive respondió con estado HTTP de error",
+        { status: externalResponse.status },
+        "facturalive"
+      );
       return NextResponse.json(
         {
           error:
             "El servicio de facturación devolvió un error. Intenta nuevamente en unos minutos.",
           rawResponse,
           endpoint: facturaEndpoint,
+          debugSteps,
         },
         { status: 502 }
       );
@@ -564,13 +738,19 @@ export async function POST(request: Request) {
       (parsedResponse?.status as string | undefined) ||
       (parsedResponse?.resultado as string | undefined) ||
       "procesado";
-      const normalizedStatus =
+    const normalizedStatus =
       typeof status === "string" ? status.trim().toLowerCase() : "";
     const isSuccessfulStatus =
       normalizedStatus.length === 0 ||
       FACTURA_SUCCESS_KEYWORDS.some((keyword) =>
         normalizedStatus.includes(keyword)
       );
+
+      recordStep(
+      "Estado devuelto por FacturaLive",
+      { status, normalizedStatus, isSuccessfulStatus },
+      "facturalive"
+    );
 
     if (!isSuccessfulStatus) {
       const errorMessages = extractFacturaMessages(parsedResponse);
@@ -584,13 +764,18 @@ export async function POST(request: Request) {
         parsedResponse,
         rawResponse,
       });
-
+      recordStep(
+        "FacturaLive rechazó la factura",
+        { status, errorMessages },
+        "facturalive"
+      );
       return NextResponse.json(
         {
           error: errorMessage,
           rawResponse,
           externalResponse: responsePayload,
           endpoint: facturaEndpoint,
+          debugSteps,
         },
         { status: 502 }
       );
@@ -638,6 +823,13 @@ export async function POST(request: Request) {
       response_payload: responsePayload,
     };
 
+
+    recordStep(
+      "Registrando factura en Supabase",
+      { invoiceRecord },
+      "database"
+    );
+
     const { data: storedInvoice, error: insertError } = await supabase
       .from("invoices")
       .insert(invoiceRecord)
@@ -646,8 +838,22 @@ export async function POST(request: Request) {
 
     if (insertError) {
       console.error("Error guardando la factura en la base de datos", insertError);
+      recordStep(
+        "Error guardando la factura en Supabase",
+        {
+          code: insertError.code,
+          message: insertError.message,
+          details: insertError.details,
+        },
+        "database"
+      );
 
       if (insertError.code === "23505") {
+        recordStep(
+          "Intentando actualizar factura existente tras conflicto",
+          { gymId, paymentId },
+          "database"
+        );
         const { data: updatedInvoice, error: updateError } = await supabase
           .from("invoices")
           .update(invoiceRecord)
@@ -657,12 +863,18 @@ export async function POST(request: Request) {
           .single();
 
         if (!updateError && updatedInvoice) {
+           recordStep(
+            "Factura existente actualizada",
+            { invoiceId: updatedInvoice.id },
+            "database"
+          );
           return NextResponse.json({
             invoice: updatedInvoice,
             externalResponse: responsePayload,
             rawResponse,
             reusedExistingInvoice: true,
             endpoint: facturaEndpoint,
+            debugSteps,
           });
         }
 
@@ -679,23 +891,35 @@ export async function POST(request: Request) {
           rawResponse,
           externalResponse: responsePayload,
           endpoint: facturaEndpoint,
+          debugSteps,
         },
         { status: 500 }
       );
     }
+
+    recordStep(
+      "Factura guardada correctamente en Supabase",
+      { invoiceId: storedInvoice.id },
+      "database"
+    );
 
     return NextResponse.json({
       invoice: storedInvoice,
       externalResponse: responsePayload,
       rawResponse,
       endpoint: facturaEndpoint,
+      debugSteps,
     });
   } catch (error) {
     console.error("Error inesperado al emitir factura", error);
+    recordStep("Error inesperado en el backend", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       {
         error:
           "Ocurrió un error inesperado al emitir la factura. Intenta nuevamente en unos momentos.",
+          debugSteps
       },
       { status: 500 }
     );
