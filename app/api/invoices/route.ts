@@ -669,9 +669,17 @@ export async function POST(request: Request) {
       body: encoded.toString(),
     });
 
+    const responseHeaders = Object.fromEntries(
+      externalResponse.headers.entries()
+    );
+
     recordStep(
       "Respuesta HTTP recibida de FacturaLive",
-      { status: externalResponse.status, ok: externalResponse.ok },
+      {
+        status: externalResponse.status,
+        ok: externalResponse.ok,
+        headers: responseHeaders,
+      },
       "facturalive"
     );
 
@@ -694,17 +702,18 @@ export async function POST(request: Request) {
     );
 
     if (!rawResponse || rawResponse.trim().length === 0) {
-       recordStep(
+      recordStep(
         "FacturaLive no devolvió contenido",
-        undefined,
+        { headers: responseHeaders },
         "facturalive"
       );
       return NextResponse.json(
         {
           error:
-            "FACTURALIVE no devolvió contenido. Revisa las credenciales y la configuración enviada porque el servicio no confirmó la emisión.",
+            "FacturaLive respondió sin cuerpo aunque confirmó la recepción HTTP. Esto suele ocurrir cuando las credenciales o el formato del payload fueron rechazados antes de generar el comprobante.",
           rawResponse,
           endpoint: facturaEndpoint,
+          responseHeaders,
           debugSteps,
         },
         { status: 502 }
