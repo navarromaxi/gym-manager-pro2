@@ -655,18 +655,24 @@ export async function POST(request: Request) {
       "facturalive"
     );
     const encoded = new URLSearchParams(payload);
+    const encodedBody = encoded.toString();
     recordStep(
       "Enviando solicitud a FacturaLive",
-      { endpoint: facturaEndpoint },
+       {
+        endpoint: facturaEndpoint,
+        payloadLength: encodedBody.length,
+      },
       "facturalive"
     );
 
     const externalResponse = await fetch(facturaEndpoint, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        Accept: "application/json, text/plain, */*",
+        "User-Agent": "gym-manager-pro/1.0 (+https://gym-manager-pro2.vercel.app)",
       },
-      body: encoded.toString(),
+      body: encodedBody,
     });
 
     const responseHeaders = Object.fromEntries(
@@ -776,9 +782,7 @@ export async function POST(request: Request) {
           rawResponse,
           rawUtf8Response,
           endpoint: facturaEndpoint,
-          responseHeaders,
-          alternateDecoding,
-          binaryFallback,
+          
           debugSteps,
         },
         { status: 502 }
