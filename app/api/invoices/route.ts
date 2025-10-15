@@ -97,13 +97,21 @@ const resolveFacturaEndpoint = (environment: string | null | undefined) =>
     ? FACTURA_LIVE_PROD_ENDPOINT
     : FACTURA_LIVE_TEST_ENDPOINT;
 
-    const shouldIncludeFacturaField = (field: string, value: unknown) => {
+  const shouldIncludeFacturaField = (field: string, value: unknown) => {
   if (value === undefined || value === null) {
     return false;
   }
 
   if (typeof value === "number") {
-    return Number.isFinite(value);
+    if (!Number.isFinite(value)) {
+      return false;
+    }
+
+    if (field === "customerid") {
+      return value > 0;
+    }
+
+    return true;
   }
 
   if (typeof value === "string") {
@@ -111,7 +119,7 @@ const resolveFacturaEndpoint = (environment: string | null | undefined) =>
     if (trimmed.length === 0) {
       return false;
     }
-    if (field === "customerid" && trimmed === "0") {
+    if (field === "customerid" && Number(trimmed) === 0) {
       return false;
     }
     return true;
