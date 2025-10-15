@@ -683,16 +683,74 @@ export async function POST(request: Request) {
       "facturalive"
     );
 
-    const rawResponse = await externalResponse.text();
+    const responseClone = externalResponse.clone();
+    const rawUtf8Response = await externalResponse.text();
 
-     recordStep(
+    recordStep(
       "Cuerpo recibido de FacturaLive",
       {
-        length: rawResponse.length,
-        preview: rawResponse.slice(0, 500),
+        length: rawUtf8Response.length,
+        preview: rawUtf8Response.slice(0, 500),
       },
       "facturalive"
     );
+
+     let rawResponse = rawUtf8Response;
+    let alternateDecoding:
+      | { encoding: string; length: number; preview: string }
+      | null = null;
+    let binaryFallback:
+      | { byteLength: number; base64Preview: string }
+      | null = null;
+
+    if (!rawUtf8Response || rawUtf8Response.trim().length === 0) {
+      try {
+        const fallbackBuffer = await responseClone.arrayBuffer();
+        if (fallbackBuffer.byteLength > 0) {
+          const latin1Decoded = new TextDecoder("latin1", {
+            fatal: false,
+            ignoreBOM: true,
+          }).decode(fallbackBuffer);
+          const sanitizedLatin1 = latin1Decoded.replace(/\u0000/g, "");
+          if (sanitizedLatin1.trim().length > 0) {
+            rawResponse = sanitizedLatin1;
+            alternateDecoding = {
+              encoding: "latin1",
+              length: sanitizedLatin1.length,
+              preview: sanitizedLatin1.slice(0, 500),
+            };
+            recordStep(
+              "Cuerpo recuperado con decodificación Latin-1",
+              alternateDecoding,
+              "facturalive"
+            );
+          } else {
+            binaryFallback = {
+              byteLength: fallbackBuffer.byteLength,
+              base64Preview: Buffer.from(fallbackBuffer)
+                .toString("base64")
+                .slice(0, 200),
+            };
+            recordStep(
+              "FacturaLive devolvió payload binario sin contenido textual",
+              binaryFallback,
+              "facturalive"
+            );
+          }
+        }
+      } catch (fallbackError) {
+        recordStep(
+          "No se pudo obtener el cuerpo bruto de FacturaLive",
+          {
+            error:
+              fallbackError instanceof Error
+                ? fallbackError.message
+                : String(fallbackError),
+          },
+          "facturalive"
+        );
+      }
+    }
 
     const parsedResponse = parseFacturaResponse(rawResponse);
     recordStep(
@@ -704,7 +762,11 @@ export async function POST(request: Request) {
     if (!rawResponse || rawResponse.trim().length === 0) {
       recordStep(
         "FacturaLive no devolvió contenido",
-        { headers: responseHeaders },
+        {
+          headers: responseHeaders,
+          alternateDecoding,
+          binaryFallback,
+        },
         "facturalive"
       );
       return NextResponse.json(
@@ -712,8 +774,11 @@ export async function POST(request: Request) {
           error:
             "FacturaLive respondió sin cuerpo aunque confirmó la recepción HTTP. Esto suele ocurrir cuando las credenciales o el formato del payload fueron rechazados antes de generar el comprobante.",
           rawResponse,
+          rawUtf8Response,
           endpoint: facturaEndpoint,
           responseHeaders,
+          alternateDecoding,
+          binaryFallback,
           debugSteps,
         },
         { status: 502 }
