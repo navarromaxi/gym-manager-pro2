@@ -428,14 +428,14 @@ export async function POST(request: Request) {
 
     const defaults: InvoicePayload = {
       userid: resolvedCredentials.userId!,
-      empresaid: resolvedCredentials.companyId!,
-      codsucursal: resolvedCredentials.branchCode!,
-      sucursal: resolvedCredentials.branchId!,
-      password: resolvedCredentials.password!,
       customerid:
         typeof invoice.customerid === "number" && Number.isFinite(invoice.customerid)
           ? invoice.customerid
           : resolvedCredentials.customerId ?? 0,
+      empresaid: resolvedCredentials.companyId!,
+      codsucursal: resolvedCredentials.branchCode!,
+      sucursal: resolvedCredentials.branchId!,
+      password: resolvedCredentials.password!,
       facturareferencia: invoice.facturareferencia ?? paymentId,
       contnumero: invoice.contnumero ?? "",
       contserie: invoice.contserie ?? "",
