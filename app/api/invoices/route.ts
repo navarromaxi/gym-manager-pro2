@@ -135,13 +135,20 @@ const buildFacturaPayload = (
   invoice: InvoicePayload,
   overrides: InvoicePayload
 ) => {
-  const merged: InvoicePayload = { ...invoice };
+  const merged: InvoicePayload = {};
 
   Object.entries(overrides).forEach(([key, value]) => {
-    if (value === undefined || value === null) {
+    if (!shouldIncludeFacturaField(key, value)) {
       return;
     }
-    merged[key] = value;
+    merged[key as keyof InvoicePayload] = value;
+  });
+
+  Object.entries(invoice).forEach(([key, value]) => {
+    if (!shouldIncludeFacturaField(key, value)) {
+      return;
+    }
+    merged[key as keyof InvoicePayload] = value;
   });
 
   const payload: Record<string, string> = {};
