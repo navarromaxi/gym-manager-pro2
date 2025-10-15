@@ -364,20 +364,18 @@ const REQUIRED_CREDENTIALS: { key: CredentialKey; label: string }[] = [
 ];
 
 function enforceCfeConsistency(p: Record<string, string>) {
-  const t = p.typecfe?.toString();
+  const hasRut = !!(p.rutneg && p.rutneg.toString().trim().length > 0);
+  // normalizo por las dudas
+  p.typecfe = (p.typecfe ?? "").toString().trim();
 
-  // e-Ticket (consumidor final): no debe llevar RUT/typedoc
-  if (t === "111") {
-    delete p.rutneg;
-    delete p.typedoc;
-  }
-
-  // e-Factura (empresa con RUT): debe llevar rutneg + typedoc=2
-  if (t === "101") {
-    if (!p.rutneg || p.rutneg.trim().length === 0) {
-      throw new Error("Para e-Factura (typecfe=101) es obligatorio enviar rutneg.");
-    }
+  if (hasRut) {
+    // Con RUT → e-Factura
+    p.typecfe = "101";
     p.typedoc = "2";
+  } else {
+    // Sin RUT → e-Ticket
+    p.typecfe = "111";
+    delete p.typedoc;
   }
 }
 
@@ -719,17 +717,7 @@ const invoiceIssueDate =
     const payload = buildFacturaPayload(invoice, defaults);
     
     const facturaEndpoint = resolveFacturaEndpoint(effectiveEnvironment);
-    const payloadForStorage: Record<string, string> = { ...payload };
-    if (typeof payloadForStorage.password === "string") {
-      payloadForStorage.password = "<hidden>";
-    }
-    payloadForStorage.endpoint = facturaEndpoint;
-
-    recordStep(
-      "Payload final armado para FacturaLive",
-      { payload: payloadForStorage },
-      "facturalive"
-    );
+    
 
     try {
   enforceCfeConsistency(payload);
@@ -749,6 +737,25 @@ const invoiceIssueDate =
     { status: 400 }
   );
 }
+
+const payloadForStorage: Record<string, string> = { ...payload };
+    if (typeof payloadForStorage.password === "string") {
+      payloadForStorage.password = "<hidden>";
+    }
+    payloadForStorage.endpoint = facturaEndpoint;
+
+    recordStep(
+      "Payload final armado para FacturaLive",
+      { payload: payloadForStorage },
+      "facturalive"
+    );
+
+    // Si viene algo raro, por defecto efectivo (1) para homologación
+const pt = (payload.payment_type ?? "").toString().trim();
+if (!["1", "2", "3"].includes(pt)) {
+  payload.payment_type = "1";
+}
+
 
     //MOMENTO ANTES DE ENVIAR A FACTURALIVE
     const encoded = new URLSearchParams(payload);
