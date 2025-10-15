@@ -97,36 +97,39 @@ const resolveFacturaEndpoint = (environment: string | null | undefined) =>
     ? FACTURA_LIVE_PROD_ENDPOINT
     : FACTURA_LIVE_TEST_ENDPOINT;
 
-  const shouldIncludeFacturaField = (field: string, value: unknown) => {
-  if (value === undefined || value === null) {
-    return false;
-  }
+  const ALLOW_EMPTY = new Set([
+  "customerid",
+  "contnumero",
+  "contserie",
+  "fechavencimiento",
+  "additionalinfo",
+  "terms_conditions",
+  "ordencompra",
+  "lugarentrega",
+  "periododesde",
+  "periodohasta",
+  "indicadorfacturacion",
+]);
 
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) {
-      return false;
-    }
+const shouldIncludeFacturaField = (field: string, value: unknown) => {
+  if (value === undefined || value === null) return false;
 
-    if (field === "customerid") {
-      return value > 0;
-    }
+  // siempre incluir customerid aunque sea 0
+  if (field === "customerid") return true;
 
-    return true;
-  }
+  if (typeof value === "number") return Number.isFinite(value);
 
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed.length === 0) {
-      return false;
-    }
-    if (field === "customerid" && Number(trimmed) === 0) {
-      return false;
+      // para estos campos, enviar aunque esté vacío
+      return ALLOW_EMPTY.has(field);
     }
     return true;
   }
-
   return false;
 };
+
 
 const buildFacturaPayload = (
   invoice: InvoicePayload,
@@ -353,6 +356,25 @@ const REQUIRED_CREDENTIALS: { key: CredentialKey; label: string }[] = [
   { key: "password", label: "password" },
 ];
 
+function enforceCfeConsistency(p: Record<string, string>) {
+  const t = p.typecfe?.toString();
+
+  // e-Ticket (consumidor final): no debe llevar RUT/typedoc
+  if (t === "111") {
+    delete p.rutneg;
+    delete p.typedoc;
+  }
+
+  // e-Factura (empresa con RUT): debe llevar rutneg + typedoc=2
+  if (t === "101") {
+    if (!p.rutneg || p.rutneg.trim().length === 0) {
+      throw new Error("Para e-Factura (typecfe=101) es obligatorio enviar rutneg.");
+    }
+    p.typedoc = "2";
+  }
+}
+
+
 export async function POST(request: Request) {
   const debugSteps: DebugStep[] = [];
   const recordStep = (
@@ -572,7 +594,9 @@ export async function POST(request: Request) {
     }
 
     const today = new Date().toISOString().split("T")[0];
-    const invoiceIssueDate = sanitizeDateString(invoice.fechafacturacion);
+const requestedIssueDate = sanitizeDateString(invoice.fechafacturacion);
+const invoiceIssueDate =
+  requestedIssueDate && requestedIssueDate <= today ? requestedIssueDate : today;
     const invoiceDueDate = sanitizeDateString(invoice.fechavencimiento);
 
     const invoiceEnvironmentOverride = normalizeEnvironment(
@@ -591,13 +615,10 @@ export async function POST(request: Request) {
     const defaults: InvoicePayload = {
       userid: resolvedCredentials.userId!,
       customerid:
-        typeof invoice.customerid === "number" &&
-        Number.isFinite(invoice.customerid) &&
-        invoice.customerid > 0
-          ? invoice.customerid
-          : resolvedCredentials.customerId && resolvedCredentials.customerId > 0
-          ? resolvedCredentials.customerId
-          : undefined,
+  typeof invoice.customerid === "number" && Number.isFinite(invoice.customerid)
+    ? invoice.customerid
+    : (resolvedCredentials.customerId ?? 0),
+
       empresaid: resolvedCredentials.companyId!,
       codsucursal: resolvedCredentials.branchCode!,
       sucursal: resolvedCredentials.branchId!,
@@ -662,14 +683,22 @@ export async function POST(request: Request) {
           : resolvedCredentials.addinfoneg ?? "",
       lineas: sanitizedLineas,
       indicadorfacturacion: invoice.indicadorfacturacion ?? "",
-      typedoc: invoice.typedoc ?? 2,
+      //typedoc: invoice.typedoc ?? 2,
       environment: effectiveEnvironment,
-      facturaext:
-        typeof invoice.facturaext === "string" && invoice.facturaext.trim().length > 0
-          ? invoice.facturaext
-          : typeof invoice.facturaext === "number" && Number.isFinite(invoice.facturaext)
-          ? String(invoice.facturaext)
-          : resolvedCredentials.facturaext ?? paymentId,
+      facturaext: (() => {
+  // priorizá lo que viene en la request
+  if (typeof invoice.facturaext === "string" && invoice.facturaext.trim().length > 0) {
+    return invoice.facturaext;
+  }
+  if (typeof invoice.facturaext === "number" && Number.isFinite(invoice.facturaext)) {
+    return String(invoice.facturaext);
+  }
+  // si la de Supabase parece contener líneas (</col/>), ignorarla
+  if (resolvedCredentials.facturaext && resolvedCredentials.facturaext.includes("</col/>")) {
+    return paymentId;
+  }
+  return resolvedCredentials.facturaext ?? paymentId;
+})(),
       TipoTraslado:
         typeof invoice.TipoTraslado === "number" &&
         Number.isFinite(invoice.TipoTraslado) &&
@@ -681,19 +710,6 @@ export async function POST(request: Request) {
     };
 
     const payload = buildFacturaPayload(invoice, defaults);
-
-    if (
-      "customerid" in payload &&
-      payload.customerid !== undefined &&
-      Number(payload.customerid) === 0
-    ) {
-      recordStep(
-        "Customer ID inválido detectado. Eliminando campo para evitar rechazo de FacturaLive",
-        { customerid: payload.customerid },
-        "facturalive"
-      );
-      delete payload.customerid;
-    }
     
     const facturaEndpoint = resolveFacturaEndpoint(effectiveEnvironment);
     const payloadForStorage: Record<string, string> = { ...payload };
@@ -707,6 +723,27 @@ export async function POST(request: Request) {
       { payload: payloadForStorage },
       "facturalive"
     );
+
+    try {
+  enforceCfeConsistency(payload);
+  recordStep("Consistencia CFE aplicada", {
+    typecfe: payload.typecfe,
+    rutneg: payload.rutneg ? "<present>" : "<none>",
+    typedoc: payload.typedoc ?? "<none>",
+  }, "facturalive");
+} catch (consistencyErr) {
+  recordStep("Inconsistencia CFE detectada", { error: String(consistencyErr) }, "facturalive");
+  return NextResponse.json(
+    {
+      error: String(consistencyErr),
+      hint: "Si usás e-Ticket (111) no mandes RUT/typedoc. Si usás e-Factura (101) mandá rutneg y typedoc=2.",
+      debugSteps,
+    },
+    { status: 400 }
+  );
+}
+
+    //MOMENTO ANTES DE ENVIAR A FACTURALIVE
     const encoded = new URLSearchParams(payload);
     const encodedBody = encoded.toString();
     recordStep(
