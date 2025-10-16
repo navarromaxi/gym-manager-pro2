@@ -747,16 +747,17 @@ const invoiceIssueDate =
     };
 
     const payload = buildFacturaPayload(invoice, defaults);
-    // 🚫 No mandar customerid=0
-if (payload.customerid === "0" || payload.customerid === 0 as any) {
-  delete payload.customerid;
-}
     
     const facturaEndpoint = resolveFacturaEndpoint(effectiveEnvironment);
     
 
     try {
   enforceCfeConsistency(payload);
+  if (payload.typecfe === "111") {
+  delete payload.periododesde;
+  delete payload.periodohasta;
+}
+
   recordStep("Consistencia CFE aplicada", {
     typecfe: payload.typecfe,
     rutneg: payload.rutneg ? "<present>" : "<none>",
@@ -804,6 +805,11 @@ if (!["1", "2", "3"].includes(pt)) {
       },
       "facturalive"
     );
+
+    if (effectiveEnvironment === "TEST") {
+  payload.payment_type = "1";
+}
+
 
     const externalResponse = await fetch(facturaEndpoint, {
       method: "POST",
