@@ -368,15 +368,25 @@ function enforceCfeConsistency(p: Record<string, string>) {
   const requested = (p.typecfe ?? "").toString().trim();
   const hasRut = !!(p.rutneg && p.rutneg.toString().trim().length > 0);
 
-  // Si el request pidió explícitamente 111, respetamos y limpiamos RUT/typedoc
+  // normalizo rutneg a dígitos por si viene con puntos/guiones
+  if (hasRut) {
+    p.rutneg = p.rutneg.toString().replace(/\D+/g, "");
+  }
+
+  // Si el request pide explícitamente 111:
+  //  - si hay RUT, lo MANTENEMOS (quirk de FacturaLive) y seteamos typedoc=2
+  //  - si NO hay RUT, no mandamos typedoc
   if (requested === "111") {
     p.typecfe = "111";
-    delete p.rutneg;
-    delete p.typedoc;
+    if (hasRut) {
+      p.typedoc = "2";
+    } else {
+      delete p.typedoc;
+    }
     return;
   }
 
-  // Si el request pidió explícitamente 101, validamos que haya RUT y seteamos typedoc=2
+  // Si el request pide explícitamente 101: debe venir RUT
   if (requested === "101") {
     if (!hasRut) {
       throw new Error("Para e-Factura (typecfe=101) es obligatorio enviar rutneg.");
@@ -395,6 +405,7 @@ function enforceCfeConsistency(p: Record<string, string>) {
     delete p.typedoc;
   }
 }
+
 
 
 
@@ -683,9 +694,12 @@ const invoiceIssueDate =
       clicountry: invoice.clicountry ?? "UY",
       nomneg: invoice.nomneg ?? memberName ?? "Cliente",
       rutneg:
-        typeof invoice.rutneg === "string" && invoice.rutneg.trim().length > 0
-          ? invoice.rutneg
-          : resolvedCredentials.rutneg ?? "",
+  typeof invoice.rutneg === "string" && invoice.rutneg.trim().length > 0
+    ? invoice.rutneg.replace(/\D+/g, "")
+    : resolvedCredentials.rutneg
+      ? resolvedCredentials.rutneg.replace(/\D+/g, "")
+      : "",
+
       dirneg:
         typeof invoice.dirneg === "string" && invoice.dirneg.trim().length > 0
           ? invoice.dirneg
@@ -733,6 +747,10 @@ const invoiceIssueDate =
     };
 
     const payload = buildFacturaPayload(invoice, defaults);
+    // 🚫 No mandar customerid=0
+if (payload.customerid === "0" || payload.customerid === 0 as any) {
+  delete payload.customerid;
+}
     
     const facturaEndpoint = resolveFacturaEndpoint(effectiveEnvironment);
     
