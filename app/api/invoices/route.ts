@@ -754,9 +754,10 @@ const invoiceIssueDate =
     try {
   enforceCfeConsistency(payload);
   if (payload.typecfe === "111") {
-  delete payload.periododesde;
-  delete payload.periodohasta;
+  payload.periododesde = "";
+  payload.periodohasta = "";
 }
+
 
   recordStep("Consistencia CFE aplicada", {
     typecfe: payload.typecfe,
@@ -817,10 +818,11 @@ if (!["1", "2", "3"].includes(pt)) {
     const externalResponse = await fetch(facturaEndpoint, {
       method: "POST",
       headers: {
-         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        Accept: "application/json, text/plain, */*",
-        "User-Agent": "gym-manager-pro/1.0 (+https://gym-manager-pro2.vercel.app)",
-      },
+  "Content-Type": "application/x-www-form-urlencoded",
+  Accept: "application/json, text/plain, */*",
+  "User-Agent": "gym-manager-pro/1.0 (+https://gym-manager-pro2.vercel.app)",
+},
+
       body: encodedBody,
     });
 
