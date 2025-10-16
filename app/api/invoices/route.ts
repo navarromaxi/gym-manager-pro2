@@ -365,20 +365,37 @@ const REQUIRED_CREDENTIALS: { key: CredentialKey; label: string }[] = [
 ];
 
 function enforceCfeConsistency(p: Record<string, string>) {
+  const requested = (p.typecfe ?? "").toString().trim();
   const hasRut = !!(p.rutneg && p.rutneg.toString().trim().length > 0);
-  // normalizo por las dudas
-  p.typecfe = (p.typecfe ?? "").toString().trim();
 
+  // Si el request pidió explícitamente 111, respetamos y limpiamos RUT/typedoc
+  if (requested === "111") {
+    p.typecfe = "111";
+    delete p.rutneg;
+    delete p.typedoc;
+    return;
+  }
+
+  // Si el request pidió explícitamente 101, validamos que haya RUT y seteamos typedoc=2
+  if (requested === "101") {
+    if (!hasRut) {
+      throw new Error("Para e-Factura (typecfe=101) es obligatorio enviar rutneg.");
+    }
+    p.typecfe = "101";
+    p.typedoc = "2";
+    return;
+  }
+
+  // Si no especificaron typecfe, inferimos por presencia de RUT
   if (hasRut) {
-    // Con RUT → e-Factura
     p.typecfe = "101";
     p.typedoc = "2";
   } else {
-    // Sin RUT → e-Ticket
     p.typecfe = "111";
     delete p.typedoc;
   }
 }
+
 
 
 export async function POST(request: Request) {
