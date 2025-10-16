@@ -225,6 +225,7 @@ const extractFacturaMessages = (parsed: unknown): string[] => {
       "observacion",
       "causas",
       "causa",
+      "errordesc"
     ].map((value) => value.toLowerCase())
   );
 
@@ -916,66 +917,94 @@ if (!["1", "2", "3"].includes(pt)) {
       );
     }
 
-    const status =
-      (parsedResponse?.status as string | undefined) ||
-      (parsedResponse?.resultado as string | undefined) ||
-      "procesado";
-    const normalizedStatus =
-      typeof status === "string" ? status.trim().toLowerCase() : "";
-    const isSuccessfulStatus =
-      normalizedStatus.length === 0 ||
-      FACTURA_SUCCESS_KEYWORDS.some((keyword) =>
-        normalizedStatus.includes(keyword)
-      );
+    // Evaluar éxito/fracaso de forma robusta (acepta number o string y contempla campos de error)
+const statusRaw =
+  (parsedResponse as any)?.status ??
+  (parsedResponse as any)?.resultado ??
+  (parsedResponse as any)?.Status ??
+  (parsedResponse as any)?.RESULTADO;
 
-      recordStep(
-      "Estado devuelto por FacturaLive",
-      { status, normalizedStatus, isSuccessfulStatus },
-      "facturalive"
-    );
+let isSuccess = false;
+if (typeof statusRaw === "number") {
+  // FacturaLive suele usar 1=OK, 0=ERROR
+  isSuccess = statusRaw === 1;
+} else if (typeof statusRaw === "string") {
+  const s = statusRaw.trim().toLowerCase();
+  isSuccess = FACTURA_SUCCESS_KEYWORDS.some(k => s.includes(k));
+}
 
-    if (!isSuccessfulStatus) {
-      const errorMessages = extractFacturaMessages(parsedResponse);
-      const errorMessage =
-        errorMessages.length > 0
-          ? errorMessages.join(". ")
-          : "La factura fue rechazada por FacturaLive. Revisa los datos enviados.";
+// Si hay campos típicos de error, forzamos fallo
+const hasExplicitError =
+  !!(parsedResponse as any)?.ErrorDesc ||
+  !!(parsedResponse as any)?.error ||
+  !!(parsedResponse as any)?.errors ||
+  !!(parsedResponse as any)?.descripcion_error ||
+  !!(parsedResponse as any)?.detalle_error;
 
-      console.error("FacturaLive rechazó la factura", {
-        status,
-        parsedResponse,
-        rawResponse,
-      });
-      recordStep(
-        "FacturaLive rechazó la factura",
-        { status, errorMessages },
-        "facturalive"
-      );
-      return NextResponse.json(
-        {
-          error: errorMessage,
-          rawResponse,
-          externalResponse: responsePayload,
-          endpoint: facturaEndpoint,
-          debugSteps,
-        },
-        { status: 502 }
-      );
-    }
+// También considerá éxito si vienen identificadores “fuertes”
+const hasStrongSuccessHints =
+  !!(parsedResponse as any)?.CAE_ID ||
+  !!(parsedResponse as any)?.facturaid ||
+  !!(parsedResponse as any)?.numeroCFE ||
+  !!(parsedResponse as any)?.CAE_Nro;
+
+const isSuccessfulStatus = (isSuccess || hasStrongSuccessHints) && !hasExplicitError;
+
+recordStep(
+  "Estado devuelto por FacturaLive (robusto)",
+  { statusRaw, isSuccess, hasExplicitError, hasStrongSuccessHints, isSuccessfulStatus },
+  "facturalive"
+);
+
+if (!isSuccessfulStatus) {
+  const errorMessages = extractFacturaMessages(parsedResponse);
+  const extraErr = (parsedResponse as any)?.ErrorDesc
+    ? [`Detalle de proveedor: ${(parsedResponse as any).ErrorDesc}`]
+    : [];
+  const errorMessage =
+    [...errorMessages, ...extraErr].filter(Boolean).join(". ") ||
+    "La factura fue rechazada por FacturaLive. Revisa los datos enviados.";
+
+  console.error("FacturaLive rechazó la factura", {
+    statusRaw,
+    parsedResponse,
+    rawResponse,
+  });
+  recordStep(
+    "FacturaLive rechazó la factura",
+    { statusRaw, errorMessages, ErrorDesc: (parsedResponse as any)?.ErrorDesc },
+    "facturalive"
+  );
+  return NextResponse.json(
+    {
+      error: errorMessage,
+      rawResponse,
+      externalResponse: responsePayload,
+      endpoint: facturaEndpoint,
+      debugSteps,
+    },
+    { status: 502 }
+  );
+}
+
     const invoiceNumber =
-      (parsedResponse?.numeroCFE as string | undefined) ||
-      (parsedResponse?.invoice_number as string | undefined) ||
-      null;
-    const invoiceSeries =
-      (parsedResponse?.serieCFE as string | undefined) ||
-      (parsedResponse?.invoice_series as string | undefined) ||
-      (typeof defaults.seriereferencia === "string"
-        ? defaults.seriereferencia
-        : null);
-    const externalInvoiceId =
-      (parsedResponse?.idCFE as string | undefined) ||
-      (parsedResponse?.external_invoice_id as string | undefined) ||
-      null;
+  (parsedResponse as any)?.numeroCFE ??
+  (parsedResponse as any)?.Nro ??
+  (parsedResponse as any)?.invoice_number ??
+  null;
+
+const invoiceSeries =
+  (parsedResponse as any)?.serieCFE ??
+  (parsedResponse as any)?.Serie ??
+  (parsedResponse as any)?.invoice_series ??
+  (typeof defaults.seriereferencia === "string" ? defaults.seriereferencia : null);
+
+const externalInvoiceId =
+  (parsedResponse as any)?.idCFE ??
+  (parsedResponse as any)?.CAE_ID ??
+  (parsedResponse as any)?.external_invoice_id ??
+  null;
+
 
     const selection =
       "id, gym_id, payment_id, member_id, member_name, total, currency, status, invoice_number, invoice_series, external_invoice_id, environment, typecfe, issued_at, due_date, request_payload, response_payload, created_at, updated_at";
