@@ -775,6 +775,8 @@ const invoiceIssueDate =
   );
 }
 
+
+
 const payloadForStorage: Record<string, string> = { ...payload };
     if (typeof payloadForStorage.password === "string") {
       payloadForStorage.password = "<hidden>";
@@ -797,6 +799,11 @@ if (!["1", "2", "3"].includes(pt)) {
     //MOMENTO ANTES DE ENVIAR A FACTURALIVE
     const encoded = new URLSearchParams(payload);
     const encodedBody = encoded.toString();
+
+    if (effectiveEnvironment === "TEST") {
+  payload.payment_type = "1";
+}
+
     recordStep(
       "Enviando solicitud a FacturaLive",
        {
@@ -805,10 +812,6 @@ if (!["1", "2", "3"].includes(pt)) {
       },
       "facturalive"
     );
-
-    if (effectiveEnvironment === "TEST") {
-  payload.payment_type = "1";
-}
 
 
     const externalResponse = await fetch(facturaEndpoint, {
