@@ -1088,6 +1088,8 @@ const encodedBody = encoded.toString();
     const selection =
       "id, gym_id, payment_id, member_id, member_name, total, currency, status, invoice_number, invoice_series, external_invoice_id, environment, typecfe, issued_at, due_date, request_payload, response_payload, created_at, updated_at";
 
+    const status = isSuccessfulStatus ? "APPROVED" : "REJECTED"; // o "EMITIDA"/"RECHAZADA"
+
     const invoiceRecord = {
       gym_id: gymId,
       payment_id: paymentId,
