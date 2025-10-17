@@ -796,19 +796,30 @@ export async function POST(request: Request) {
     if (!["1", "2", "3"].includes(pt)) payload.payment_type = "1";
     if (effectiveEnvironment === "TEST") payload.payment_type = "1"; // <-- acá
 
-    const encoded = new URLSearchParams(payload);
-    const encodedBody = encoded.toString();
+    if (effectiveEnvironment === "TEST") {
+  payload.facturaext = "13";
+} else {
+  const digits = String(payload.facturaext ?? "").replace(/\D+/g, "");
+  payload.facturaext = digits || "1"; // o lo que te pida tu prov. en PROD
+}
 
-    recordStep(
-      "Request x-www-form-urlencoded (sanitizado)",
-      {
-        preview: encodedBody
-          .replace(/password=[^&]*/i, "password=<hidden>")
-          .slice(0, 300),
-        length: encodedBody.length,
-      },
-      "facturalive"
-    );
+// 2) por las dudas, normalizá rutneg a dígitos
+if (payload.rutneg) payload.rutneg = String(payload.rutneg).replace(/\D+/g, "");
+
+// 3) en TEST, payment_type=1 (ya lo hacés, pero que sea ANTES de encode)
+payload.payment_type = effectiveEnvironment === "TEST" ? "1" : (payload.payment_type ?? "1");
+
+// AHORA sí:
+const encoded = new URLSearchParams(payload);
+const encodedBody = encoded.toString();
+
+    recordStep("Campos críticos (post-normalización, prev-encode)", {
+  typecfe: payload.typecfe,
+  typedoc: payload.typedoc,
+  rutneg: payload.rutneg ? "<present>" : "<none>",
+  facturaext: payload.facturaext // ← acá queremos ver "13"
+}, "facturalive");
+
 
     recordStep(
       "Enviando solicitud a FacturaLive",
