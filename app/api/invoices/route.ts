@@ -91,13 +91,12 @@ type ResolvedCredentials = {
   facturaext: string | null;
 };
 
-
 const resolveFacturaEndpoint = (environment: string | null | undefined) =>
   environment === "PROD"
     ? FACTURA_LIVE_PROD_ENDPOINT
     : FACTURA_LIVE_TEST_ENDPOINT;
 
-  const ALLOW_EMPTY = new Set([
+const ALLOW_EMPTY = new Set([
   "customerid",
   "contnumero",
   "contserie",
@@ -130,7 +129,6 @@ const shouldIncludeFacturaField = (field: string, value: unknown) => {
   return false;
 };
 
-
 const buildFacturaPayload = (
   invoice: InvoicePayload,
   overrides: InvoicePayload
@@ -162,10 +160,8 @@ const buildFacturaPayload = (
     if (!shouldIncludeFacturaField(field, value)) {
       return;
     }
-    payload[field] =
-      typeof value === "string" ? value.trim() : String(value);
+    payload[field] = typeof value === "string" ? value.trim() : String(value);
   });
-
 
   return payload;
 };
@@ -225,7 +221,7 @@ const extractFacturaMessages = (parsed: unknown): string[] => {
       "observacion",
       "causas",
       "causa",
-      "errordesc"
+      "errordesc",
     ].map((value) => value.toLowerCase())
   );
 
@@ -296,18 +292,14 @@ const normalizeEnvironment = (value: string | null | undefined) => {
   if (!value) return null;
 
   const normalized = value.trim().toUpperCase();
-   if (["PROD", "PRODUCCION", "PRODUCCIÓN", "PRODUCTION"].includes(normalized)) {
+  if (["PROD", "PRODUCCION", "PRODUCCIÓN", "PRODUCTION"].includes(normalized)) {
     return "PROD";
   }
 
   if (
-    [
-      "TEST",
-      "HOMOLOGACION",
-      "HOMOLOGACIÓN",
-      "HOMOLOGA",
-      "HOMO",
-    ].includes(normalized)
+    ["TEST", "HOMOLOGACION", "HOMOLOGACIÓN", "HOMOLOGA", "HOMO"].includes(
+      normalized
+    )
   ) {
     return "TEST";
   }
@@ -318,7 +310,7 @@ const normalizeEnvironment = (value: string | null | undefined) => {
 const FACTURA_LIVE_DEFAULT_ENVIRONMENT =
   normalizeEnvironment(rawDefaultEnvironment) ?? "TEST";
 
-  type DebugSource = "server" | "facturalive" | "database";
+type DebugSource = "server" | "facturalive" | "database";
 
 type DebugStep = {
   at: string;
@@ -354,7 +346,12 @@ const sanitizeDateString = (value: unknown): string | null => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
-type CredentialKey = "userId" | "companyId" | "branchCode" | "branchId" | "password";
+type CredentialKey =
+  | "userId"
+  | "companyId"
+  | "branchCode"
+  | "branchId"
+  | "password";
 
 const REQUIRED_CREDENTIALS: { key: CredentialKey; label: string }[] = [
   { key: "userId", label: "userid" },
@@ -389,7 +386,9 @@ function enforceCfeConsistency(p: Record<string, string>) {
   // Si el request pide explícitamente 101: debe venir RUT
   if (requested === "101") {
     if (!hasRut) {
-      throw new Error("Para e-Factura (typecfe=101) es obligatorio enviar rutneg.");
+      throw new Error(
+        "Para e-Factura (typecfe=101) es obligatorio enviar rutneg."
+      );
     }
     p.typecfe = "101";
     p.typedoc = "2";
@@ -405,9 +404,6 @@ function enforceCfeConsistency(p: Record<string, string>) {
     delete p.typedoc;
   }
 }
-
-
-
 
 export async function POST(request: Request) {
   const debugSteps: DebugStep[] = [];
@@ -439,15 +435,10 @@ export async function POST(request: Request) {
             : [],
       });
     } catch (parseError) {
-      recordStep(
-        "No se pudo interpretar el cuerpo de la solicitud",
-        {
-          error:
-            parseError instanceof Error
-              ? parseError.message
-              : String(parseError),
-        }
-      );
+      recordStep("No se pudo interpretar el cuerpo de la solicitud", {
+        error:
+          parseError instanceof Error ? parseError.message : String(parseError),
+      });
       return NextResponse.json(
         {
           error:
@@ -509,26 +500,26 @@ export async function POST(request: Request) {
       preview: sanitizedLineas.slice(0, 200),
     });
     if (!sanitizedLineas) {
-      recordStep(
-        "Solicitud rechazada: no se encontraron líneas de factura"
-      );
+      recordStep("Solicitud rechazada: no se encontraron líneas de factura");
       return NextResponse.json(
         {
           error:
             "No se encontraron ítems para la factura. Asegúrate de completar el detalle de líneas.",
-            debugSteps,
+          debugSteps,
         },
         { status: 400 }
       );
     }
 
     const supabase = createClient();
-    recordStep("Obteniendo configuración de facturación del gimnasio", { gymId });
+    recordStep("Obteniendo configuración de facturación del gimnasio", {
+      gymId,
+    });
 
     const { data: gymConfigRow, error: gymConfigError } = await supabase
       .from("gyms")
       .select(
-         "invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_password, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado, invoice_payment_type, invoice_rutneg, invoice_dirneg, invoice_cityneg, invoice_stateneg, invoice_addinfoneg, invoice_facturaext"
+        "invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_password, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado, invoice_payment_type, invoice_rutneg, invoice_dirneg, invoice_cityneg, invoice_stateneg, invoice_addinfoneg, invoice_facturaext"
       )
       .eq("id", gymId)
       .maybeSingle();
@@ -551,13 +542,11 @@ export async function POST(request: Request) {
         {
           error:
             "No pudimos obtener las credenciales de facturación del gimnasio. Revisa la configuración en Supabase e intenta nuevamente.",
-          debugSteps,},
+          debugSteps,
+        },
         { status: 500 }
       );
     }
-
-
-
 
     recordStep(
       "Configuración del gimnasio obtenida",
@@ -616,10 +605,14 @@ export async function POST(request: Request) {
       const missingLabels = missingCredentials.map(
         (credential) => credential.label
       );
-      recordStep("Faltan credenciales obligatorias", { missing: missingLabels });
+      recordStep("Faltan credenciales obligatorias", {
+        missing: missingLabels,
+      });
       return NextResponse.json(
         {
-          error: `Faltan credenciales obligatorias (${missingLabels.join(", ")}) para facturar este gimnasio. Completa la configuración en la tabla gyms de Supabase, incluyendo la contraseña invoice_password.`,
+          error: `Faltan credenciales obligatorias (${missingLabels.join(
+            ", "
+          )}) para facturar este gimnasio. Completa la configuración en la tabla gyms de Supabase, incluyendo la contraseña invoice_password.`,
           missing: missingLabels,
           debugSteps,
         },
@@ -628,9 +621,11 @@ export async function POST(request: Request) {
     }
 
     const today = new Date().toISOString().split("T")[0];
-const requestedIssueDate = sanitizeDateString(invoice.fechafacturacion);
-const invoiceIssueDate =
-  requestedIssueDate && requestedIssueDate <= today ? requestedIssueDate : today;
+    const requestedIssueDate = sanitizeDateString(invoice.fechafacturacion);
+    const invoiceIssueDate =
+      requestedIssueDate && requestedIssueDate <= today
+        ? requestedIssueDate
+        : today;
     const invoiceDueDate = sanitizeDateString(invoice.fechavencimiento);
 
     const invoiceEnvironmentOverride = normalizeEnvironment(
@@ -641,7 +636,7 @@ const invoiceIssueDate =
       resolvedCredentials.environment ||
       FACTURA_LIVE_DEFAULT_ENVIRONMENT;
 
-      recordStep("Ambiente de facturación determinado", {
+    recordStep("Ambiente de facturación determinado", {
       invoiceEnvironmentOverride,
       effectiveEnvironment,
     });
@@ -649,9 +644,10 @@ const invoiceIssueDate =
     const defaults: InvoicePayload = {
       userid: resolvedCredentials.userId!,
       customerid:
-  typeof invoice.customerid === "number" && Number.isFinite(invoice.customerid)
-    ? invoice.customerid
-    : (resolvedCredentials.customerId ?? 0),
+        typeof invoice.customerid === "number" &&
+        Number.isFinite(invoice.customerid)
+          ? invoice.customerid
+          : resolvedCredentials.customerId ?? 0,
 
       empresaid: resolvedCredentials.companyId!,
       codsucursal: resolvedCredentials.branchCode!,
@@ -694,11 +690,11 @@ const invoiceIssueDate =
       clicountry: invoice.clicountry ?? "UY",
       nomneg: invoice.nomneg ?? memberName ?? "Cliente",
       rutneg:
-  typeof invoice.rutneg === "string" && invoice.rutneg.trim().length > 0
-    ? invoice.rutneg.replace(/\D+/g, "")
-    : resolvedCredentials.rutneg
-      ? resolvedCredentials.rutneg.replace(/\D+/g, "")
-      : "",
+        typeof invoice.rutneg === "string" && invoice.rutneg.trim().length > 0
+          ? invoice.rutneg.replace(/\D+/g, "")
+          : resolvedCredentials.rutneg
+          ? resolvedCredentials.rutneg.replace(/\D+/g, "")
+          : "",
 
       dirneg:
         typeof invoice.dirneg === "string" && invoice.dirneg.trim().length > 0
@@ -723,62 +719,68 @@ const invoiceIssueDate =
       //typedoc: invoice.typedoc ?? 2,
       environment: effectiveEnvironment,
       facturaext: (() => {
-  // priorizá lo que viene en la request
-  if (typeof invoice.facturaext === "string" && invoice.facturaext.trim().length > 0) {
-    return invoice.facturaext;
-  }
-  if (typeof invoice.facturaext === "number" && Number.isFinite(invoice.facturaext)) {
-    return String(invoice.facturaext);
-  }
-  // si la de Supabase parece contener líneas (</col/>), ignorarla
-  if (resolvedCredentials.facturaext && resolvedCredentials.facturaext.includes("</col/>")) {
-    return paymentId;
-  }
-  return resolvedCredentials.facturaext ?? paymentId;
-})(),
+        // prioridad a lo que venga en la request
+        let val: string =
+          typeof invoice.facturaext === "number" &&
+          Number.isFinite(invoice.facturaext)
+            ? String(invoice.facturaext)
+            : typeof invoice.facturaext === "string"
+            ? invoice.facturaext
+            : resolvedCredentials.facturaext ?? "";
+
+        // dejar solo dígitos
+        val = val.replace(/\D+/g, "");
+        // si queda vacío, usá un número corto fijo para homologación (p.ej. "13")
+        return val || "13";
+      })(),
       TipoTraslado:
         typeof invoice.TipoTraslado === "number" &&
         Number.isFinite(invoice.TipoTraslado) &&
         invoice.TipoTraslado > 0
           ? invoice.TipoTraslado
-          : resolvedCredentials.tipoTraslado && resolvedCredentials.tipoTraslado > 0
+          : resolvedCredentials.tipoTraslado &&
+            resolvedCredentials.tipoTraslado > 0
           ? resolvedCredentials.tipoTraslado
           : undefined,
     };
 
     const payload = buildFacturaPayload(invoice, defaults);
-    
+
     const facturaEndpoint = resolveFacturaEndpoint(effectiveEnvironment);
-    
 
     try {
-  enforceCfeConsistency(payload);
-  if (payload.typecfe === "111") {
-  payload.periododesde = "";
-  payload.periodohasta = "";
-}
+      enforceCfeConsistency(payload);
+      if (payload.typecfe === "111") {
+        payload.periododesde = "";
+        payload.periodohasta = "";
+      }
 
+      recordStep(
+        "Consistencia CFE aplicada",
+        {
+          typecfe: payload.typecfe,
+          rutneg: payload.rutneg ? "<present>" : "<none>",
+          typedoc: payload.typedoc ?? "<none>",
+        },
+        "facturalive"
+      );
+    } catch (consistencyErr) {
+      recordStep(
+        "Inconsistencia CFE detectada",
+        { error: String(consistencyErr) },
+        "facturalive"
+      );
+      return NextResponse.json(
+        {
+          error: String(consistencyErr),
+          hint: "Si usás e-Ticket (111) no mandes RUT/typedoc. Si usás e-Factura (101) mandá rutneg y typedoc=2.",
+          debugSteps,
+        },
+        { status: 400 }
+      );
+    }
 
-  recordStep("Consistencia CFE aplicada", {
-    typecfe: payload.typecfe,
-    rutneg: payload.rutneg ? "<present>" : "<none>",
-    typedoc: payload.typedoc ?? "<none>",
-  }, "facturalive");
-} catch (consistencyErr) {
-  recordStep("Inconsistencia CFE detectada", { error: String(consistencyErr) }, "facturalive");
-  return NextResponse.json(
-    {
-      error: String(consistencyErr),
-      hint: "Si usás e-Ticket (111) no mandes RUT/typedoc. Si usás e-Factura (101) mandá rutneg y typedoc=2.",
-      debugSteps,
-    },
-    { status: 400 }
-  );
-}
-
-
-
-const payloadForStorage: Record<string, string> = { ...payload };
+    const payloadForStorage: Record<string, string> = { ...payload };
     if (typeof payloadForStorage.password === "string") {
       payloadForStorage.password = "<hidden>";
     }
@@ -790,38 +792,41 @@ const payloadForStorage: Record<string, string> = { ...payload };
       "facturalive"
     );
 
-    // Si viene algo raro, por defecto efectivo (1) para homologación
-const pt = (payload.payment_type ?? "").toString().trim();
-if (!["1", "2", "3"].includes(pt)) {
-  payload.payment_type = "1";
-}
+    const pt = (payload.payment_type ?? "").toString().trim();
+    if (!["1", "2", "3"].includes(pt)) payload.payment_type = "1";
+    if (effectiveEnvironment === "TEST") payload.payment_type = "1"; // <-- acá
 
-
-    //MOMENTO ANTES DE ENVIAR A FACTURALIVE
     const encoded = new URLSearchParams(payload);
     const encodedBody = encoded.toString();
 
-    if (effectiveEnvironment === "TEST") {
-  payload.payment_type = "1";
-}
+    recordStep(
+      "Request x-www-form-urlencoded (sanitizado)",
+      {
+        preview: encodedBody
+          .replace(/password=[^&]*/i, "password=<hidden>")
+          .slice(0, 300),
+        length: encodedBody.length,
+      },
+      "facturalive"
+    );
 
     recordStep(
       "Enviando solicitud a FacturaLive",
-       {
+      {
         endpoint: facturaEndpoint,
         payloadLength: encodedBody.length,
       },
       "facturalive"
     );
 
-
     const externalResponse = await fetch(facturaEndpoint, {
       method: "POST",
       headers: {
-  "Content-Type": "application/x-www-form-urlencoded",
-  Accept: "application/json, text/plain, */*",
-  "User-Agent": "gym-manager-pro/1.0 (+https://gym-manager-pro2.vercel.app)",
-},
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        Accept: "application/json, text/plain, */*",
+        "User-Agent":
+          "gym-manager-pro/1.0 (+https://gym-manager-pro2.vercel.app)",
+      },
 
       body: encodedBody,
     });
@@ -852,13 +857,14 @@ if (!["1", "2", "3"].includes(pt)) {
       "facturalive"
     );
 
-     let rawResponse = rawUtf8Response;
-    let alternateDecoding:
-      | { encoding: string; length: number; preview: string }
-      | null = null;
-    let binaryFallback:
-      | { byteLength: number; base64Preview: string }
-      | null = null;
+    let rawResponse = rawUtf8Response;
+    let alternateDecoding: {
+      encoding: string;
+      length: number;
+      preview: string;
+    } | null = null;
+    let binaryFallback: { byteLength: number; base64Preview: string } | null =
+      null;
 
     if (!rawUtf8Response || rawUtf8Response.trim().length === 0) {
       try {
@@ -933,7 +939,7 @@ if (!["1", "2", "3"].includes(pt)) {
           rawResponse,
           rawUtf8Response,
           endpoint: facturaEndpoint,
-          
+
           debugSteps,
         },
         { status: 502 }
@@ -942,7 +948,11 @@ if (!["1", "2", "3"].includes(pt)) {
 
     const responsePayload =
       parsedResponse && typeof parsedResponse === "object"
-        ? { raw: rawResponse, parsed: parsedResponse, endpoint: facturaEndpoint }
+        ? {
+            raw: rawResponse,
+            parsed: parsedResponse,
+            endpoint: facturaEndpoint,
+          }
         : { raw: rawResponse, endpoint: facturaEndpoint };
 
     if (!externalResponse.ok) {
@@ -964,93 +974,105 @@ if (!["1", "2", "3"].includes(pt)) {
     }
 
     // Evaluar éxito/fracaso de forma robusta (acepta number o string y contempla campos de error)
-const statusRaw =
-  (parsedResponse as any)?.status ??
-  (parsedResponse as any)?.resultado ??
-  (parsedResponse as any)?.Status ??
-  (parsedResponse as any)?.RESULTADO;
+    const statusRaw =
+      (parsedResponse as any)?.status ??
+      (parsedResponse as any)?.resultado ??
+      (parsedResponse as any)?.Status ??
+      (parsedResponse as any)?.RESULTADO;
 
-let isSuccess = false;
-if (typeof statusRaw === "number") {
-  // FacturaLive suele usar 1=OK, 0=ERROR
-  isSuccess = statusRaw === 1;
-} else if (typeof statusRaw === "string") {
-  const s = statusRaw.trim().toLowerCase();
-  isSuccess = FACTURA_SUCCESS_KEYWORDS.some(k => s.includes(k));
-}
+    let isSuccess = false;
+    if (typeof statusRaw === "number") {
+      // FacturaLive suele usar 1=OK, 0=ERROR
+      isSuccess = statusRaw === 1;
+    } else if (typeof statusRaw === "string") {
+      const s = statusRaw.trim().toLowerCase();
+      isSuccess = FACTURA_SUCCESS_KEYWORDS.some((k) => s.includes(k));
+    }
 
-// Si hay campos típicos de error, forzamos fallo
-const hasExplicitError =
-  !!(parsedResponse as any)?.ErrorDesc ||
-  !!(parsedResponse as any)?.error ||
-  !!(parsedResponse as any)?.errors ||
-  !!(parsedResponse as any)?.descripcion_error ||
-  !!(parsedResponse as any)?.detalle_error;
+    // Si hay campos típicos de error, forzamos fallo
+    const hasExplicitError =
+      !!(parsedResponse as any)?.ErrorDesc ||
+      !!(parsedResponse as any)?.error ||
+      !!(parsedResponse as any)?.errors ||
+      !!(parsedResponse as any)?.descripcion_error ||
+      !!(parsedResponse as any)?.detalle_error;
 
-// También considerá éxito si vienen identificadores “fuertes”
-const hasStrongSuccessHints =
-  !!(parsedResponse as any)?.CAE_ID ||
-  !!(parsedResponse as any)?.facturaid ||
-  !!(parsedResponse as any)?.numeroCFE ||
-  !!(parsedResponse as any)?.CAE_Nro;
+    // También considerá éxito si vienen identificadores “fuertes”
+    const hasStrongSuccessHints =
+      !!(parsedResponse as any)?.CAE_ID ||
+      !!(parsedResponse as any)?.facturaid ||
+      !!(parsedResponse as any)?.numeroCFE ||
+      !!(parsedResponse as any)?.CAE_Nro;
 
-const isSuccessfulStatus = (isSuccess || hasStrongSuccessHints) && !hasExplicitError;
+    const isSuccessfulStatus =
+      (isSuccess || hasStrongSuccessHints) && !hasExplicitError;
 
-recordStep(
-  "Estado devuelto por FacturaLive (robusto)",
-  { statusRaw, isSuccess, hasExplicitError, hasStrongSuccessHints, isSuccessfulStatus },
-  "facturalive"
-);
+    recordStep(
+      "Estado devuelto por FacturaLive (robusto)",
+      {
+        statusRaw,
+        isSuccess,
+        hasExplicitError,
+        hasStrongSuccessHints,
+        isSuccessfulStatus,
+      },
+      "facturalive"
+    );
 
-if (!isSuccessfulStatus) {
-  const errorMessages = extractFacturaMessages(parsedResponse);
-  const extraErr = (parsedResponse as any)?.ErrorDesc
-    ? [`Detalle de proveedor: ${(parsedResponse as any).ErrorDesc}`]
-    : [];
-  const errorMessage =
-    [...errorMessages, ...extraErr].filter(Boolean).join(". ") ||
-    "La factura fue rechazada por FacturaLive. Revisa los datos enviados.";
+    if (!isSuccessfulStatus) {
+      const errorMessages = extractFacturaMessages(parsedResponse);
+      const extraErr = (parsedResponse as any)?.ErrorDesc
+        ? [`Detalle de proveedor: ${(parsedResponse as any).ErrorDesc}`]
+        : [];
+      const errorMessage =
+        [...errorMessages, ...extraErr].filter(Boolean).join(". ") ||
+        "La factura fue rechazada por FacturaLive. Revisa los datos enviados.";
 
-  console.error("FacturaLive rechazó la factura", {
-    statusRaw,
-    parsedResponse,
-    rawResponse,
-  });
-  recordStep(
-    "FacturaLive rechazó la factura",
-    { statusRaw, errorMessages, ErrorDesc: (parsedResponse as any)?.ErrorDesc },
-    "facturalive"
-  );
-  return NextResponse.json(
-    {
-      error: errorMessage,
-      rawResponse,
-      externalResponse: responsePayload,
-      endpoint: facturaEndpoint,
-      debugSteps,
-    },
-    { status: 502 }
-  );
-}
+      console.error("FacturaLive rechazó la factura", {
+        statusRaw,
+        parsedResponse,
+        rawResponse,
+      });
+      recordStep(
+        "FacturaLive rechazó la factura",
+        {
+          statusRaw,
+          errorMessages,
+          ErrorDesc: (parsedResponse as any)?.ErrorDesc,
+        },
+        "facturalive"
+      );
+      return NextResponse.json(
+        {
+          error: errorMessage,
+          rawResponse,
+          externalResponse: responsePayload,
+          endpoint: facturaEndpoint,
+          debugSteps,
+        },
+        { status: 502 }
+      );
+    }
 
     const invoiceNumber =
-  (parsedResponse as any)?.numeroCFE ??
-  (parsedResponse as any)?.Nro ??
-  (parsedResponse as any)?.invoice_number ??
-  null;
+      (parsedResponse as any)?.numeroCFE ??
+      (parsedResponse as any)?.Nro ??
+      (parsedResponse as any)?.invoice_number ??
+      null;
 
-const invoiceSeries =
-  (parsedResponse as any)?.serieCFE ??
-  (parsedResponse as any)?.Serie ??
-  (parsedResponse as any)?.invoice_series ??
-  (typeof defaults.seriereferencia === "string" ? defaults.seriereferencia : null);
+    const invoiceSeries =
+      (parsedResponse as any)?.serieCFE ??
+      (parsedResponse as any)?.Serie ??
+      (parsedResponse as any)?.invoice_series ??
+      (typeof defaults.seriereferencia === "string"
+        ? defaults.seriereferencia
+        : null);
 
-const externalInvoiceId =
-  (parsedResponse as any)?.idCFE ??
-  (parsedResponse as any)?.CAE_ID ??
-  (parsedResponse as any)?.external_invoice_id ??
-  null;
-
+    const externalInvoiceId =
+      (parsedResponse as any)?.idCFE ??
+      (parsedResponse as any)?.CAE_ID ??
+      (parsedResponse as any)?.external_invoice_id ??
+      null;
 
     const selection =
       "id, gym_id, payment_id, member_id, member_name, total, currency, status, invoice_number, invoice_series, external_invoice_id, environment, typecfe, issued_at, due_date, request_payload, response_payload, created_at, updated_at";
@@ -1080,7 +1102,6 @@ const externalInvoiceId =
       response_payload: responsePayload,
     };
 
-
     recordStep(
       "Registrando factura en Supabase",
       { invoiceRecord },
@@ -1094,7 +1115,10 @@ const externalInvoiceId =
       .single();
 
     if (insertError) {
-      console.error("Error guardando la factura en la base de datos", insertError);
+      console.error(
+        "Error guardando la factura en la base de datos",
+        insertError
+      );
       recordStep(
         "Error guardando la factura en Supabase",
         {
@@ -1120,7 +1144,7 @@ const externalInvoiceId =
           .single();
 
         if (!updateError && updatedInvoice) {
-           recordStep(
+          recordStep(
             "Factura existente actualizada",
             { invoiceId: updatedInvoice.id },
             "database"
@@ -1140,7 +1164,7 @@ const externalInvoiceId =
           updateError
         );
       }
-      
+
       return NextResponse.json(
         {
           error:
@@ -1176,7 +1200,7 @@ const externalInvoiceId =
       {
         error:
           "Ocurrió un error inesperado al emitir la factura. Intenta nuevamente en unos momentos.",
-          debugSteps
+        debugSteps,
       },
       { status: 500 }
     );
