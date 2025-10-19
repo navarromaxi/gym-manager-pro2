@@ -1514,8 +1514,8 @@ export function PaymentManagement({
 
       if (newPayment.type === "new_plan") {
         if (!selectedPlan) return;
-        if (newPayment.amount <= 0) {
-          alert("El monto debe ser mayor a 0");
+        if (newPayment.amount < 0) {
+          alert("El monto no puede ser negativo");
           return;
         }
         if (newPayment.amount > maxPlanAmount) {
@@ -1661,8 +1661,8 @@ export function PaymentManagement({
         );
       } else if (newPayment.type === "existing_plan") {
         if (!selectedPlan) return;
-        if (newPayment.amount <= 0) {
-          alert("El monto debe ser mayor a 0");
+        if (newPayment.amount < 0) {
+          alert("El monto no puede ser negativo");
           return;
         }
         if (newPayment.amount > balanceDueActual) {
@@ -1841,8 +1841,8 @@ export function PaymentManagement({
   const handleUpdatePayment = async () => {
     if (!editingPayment) return;
 
-    if (editPaymentData.amount <= 0) {
-      alert("El monto debe ser mayor a 0");
+    if (editPaymentData.amount < 0) {
+      alert("El monto no puede ser negativo");
       return;
     }
 
@@ -2572,9 +2572,11 @@ export function PaymentManagement({
                   (newPayment.type === "new_plan"
                     ? !newPayment.planId ||
                       !newPayment.startDate ||
-                      !newPayment.amount
+                      Number.isNaN(newPayment.amount) ||
+                      newPayment.amount < 0
                     : newPayment.type === "existing_plan"
-                    ? newPayment.amount <= 0 ||
+                    ? Number.isNaN(newPayment.amount) ||
+                      newPayment.amount < 0 ||
                       (shouldAskNextInstallmentDue &&
                         !newPayment.nextInstallmentDue)
                     : !newPayment.description || !newPayment.amount)
@@ -2586,46 +2588,6 @@ export function PaymentManagement({
           </DialogContent>
         </Dialog>
       </div>
-      {/* <Alert
-        variant={isInvoiceConfigReady ? "default" : "destructive"}
-        className="flex items-start gap-3"
-      >
-        <ShieldAlert className="mt-0.5 h-5 w-5" />
-        <AlertDescription className="space-y-2 text-sm">
-          {isInvoiceConfigReady ? (
-            <p>
-              Facturarás utilizando las credenciales guardadas en Supabase
-              (ambiente <strong>{facturaEnvironment}</strong>). Asegúrate de
-              mantener actualizada la columna secreta
-              <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">
-                invoice_password
-              </code>
-              para cada gimnasio.
-            </p>
-          ) : (
-            <>
-              <p>
-                Completa en Supabase → tabla
-                <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">
-                  gyms
-                </code>
-                los campos obligatorios de FacturaLive:
-                <strong className="ml-1">
-                  {missingInvoiceConfig.join(", ")}
-                </strong>
-                y la contraseña secreta
-                <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">
-                  invoice_password
-                </code>
-                para poder emitir facturas.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Ambiente actual detectado: <strong>{facturaEnvironment}</strong>
-              </p>
-            </>
-          )}
-        </AlertDescription>
-      </Alert> */}
 
       {/* Summary Cards - AGREGAR TARJETAS DE MÉTODOS */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">

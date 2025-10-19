@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Buffer } from "node:buffer";
 
 import { buildInvoicePdfFileName, findInvoicePdfSource } from "@/lib/invoice-pdf";
+import { buildManualInvoicePdf } from "@/lib/manual-invoice-pdf";
 import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,9 @@ const toArrayBuffer = (buffer: Buffer): ArrayBuffer =>
     buffer.byteOffset,
     buffer.byteOffset + buffer.byteLength
   ) as ArrayBuffer;
+
+  const fromUint8Array = (value: Uint8Array): ArrayBuffer =>
+  value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
 
 const decodeBase64Pdf = (value: string): ArrayBuffer | null => {
   const trimmed = value.trim();
