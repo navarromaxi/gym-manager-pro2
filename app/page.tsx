@@ -1163,7 +1163,7 @@ export default function GymManagementSystem() {
           <MemberManagement
             members={members}
             setMembers={setMembers}
-            //payments={payments}
+            payments={payments}
             setPayments={setPayments}
             plans={plans}
             customPlans={customPlans}
