@@ -15,29 +15,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { RefreshCcw, FileText, Download } from "lucide-react";
+import { RefreshCcw, Download } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
-import type { Invoice, Payment } from "@/lib/supabase";
-import {
-  buildInvoicePdfFileName,
-  findInvoicePdfSource,
-} from "@/lib/invoice-pdf";
+import type { Invoice } from "@/lib/supabase";
+import { buildInvoicePdfFileName } from "@/lib/invoice-pdf";
 
 interface InvoiceManagementProps {
   invoices: Invoice[];
   setInvoices: Dispatch<SetStateAction<Invoice[]>>;
-  payments: Payment[];
   gymId: string;
 }
+
 
 const parseISODate = (value?: string | null) => {
   if (!value) return null;
@@ -74,17 +63,16 @@ const statusBadgeVariant = (status?: string | null) => {
 export function InvoiceManagement({
   invoices,
   setInvoices,
-  payments,
   gymId,
 }: InvoiceManagementProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
-  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(
+    null
+  );
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const filteredInvoices = useMemo(() => {
@@ -125,11 +113,6 @@ export function InvoiceManagement({
     });
   }, [invoices, searchTerm, startDate, endDate]);
 
-  const handleOpenDetails = (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
-    setIsDetailOpen(true);
-  };
-
   const handleRefresh = async () => {
     if (!gymId) return;
 
@@ -161,38 +144,16 @@ export function InvoiceManagement({
     }
   };
 
-  const relatedPayment = useMemo(() => {
-    if (!selectedInvoice) return null;
-    return payments.find((payment) => payment.id === selectedInvoice.payment_id);
-  }, [selectedInvoice, payments]);
+  const handleDownloadPdf = async (invoice: Invoice) => {
+    if (!invoice?.id) return;
 
-  const detectedPdfSource = useMemo(() => {
-    if (!selectedInvoice?.response_payload) {
-      return null;
-    }
-    return findInvoicePdfSource(selectedInvoice.response_payload);
-  }, [selectedInvoice]);
-
-  const canDownloadPdf = Boolean(selectedInvoice?.response_payload);
-
-  useEffect(() => {
-    setDownloadError(null);
-    setIsDownloadingPdf(false);
-  }, [selectedInvoice?.id]);
-
-  const handleDownloadPdf = async () => {
-    if (!selectedInvoice) return;
-
-    setIsDownloadingPdf(true);
-    setDownloadError(null);
+  setDownloadingInvoiceId(invoice.id);
+  setDownloadError(null);
 
     try {
-      const response = await fetch(
-        `/api/invoices/${selectedInvoice.id}/pdf`,
-        {
-          method: "GET",
-        }
-      );
+      const response = await fetch(`/api/invoices/${invoice.id}/pdf`, {
+        method: "GET",
+      });
 
       if (!response.ok) {
         let errorMessage =
@@ -210,9 +171,9 @@ export function InvoiceManagement({
 
       const blob = await response.blob();
       const fallbackFileName = buildInvoicePdfFileName(
-        selectedInvoice.invoice_number,
-        selectedInvoice.invoice_series,
-        selectedInvoice.id
+        invoice.invoice_number,
+        invoice.invoice_series,
+        invoice.id
       );
       const resolvedFileName =
         response.headers.get("X-Invoice-Filename") || fallbackFileName;
@@ -234,7 +195,7 @@ export function InvoiceManagement({
           : "Ocurrió un error inesperado al descargar la factura."
       );
     } finally {
-      setIsDownloadingPdf(false);
+      setDownloadingInvoiceId(null);
     }
   };
 
@@ -344,13 +305,19 @@ export function InvoiceManagement({
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
-                          variant="outline"
+                          variant="default"
                           size="sm"
                           className="inline-flex items-center gap-2"
-                          onClick={() => handleOpenDetails(invoice)}
+                          onClick={() => handleDownloadPdf(invoice)}
+                          disabled={
+                            downloadingInvoiceId === invoice.id ||
+                            !invoice.response_payload
+                          }
                         >
-                          <FileText className="h-4 w-4" />
-                          Ver
+                          <Download className="h-4 w-4" />
+                          {downloadingInvoiceId === invoice.id
+                            ? "Descargando…"
+                            : "Descargar"}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -359,6 +326,9 @@ export function InvoiceManagement({
               </TableBody>
             </Table>
           </div>
+          {downloadError && (
+            <p className="mt-4 text-sm text-red-600">{downloadError}</p>
+          )}
           {filteredInvoices.length > 0 && (
             <p className="mt-4 text-sm text-muted-foreground">
               Mostrando {filteredInvoices.length} factura
@@ -367,135 +337,6 @@ export function InvoiceManagement({
           )}
         </CardContent>
       </Card>
-
-      <Dialog
-        open={isDetailOpen}
-        onOpenChange={(open) => {
-          setIsDetailOpen(open);
-          if (!open) {
-            setSelectedInvoice(null);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Detalle de factura</DialogTitle>
-            <DialogDescription>
-              Información completa de la factura seleccionada.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedInvoice && (
-            <div className="space-y-4 py-2">
-              <div className="grid gap-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Estado</span>
-                  <Badge variant={statusBadgeVariant(selectedInvoice.status)}>
-                    {selectedInvoice.status || "Sin estado"}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Socio / Cliente</span>
-                  <span className="font-medium text-right">
-                    {selectedInvoice.member_name}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Monto</span>
-                  <span className="font-semibold text-green-600">
-                    ${selectedInvoice.total.toLocaleString()} {selectedInvoice.currency || "UYU"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Fecha de emisión</span>
-                  <span>{formatDisplayDate(selectedInvoice.issued_at)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Vencimiento</span>
-                  <span>{formatDisplayDate(selectedInvoice.due_date)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Número</span>
-                  <span>{selectedInvoice.invoice_number ?? "-"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Serie</span>
-                  <span>{selectedInvoice.invoice_series ?? "-"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Identificador externo</span>
-                  <span className="truncate max-w-[250px] text-right" title={selectedInvoice.external_invoice_id ?? undefined}>
-                    {selectedInvoice.external_invoice_id ?? "-"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Ambiente</span>
-                  <Badge variant="outline">
-                    {selectedInvoice.environment || "TEST"}
-                  </Badge>
-                </div>
-                {relatedPayment && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Pago asociado</span>
-                    <span className="text-right">
-                      {relatedPayment.plan || relatedPayment.description || "Pago registrado"}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <h4 className="text-sm font-semibold">Detalle técnico</h4>
-                <div>
-                  <span className="text-xs text-muted-foreground block mb-1">
-                    Datos enviados
-                  </span>
-                  <pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 text-xs">
-                    {JSON.stringify(selectedInvoice.request_payload ?? {}, null, 2)}
-                  </pre>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground block mb-1">
-                    Respuesta del proveedor
-                  </span>
-                  <pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 text-xs">
-                    {JSON.stringify(selectedInvoice.response_payload ?? {}, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            </div>
-          )}
-           <DialogFooter className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="w-full text-left text-sm text-muted-foreground sm:w-auto">
-              {downloadError ? (
-                <span className="text-red-600">{downloadError}</span>
-              ) : selectedInvoice?.response_payload && !detectedPdfSource ? (
-                <span>
-                  No encontramos un enlace al PDF todavía. Si ya fue emitido, intenta
-                  nuevamente en unos minutos.
-                </span>
-              ) : null}
-            </div>
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="default"
-                onClick={handleDownloadPdf}
-                disabled={isDownloadingPdf || !canDownloadPdf}
-                className="inline-flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                {isDownloadingPdf ? "Descargando…" : "Descargar PDF"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsDetailOpen(false)}
-              >
-                Cerrar
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

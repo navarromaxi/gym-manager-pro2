@@ -185,7 +185,9 @@ export async function GET(_request: Request, context: RouteContext) {
   headers.set("X-Invoice-Filename", fileName);
   headers.set("Cache-Control", "no-store");
 
-  return new NextResponse(pdfBuffer, {
+  const pdfBody = Buffer.from(pdfBuffer);
+
+  return new NextResponse(pdfBody, {
     status: 200,
     headers,
   });
