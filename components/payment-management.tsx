@@ -915,9 +915,13 @@ export function PaymentManagement({
         empresaid: empresaId,
       });
 
-      const response = await fetch(
-        `${FACTURA_LIVE_COMPANY_LOOKUP_ENDPOINT}?${params.toString()}`
-      );
+      const response = await fetch(FACTURA_LIVE_COMPANY_LOOKUP_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params.toString(),
+      });
 
       if (!response.ok) {
         throw new Error(
