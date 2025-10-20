@@ -641,19 +641,26 @@ export const buildManualInvoicePdf = async ({
       ["cae", "numero"],
       ["cae", "code"],
     ]) ??
-    findValueByKeyHints(parsedResponse, [["cae"]]);
+    findValueByKeyHints(parsedResponse, [["cae"]]) ??
+    sanitizeString(invoice.external_invoice_id) ??
+    "Pendiente";
 
-  const invoiceNumber =
+  let invoiceNumber =
     sanitizeString(invoice.invoice_number) ??
     findValueByKeyHints(parsedResponse, [
       ["numero", "cfe"],
       ["nro", "cfe"],
       ["numero", "comprobante"],
       ["nro", "comprobante"],
-    ]);
+    ]) ??
+    sanitizeString((requestPayload as UnknownRecord)?.numerocomprobante) ??
+    sanitizeString((requestPayload as UnknownRecord)?.nrocomprobante);
 
-  if (!caeNumber || !invoiceNumber) {
-    return null;
+  if (!invoiceNumber) {
+    invoiceNumber =
+      sanitizeString(invoice.external_invoice_id) ??
+      sanitizeString((requestPayload as UnknownRecord)?.numero) ??
+      invoice.id;
   }
 
   const caeExpiration = findValueByKeyHints(parsedResponse, [
