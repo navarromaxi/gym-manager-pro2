@@ -132,12 +132,19 @@ interface InvoiceFormState {
 
 interface FacturaCompanyInfo {
   name?: string;
+  tradeName?: string;
   rut?: string;
   address?: string;
   city?: string;
   state?: string;
+  postalCode?: string;
   country?: string;
+  phone?: string;
+  email?: string;
+  activityStatus?: string;
+  businessStart?: string;
   additional?: string;
+  raw?: Record<string, string>;
 }
 
 const FACTURA_LIVE_COMPANY_LOOKUP_ENDPOINT =
@@ -165,6 +172,35 @@ const flattenLookupObjects = (value: unknown): Record<string, unknown>[] => {
   );
 
   return [record, ...nested];
+};
+
+const toStringRecord = (value: Record<string, unknown>): Record<string, string> => {
+  const result: Record<string, string> = {};
+
+  Object.entries(value).forEach(([key, entry]) => {
+    if (entry === null || entry === undefined) {
+      return;
+    }
+
+    if (typeof entry === "string") {
+      const trimmed = entry.trim();
+      if (trimmed) {
+        result[key] = trimmed;
+      }
+      return;
+    }
+
+    if (typeof entry === "number" && Number.isFinite(entry)) {
+      result[key] = String(entry);
+      return;
+    }
+
+    if (typeof entry === "boolean") {
+      result[key] = entry ? "true" : "false";
+    }
+  });
+
+  return result;
 };
 
 const pickFirstStringValue = (
@@ -215,6 +251,15 @@ const parseFacturaCompanyLookup = (
       "razon_social",
       "razon",
       "denominacionsocial",
+      "name",
+    ]);
+    const tradeName = pickFirstStringValue(normalized, [
+      "namecomercial",
+      "nombrecomercial",
+      "nombrefantasia",
+      "fantasia",
+      "trade",
+      "comercial",
     ]);
     const rut = pickFirstStringValue(normalized, ["rutneg", "rut", "ruc"]);
     const address = pickFirstStringValue(normalized, [
@@ -234,12 +279,42 @@ const parseFacturaCompanyLookup = (
       "stateneg",
       "departamento",
       "provincia",
+      "deptoid",
       "state",
+    ]);
+    const postalCode = pickFirstStringValue(normalized, [
+      "codigopostal",
+      "postal",
+      "zip",
+      "zipcode",
+      "codigo_postal",
     ]);
     const country = pickFirstStringValue(normalized, [
       "clicountry",
       "pais",
       "country",
+    ]);
+    const phone = pickFirstStringValue(normalized, [
+      "telefono",
+      "phone",
+      "tel",
+    ]);
+    const email = pickFirstStringValue(normalized, [
+      "email",
+      "correo",
+      "correo_electronico",
+      "mail",
+    ]);
+    const activityStatus = pickFirstStringValue(normalized, [
+      "estadoactividad",
+      "estado",
+      "status",
+    ]);
+    const businessStart = pickFirstStringValue(normalized, [
+      "inicio",
+      "fechainicio",
+      "inicioactividades",
+      "startdate",
     ]);
     const additional = pickFirstStringValue(normalized, [
       "addinfoneg",
@@ -247,10 +322,41 @@ const parseFacturaCompanyLookup = (
       "infoadicional",
       "observacion",
       "observaciones",
+      "giro",
+      "actividad",
     ]);
 
-    if (name || rut || address || city || state || country || additional) {
-      return { name, rut, address, city, state, country, additional };
+    if (
+      name ||
+      tradeName ||
+      rut ||
+      address ||
+      city ||
+      state ||
+      postalCode ||
+      country ||
+      phone ||
+      email ||
+      activityStatus ||
+      businessStart ||
+      additional
+    ) {
+      return {
+        name,
+        tradeName,
+        rut,
+        address,
+        city,
+        state,
+        postalCode,
+        country,
+        phone,
+        email,
+        activityStatus,
+        businessStart,
+        additional,
+        raw: Object.keys(stringRecord).length > 0 ? stringRecord : undefined,
+      };
     }
   }
 
@@ -261,16 +367,74 @@ const applyCompanyInfoToInvoiceForm = (
   invoice: InvoiceFormState,
   info: FacturaCompanyInfo,
   fallbackRut?: string
-): InvoiceFormState => ({
-  ...invoice,
-  nomneg: info.name ?? invoice.nomneg,
-  rutneg: info.rut ?? fallbackRut ?? invoice.rutneg,
-  dirneg: info.address ?? invoice.dirneg,
-  cityneg: info.city ?? invoice.cityneg,
-  stateneg: info.state ?? invoice.stateneg,
-  clicountry: info.country ?? invoice.clicountry,
-  addinfoneg: info.additional ?? invoice.addinfoneg,
-});
+): InvoiceFormState => {
+  const resolvedAddress = [info.address, info.postalCode]
+    .filter((value) => typeof value === "string" && value.trim().length > 0)
+    .join(" - ");
+
+  const additionalSegments: string[] = [];
+
+  if (info.tradeName && info.tradeName !== info.name) {
+    additionalSegments.push(`Nombre comercial: ${info.tradeName}`);
+  }
+
+  if (info.additional) {
+    additionalSegments.push(info.additional);
+  }
+
+  if (info.activityStatus) {
+    additionalSegments.push(`Estado: ${info.activityStatus}`);
+  }
+
+  if (info.businessStart) {
+    additionalSegments.push(`Inicio de actividades: ${info.businessStart}`);
+  }
+
+  if (info.phone) {
+    additionalSegments.push(`Teléfono: ${info.phone}`);
+  }
+
+  if (info.email) {
+    additionalSegments.push(`Email: ${info.email}`);
+  }
+
+  const existingAdditional =
+    typeof invoice.addinfoneg === "string" && invoice.addinfoneg.trim().length > 0
+      ? invoice.addinfoneg.trim()
+      : "";
+
+  const computedAdditional = additionalSegments.join(" | ");
+
+  const mergedAdditional = (() => {
+    if (!computedAdditional) {
+      return existingAdditional;
+    }
+
+    if (!existingAdditional) {
+      return computedAdditional;
+    }
+
+    const normalizedExisting = existingAdditional.toLowerCase();
+    const normalizedComputed = computedAdditional.toLowerCase();
+
+    if (normalizedExisting.includes(normalizedComputed)) {
+      return existingAdditional;
+    }
+
+    return `${computedAdditional} | ${existingAdditional}`;
+  })();
+
+  return {
+    ...invoice,
+    nomneg: info.name ?? info.tradeName ?? invoice.nomneg,
+    rutneg: info.rut ?? fallbackRut ?? invoice.rutneg,
+    dirneg: resolvedAddress || invoice.dirneg,
+    cityneg: info.city ?? invoice.cityneg,
+    stateneg: info.state ?? invoice.stateneg,
+    clicountry: info.country ?? invoice.clicountry,
+    addinfoneg: mergedAdditional,
+  };
+};
 
 const normalizeFacturaEnvironment = (
   value: string | null | undefined
@@ -3582,9 +3746,22 @@ export function PaymentManagement({
                             Razón social
                           </span>
                           <span className="font-medium text-right">
-                            {rutLookupResult.name ?? "Sin datos"}
+                            {rutLookupResult.name ??
+                              rutLookupResult.tradeName ??
+                              "Sin datos"}
                           </span>
                         </div>
+                        {rutLookupResult.tradeName &&
+                          rutLookupResult.name !== rutLookupResult.tradeName && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">
+                                Nombre comercial
+                              </span>
+                              <span className="font-medium text-right">
+                                {rutLookupResult.tradeName}
+                              </span>
+                            </div>
+                          )}
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground">RUT</span>
                           <span className="font-medium text-right">
@@ -3604,6 +3781,7 @@ export function PaymentManagement({
                                 rutLookupResult.address,
                                 rutLookupResult.city,
                                 rutLookupResult.state,
+                                rutLookupResult.postalCode,
                                 rutLookupResult.country,
                               ]
                                 .flatMap((value) =>
@@ -3616,12 +3794,63 @@ export function PaymentManagement({
                             </span>
                           </div>
                         )}
+                        {(rutLookupResult.phone || rutLookupResult.email) && (
+                          <div className="flex items-start justify-between gap-4">
+                            <span className="text-muted-foreground">
+                              Contacto
+                            </span>
+                            <span className="text-right space-y-1">
+                              {rutLookupResult.phone && (
+                                <span className="block">
+                                  Teléfono: {rutLookupResult.phone}
+                                </span>
+                              )}
+                              {rutLookupResult.email && (
+                                <span className="block">
+                                  Email: {rutLookupResult.email}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        )}
+                        {(rutLookupResult.activityStatus ||
+                          rutLookupResult.businessStart) && (
+                          <div className="flex items-start justify-between gap-4">
+                            <span className="text-muted-foreground">
+                              Actividad
+                            </span>
+                            <span className="text-right space-y-1">
+                              {rutLookupResult.activityStatus && (
+                                <span className="block">
+                                  Estado: {rutLookupResult.activityStatus}
+                                </span>
+                              )}
+                              {rutLookupResult.businessStart && (
+                                <span className="block">
+                                  Inicio: {rutLookupResult.businessStart}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        )}
                         {rutLookupResult.additional && (
                           <div className="flex items-start justify-between gap-4">
-                            <span className="text-muted-foreground">Notas</span>
+                             <span className="text-muted-foreground">
+                              Información adicional
+                            </span>
                             <span className="text-right max-w-[16rem] break-words">
                               {rutLookupResult.additional}
                             </span>
+                          </div>
+                        )}
+                        {rutLookupResult.raw && (
+                          <div className="pt-2">
+                            <span className="text-muted-foreground block text-xs uppercase">
+                              Datos devueltos por FacturaLive
+                            </span>
+                            <pre className="mt-1 max-h-48 overflow-auto rounded-md bg-muted p-2 text-xs">
+                              {JSON.stringify(rutLookupResult.raw, null, 2)}
+                            </pre>
                           </div>
                         )}
                       </div>
