@@ -244,6 +244,8 @@ const parseFacturaCompanyLookup = (
       normalized[normalizeLookupKey(key)] = value;
     });
 
+    const stringifiedRecord = toStringRecord(object);
+    
     const name = pickFirstStringValue(normalized, [
       "nomneg",
       "nombre",
@@ -355,7 +357,10 @@ const parseFacturaCompanyLookup = (
         activityStatus,
         businessStart,
         additional,
-        raw: Object.keys(stringRecord).length > 0 ? stringRecord : undefined,
+        raw:
+          Object.keys(stringifiedRecord).length > 0
+            ? stringifiedRecord
+            : undefined,
       };
     }
   }
