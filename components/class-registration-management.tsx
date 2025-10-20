@@ -11,6 +11,7 @@ import {
   Calendar,
   Clock,
   Copy,
+  Download,
   RefreshCw,
   Trash2,
   Users,
@@ -22,7 +23,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -32,6 +32,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface ClassRegistrationManagementProps {
   gymId: string;
@@ -66,22 +82,24 @@ export function ClassRegistrationManagement({
   setRegistrations,
   onReload,
 }: ClassRegistrationManagementProps) {
-  const [formState, setFormState] = useState<ClassSessionFormState>(
-    INITIAL_FORM_STATE
-  );
+  const [formState, setFormState] =
+    useState<ClassSessionFormState>(INITIAL_FORM_STATE);
   const [creating, setCreating] = useState(false);
-  const [feedback, setFeedback] = useState<
-    | {
-        type: "success" | "error";
-        message: string;
-      }
-    | null
-  >(null);
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const [copySuccessId, setCopySuccessId] = useState<string | null>(null);
   const [copyGeneralSuccess, setCopyGeneralSuccess] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [shareBaseUrl, setShareBaseUrl] = useState<string>("");
   const [refreshing, setRefreshing] = useState(false);
+  const [isRegistrationsDialogOpen, setIsRegistrationsDialogOpen] =
+    useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    null
+  );
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -133,9 +151,7 @@ export function ClassRegistrationManagement({
         .order("start_time", { ascending: true }),
       supabase
         .from("class_registrations")
-        .select(
-          "id, session_id, gym_id, full_name, email, phone, created_at"
-        )
+        .select("id, session_id, gym_id, full_name, email, phone, created_at")
         .eq("gym_id", gymId),
     ]);
 
@@ -143,19 +159,13 @@ export function ClassRegistrationManagement({
     if (registrationsResponse.error) throw registrationsResponse.error;
 
     setSessions((sessionsResponse.data ?? []) as ClassSession[]);
-    setRegistrations(
-      (registrationsResponse.data ?? []) as ClassRegistration[]
-    );
+    setRegistrations((registrationsResponse.data ?? []) as ClassRegistration[]);
   };
 
-  const handleChange = (
-    field: keyof ClassSessionFormState,
-    value: string
-  ) => {
+  const handleChange = (field: keyof ClassSessionFormState, value: string) => {
     setFormState((prev) => ({
       ...prev,
-      [field]:
-        field === "capacity" ? Math.max(1, Number(value) || 1) : value,
+      [field]: field === "capacity" ? Math.max(1, Number(value) || 1) : value,
     }));
   };
 
@@ -163,12 +173,17 @@ export function ClassRegistrationManagement({
     setFormState(INITIAL_FORM_STATE);
   };
 
-  const handleCreateSession = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateSession = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
     if (!gymId) return;
 
     if (!formState.title.trim()) {
-      setFeedback({ type: "error", message: "Ingresa un título para la clase." });
+      setFeedback({
+        type: "error",
+        message: "Ingresa un título para la clase.",
+      });
       return;
     }
 
@@ -258,7 +273,7 @@ export function ClassRegistrationManagement({
     const previousRegistrations = registrations;
     setDeletingId(sessionId);
     try {
-       const response = await fetch("/api/class-sessions", {
+      const response = await fetch("/api/class-sessions", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -270,9 +285,9 @@ export function ClassRegistrationManagement({
       });
 
       if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null;
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
         const message = payload?.error;
         throw new Error(
           message ||
@@ -284,10 +299,13 @@ export function ClassRegistrationManagement({
       setRegistrations((prev) =>
         prev.filter((registration) => registration.session_id !== sessionId)
       );
-       try {
+      try {
         await fetchLatestData();
       } catch (refreshError) {
-        console.error("Error recargando las clases tras eliminar", refreshError);
+        console.error(
+          "Error recargando las clases tras eliminar",
+          refreshError
+        );
         setSessions(previousSessions);
         setRegistrations(previousRegistrations);
         throw refreshError;
@@ -336,13 +354,115 @@ export function ClassRegistrationManagement({
     try {
       await navigator.clipboard.writeText(url);
       setCopySuccessId(session.id);
-      setTimeout(() => setCopySuccessId((prev) => (prev === session.id ? null : prev)), 3000);
+      setTimeout(
+        () => setCopySuccessId((prev) => (prev === session.id ? null : prev)),
+        3000
+      );
     } catch (error) {
       console.error("No se pudo copiar el link", error);
       setFeedback({
         type: "error",
         message: "No se pudo copiar el enlace. Copia manualmente desde: " + url,
       });
+    }
+  };
+
+  const handleOpenRegistrations = (sessionId: string) => {
+    setSelectedSessionId(sessionId);
+    setIsRegistrationsDialogOpen(true);
+  };
+
+  const handleCloseRegistrations = (open: boolean) => {
+    setIsRegistrationsDialogOpen(open);
+    if (!open) {
+      setSelectedSessionId(null);
+    }
+  };
+
+  const handleDownloadRegistrations = (
+    session: ClassSession,
+    sessionRegistrations: ClassRegistration[]
+  ) => {
+    setDownloadingId(session.id);
+    try {
+      const escapeHtml = (value: string) =>
+        value
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+
+      const tableRows = sessionRegistrations.map((registration, index) => {
+        const formattedDate = registration.created_at
+          ? new Date(registration.created_at).toLocaleString()
+          : "";
+
+        return `<tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(registration.full_name)}</td>
+            <td>${escapeHtml(registration.email ?? "")}</td>
+            <td>${escapeHtml(registration.phone ?? "")}</td>
+            <td>${escapeHtml(formattedDate)}</td>
+          </tr>`;
+      });
+
+      if (tableRows.length === 0) {
+        tableRows.push(
+          `<tr>
+            <td colspan="5">Sin inscriptos aún</td>
+          </tr>`
+        );
+      }
+
+      const tableHtml = `<!DOCTYPE html>
+        <html lang="es">
+          <head>
+            <meta charSet="utf-8" />
+          </head>
+          <body>
+            <table border="1">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Nombre</th>
+                  <th>Email</th>
+                  <th>Teléfono</th>
+                  <th>Fecha de inscripción</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows.join("")}
+              </tbody>
+            </table>
+          </body>
+        </html>`;
+
+      const sanitizedTitle = session.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/gi, "-")
+        .replace(/^-+|-+$/g, "");
+
+      const fileName = `inscriptos-${sanitizedTitle || session.id}.xls`;
+      const blob = new Blob([tableHtml], {
+        type: "application/vnd.ms-excel;charset=utf-8;",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error descargando la lista", error);
+      setFeedback({
+        type: "error",
+        message: "No se pudo descargar la lista. Intenta nuevamente.",
+      });
+    } finally {
+      setDownloadingId(null);
     }
   };
 
@@ -366,10 +486,12 @@ export function ClassRegistrationManagement({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
-        <h2 className="text-3xl font-bold tracking-tight">Clases registradas</h2>
+        <h2 className="text-3xl font-bold tracking-tight">
+          Clases registradas
+        </h2>
         <p className="text-muted-foreground">
-          Crea clases puntuales con cupos limitados y comparte el enlace con tus socios
-          para que se anoten de forma sencilla.
+          Crea clases puntuales con cupos limitados y comparte el enlace con tus
+          socios para que se anoten de forma sencilla.
         </p>
       </div>
 
@@ -383,11 +505,15 @@ export function ClassRegistrationManagement({
         <CardHeader>
           <CardTitle>Crear nueva clase</CardTitle>
           <CardDescription>
-            Completa los datos para agregar una clase especial y controlar su cupo.
+            Completa los datos para agregar una clase especial y controlar su
+            cupo.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-4 md:grid-cols-2" onSubmit={handleCreateSession}>
+          <form
+            className="grid gap-4 md:grid-cols-2"
+            onSubmit={handleCreateSession}
+          >
             <div className="md:col-span-2 space-y-2">
               <Label htmlFor="class-title">Nombre de la clase</Label>
               <Input
@@ -414,7 +540,9 @@ export function ClassRegistrationManagement({
                 id="class-time"
                 type="time"
                 value={formState.start_time}
-                onChange={(event) => handleChange("start_time", event.target.value)}
+                onChange={(event) =>
+                  handleChange("start_time", event.target.value)
+                }
               />
             </div>
 
@@ -425,7 +553,9 @@ export function ClassRegistrationManagement({
                 type="number"
                 min={1}
                 value={formState.capacity}
-                onChange={(event) => handleChange("capacity", event.target.value)}
+                onChange={(event) =>
+                  handleChange("capacity", event.target.value)
+                }
               />
             </div>
 
@@ -462,8 +592,8 @@ export function ClassRegistrationManagement({
           <div>
             <h3 className="text-xl font-semibold">Clases programadas</h3>
             <p className="text-sm text-muted-foreground">
-              Comparte este enlace general con tus socios para que vean todas las
-              clases y elijan su cupo.
+              Comparte este enlace general con tus socios para que vean todas
+              las clases y elijan su cupo.
             </p>
             {generalSignupLink && (
               <p className="text-sm font-medium break-all text-primary">
@@ -491,109 +621,222 @@ export function ClassRegistrationManagement({
           <Card>
             <CardContent className="p-6">
               <p className="text-muted-foreground">
-                Todavía no hay clases cargadas. Crea la primera para comenzar a tomar
-                reservas.
+                Todavía no hay clases cargadas. Crea la primera para comenzar a
+                tomar reservas.
               </p>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {sortedSessions.map((session) => {
-              const sessionRegistrations = registrationsBySession.get(session.id) ?? [];
-              const spotsLeft = Math.max(session.capacity - sessionRegistrations.length, 0);
-              const isFull = spotsLeft <= 0;
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Cupo</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Hora</TableHead>
+                      <TableHead>Inscriptos</TableHead>
+                      <TableHead>Notas para los socios</TableHead>
+                      <TableHead className="w-[260px]">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedSessions.map((session) => {
+                      const sessionRegistrations =
+                        registrationsBySession.get(session.id) ?? [];
+                      const spotsLeft = Math.max(
+                        session.capacity - sessionRegistrations.length,
+                        0
+                      );
+                      const isFull = spotsLeft <= 0;
 
-              return (
-                <Card key={session.id} className="flex flex-col">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <CardTitle className="text-lg">{session.title}</CardTitle>
-                        <CardDescription>
-                          Cupo máximo: {session.capacity} personas
-                        </CardDescription>
-                      </div>
-                      <Badge variant={isFull ? "destructive" : "secondary"}>
-                        {isFull ? "Cupo completo" : `${spotsLeft} lugares libres`}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex-1 space-y-4">
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      <p className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        {new Date(session.date + "T00:00:00").toLocaleDateString()}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        {session.start_time} hs
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        {sessionRegistrations.length} inscriptos
-                      </p>
-                    </div>
-
-                    {session.notes && (
-                      <div className="rounded-md bg-muted p-3 text-sm">
-                        <p className="font-medium">Notas para los socios</p>
-                        <p className="text-muted-foreground whitespace-pre-wrap">
-                          {session.notes}
-                        </p>
-                      </div>
-                    )}
-
-                    {sessionRegistrations.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold">Listado de inscriptos</p>
-                        <ul className="space-y-1 text-sm text-muted-foreground">
-                          {sessionRegistrations.map((registration) => (
-                            <li key={registration.id} className="flex justify-between gap-2">
-                              <span>{registration.full_name}</span>
-                              <span className="text-xs">
-                                {registration.created_at
-                                  ? new Date(registration.created_at).toLocaleString()
-                                  : ""}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    <p className="text-xs text-muted-foreground">
-                      También puedes compartir el enlace general para que cada
-                      socio elija su horario. Este botón copia un enlace directo
-                      que abre esta clase seleccionada.
-                    </p>
-                  </CardContent>
-                  <CardFooter className="flex flex-wrap items-center justify-between gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => handleCopyLink(session)}
-                    >
-                      <Copy className="mr-2 h-4 w-4" />
-                      {copySuccessId === session.id
-                        ? "Link directo copiado"
-                        : "Copiar enlace directo"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      onClick={() => handleDeleteSession(session.id)}
-                      disabled={deletingId === session.id}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Eliminar
-                    </Button>
-                  </CardFooter>
-                </Card>
-              );
-            })}
-          </div>
+                      return (
+                        <TableRow key={session.id}>
+                          <TableCell className="font-medium">
+                            {session.title}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span>{session.capacity}</span>
+                              <Badge
+                                variant={isFull ? "destructive" : "secondary"}
+                              >
+                                {isFull
+                                  ? "Cupo completo"
+                                  : `${spotsLeft} lugares libres`}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(
+                              `${session.date}T00:00:00`
+                            ).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>{session.start_time} hs</TableCell>
+                          <TableCell className="font-semibold">
+                            {sessionRegistrations.length}
+                          </TableCell>
+                          <TableCell className="max-w-xs whitespace-pre-wrap text-sm text-muted-foreground">
+                            {session.notes?.trim() ? session.notes : "-"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleCopyLink(session)}
+                              >
+                                <Copy className="mr-2 h-4 w-4" />
+                                {copySuccessId === session.id
+                                  ? "Link copiado"
+                                  : "Copiar enlace"}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() =>
+                                  handleOpenRegistrations(session.id)
+                                }
+                              >
+                                <Users className="mr-2 h-4 w-4" />
+                                Ver lista
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteSession(session.id)}
+                                disabled={deletingId === session.id}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Eliminar
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
+
+      <Dialog
+        open={isRegistrationsDialogOpen}
+        onOpenChange={handleCloseRegistrations}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedSessionId
+                ? `Inscriptos - ${
+                    sessions.find((session) => session.id === selectedSessionId)
+                      ?.title ?? ""
+                  }`
+                : "Inscriptos"}
+            </DialogTitle>
+            {selectedSessionId && (
+              <DialogDescription>
+                {(() => {
+                  const selectedSession = sessions.find(
+                    (session) => session.id === selectedSessionId
+                  );
+                  if (!selectedSession) return null;
+                  return `Fecha: ${new Date(
+                    `${selectedSession.date}T00:00:00`
+                  ).toLocaleDateString()} - ${selectedSession.start_time} hs`;
+                })()}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="max-h-[50vh] overflow-y-auto rounded-md border">
+            {(() => {
+              const sessionRegistrations = selectedSessionId
+                ? registrationsBySession.get(selectedSessionId) ?? []
+                : [];
+
+              if (sessionRegistrations.length === 0) {
+                return (
+                  <div className="p-6 text-center text-sm text-muted-foreground">
+                    Aún no hay inscriptos para esta clase.
+                  </div>
+                );
+              }
+
+              return (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>#</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Teléfono</TableHead>
+                      <TableHead>Fecha de inscripción</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sessionRegistrations.map((registration, index) => (
+                      <TableRow key={registration.id}>
+                        <TableCell className="font-medium">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell>{registration.full_name}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {registration.email || "-"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {registration.phone || "-"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {registration.created_at
+                            ? new Date(registration.created_at).toLocaleString()
+                            : "-"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              );
+            })()}
+          </div>
+          <DialogFooter className="flex flex-col items-stretch gap-2 sm:flex-row sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Descarga la lista en formato Excel para gestionarla fuera de la
+              plataforma.
+            </p>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                onClick={() => {
+                  if (!selectedSessionId) return;
+                  const session = sessions.find(
+                    (current) => current.id === selectedSessionId
+                  );
+                  if (!session) return;
+                  const sessionRegistrations =
+                    registrationsBySession.get(selectedSessionId) ?? [];
+                  handleDownloadRegistrations(session, sessionRegistrations);
+                }}
+                disabled={
+                  !selectedSessionId || downloadingId === selectedSessionId
+                }
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {downloadingId === selectedSessionId
+                  ? "Generando archivo..."
+                  : "Descargar lista"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
