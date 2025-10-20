@@ -35,6 +35,7 @@ import {
 import {
   Plus,
   Search,
+  Loader2,
   DollarSign,
   Edit,
   Trash2,
@@ -129,6 +130,148 @@ interface InvoiceFormState {
   TipoTraslado: number;
 }
 
+interface FacturaCompanyInfo {
+  name?: string;
+  rut?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  additional?: string;
+}
+
+const FACTURA_LIVE_COMPANY_LOOKUP_ENDPOINT =
+  "https://www.facturalive.com/api/eGetActaEmpresarial.php";
+
+const normalizeLookupKey = (key: string) =>
+  key
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, "");
+
+const flattenLookupObjects = (value: unknown): Record<string, unknown>[] => {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => flattenLookupObjects(entry));
+  }
+
+  const record = value as Record<string, unknown>;
+  const nested = Object.values(record).flatMap((entry) =>
+    flattenLookupObjects(entry)
+  );
+
+  return [record, ...nested];
+};
+
+const pickFirstStringValue = (
+  source: Record<string, unknown>,
+  keys: string[]
+): string | undefined => {
+  for (const key of keys) {
+    if (!(key in source)) {
+      continue;
+    }
+
+    const value = source[key];
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      const stringValue = String(value).trim();
+      if (stringValue) {
+        return stringValue;
+      }
+    }
+  }
+
+  return undefined;
+};
+
+const parseFacturaCompanyLookup = (
+  payload: unknown
+): FacturaCompanyInfo | null => {
+  const objects = flattenLookupObjects(payload);
+
+  for (const object of objects) {
+    const normalized: Record<string, unknown> = {};
+
+    Object.entries(object).forEach(([key, value]) => {
+      normalized[normalizeLookupKey(key)] = value;
+    });
+
+    const name = pickFirstStringValue(normalized, [
+      "nomneg",
+      "nombre",
+      "razonsocial",
+      "razon_social",
+      "razon",
+      "denominacionsocial",
+    ]);
+    const rut = pickFirstStringValue(normalized, ["rutneg", "rut", "ruc"]);
+    const address = pickFirstStringValue(normalized, [
+      "dirneg",
+      "direccion",
+      "domicilio",
+      "address",
+      "calle",
+    ]);
+    const city = pickFirstStringValue(normalized, [
+      "cityneg",
+      "ciudad",
+      "localidad",
+      "city",
+    ]);
+    const state = pickFirstStringValue(normalized, [
+      "stateneg",
+      "departamento",
+      "provincia",
+      "state",
+    ]);
+    const country = pickFirstStringValue(normalized, [
+      "clicountry",
+      "pais",
+      "country",
+    ]);
+    const additional = pickFirstStringValue(normalized, [
+      "addinfoneg",
+      "adicional",
+      "infoadicional",
+      "observacion",
+      "observaciones",
+    ]);
+
+    if (name || rut || address || city || state || country || additional) {
+      return { name, rut, address, city, state, country, additional };
+    }
+  }
+
+  return null;
+};
+
+const applyCompanyInfoToInvoiceForm = (
+  invoice: InvoiceFormState,
+  info: FacturaCompanyInfo,
+  fallbackRut?: string
+): InvoiceFormState => ({
+  ...invoice,
+  nomneg: info.name ?? invoice.nomneg,
+  rutneg: info.rut ?? fallbackRut ?? invoice.rutneg,
+  dirneg: info.address ?? invoice.dirneg,
+  cityneg: info.city ?? invoice.cityneg,
+  stateneg: info.state ?? invoice.stateneg,
+  clicountry: info.country ?? invoice.clicountry,
+  addinfoneg: info.additional ?? invoice.addinfoneg,
+});
+
 const normalizeFacturaEnvironment = (
   value: string | null | undefined
 ): "PROD" | "TEST" | null => {
@@ -139,6 +282,7 @@ const normalizeFacturaEnvironment = (
   if (["PROD", "PRODUCCION", "PRODUCCIÓN", "PRODUCTION"].includes(normalized)) {
     return "PROD";
   }
+
 
   if (
     [
@@ -489,6 +633,21 @@ export function PaymentManagement({
   >("create");
   const [invoicePayment, setInvoicePayment] = useState<Payment | null>(null);
   const [invoiceForm, setInvoiceForm] = useState<InvoiceFormState | null>(null);
+  const consumerInvoiceFieldsRef = useRef<
+    Pick<
+      InvoiceFormState,
+      "nomneg" | "rutneg" | "dirneg" | "cityneg" | "stateneg" | "clicountry" | "addinfoneg"
+    > | null
+  >(null);
+  const [invoiceCustomerType, setInvoiceCustomerType] = useState<
+    "consumer" | "rut"
+  >("consumer");
+  const [rutSearchValue, setRutSearchValue] = useState("");
+  const [rutLookupResult, setRutLookupResult] = useState<FacturaCompanyInfo | null>(
+    null
+  );
+  const [rutLookupError, setRutLookupError] = useState<string | null>(null);
+  const [isRutLookupLoading, setIsRutLookupLoading] = useState(false);
   const [selectedInvoiceRecord, setSelectedInvoiceRecord] =
     useState<Invoice | null>(null);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
@@ -577,6 +736,19 @@ export function PaymentManagement({
     };
     checkTable();
   }, []);
+  useEffect(() => {
+    if (invoiceCustomerType === "consumer" && invoiceForm) {
+      consumerInvoiceFieldsRef.current = {
+        nomneg: invoiceForm.nomneg,
+        rutneg: invoiceForm.rutneg,
+        dirneg: invoiceForm.dirneg,
+        cityneg: invoiceForm.cityneg,
+        stateneg: invoiceForm.stateneg,
+        clicountry: invoiceForm.clicountry,
+        addinfoneg: invoiceForm.addinfoneg,
+      };
+    }
+  }, [invoiceCustomerType, invoiceForm]);
   const paymentMethods = [
     "Efectivo",
     "Transferencia",
@@ -606,6 +778,7 @@ export function PaymentManagement({
   const resetInvoiceDialogState = () => {
     setInvoicePayment(null);
     setInvoiceForm(null);
+    consumerInvoiceFieldsRef.current = null;
     setSelectedInvoiceRecord(null);
     setInvoiceError(null);
     setInvoiceErrorDetails(null);
@@ -613,6 +786,11 @@ export function PaymentManagement({
     setInvoiceDialogMode("create");
     setIsSendingInvoice(false);
     setInvoiceDebugSteps([]);
+    setInvoiceCustomerType("consumer");
+    setRutSearchValue("");
+    setRutLookupResult(null);
+    setRutLookupError(null);
+    setIsRutLookupLoading(false);
   };
 
   const openInvoiceDialog = (
@@ -624,11 +802,17 @@ export function PaymentManagement({
     setInvoiceErrorDetails(null);
     setInvoiceSuccess(null);
     setInvoiceDebugSteps([]);
+    setInvoiceCustomerType("consumer");
+    setRutSearchValue("");
+    setRutLookupResult(null);
+    setRutLookupError(null);
+    setIsRutLookupLoading(false);
 
     if (existingInvoice) {
       setInvoiceDialogMode("view");
       setSelectedInvoiceRecord(existingInvoice);
       setInvoiceForm(null);
+      consumerInvoiceFieldsRef.current = null;
     } else {
       const periodStart = payment.start_date
         ? payment.start_date.split("T")[0] ?? payment.start_date
@@ -652,6 +836,15 @@ export function PaymentManagement({
       );
       setInvoiceDialogMode("create");
       setInvoiceForm(defaults);
+      consumerInvoiceFieldsRef.current = {
+        nomneg: defaults.nomneg,
+        rutneg: defaults.rutneg,
+        dirneg: defaults.dirneg,
+        cityneg: defaults.cityneg,
+        stateneg: defaults.stateneg,
+        clicountry: defaults.clicountry,
+        addinfoneg: defaults.addinfoneg,
+      };
       setSelectedInvoiceRecord(null);
     }
 
@@ -668,6 +861,118 @@ export function PaymentManagement({
     value: InvoiceFormState[K]
   ) => {
     setInvoiceForm((prev) => (prev ? { ...prev, [field]: value } : prev));
+  };
+
+  const handleInvoiceCustomerTypeChange = (value: "consumer" | "rut") => {
+    setInvoiceCustomerType(value);
+
+    if (value === "consumer") {
+      setRutLookupResult(null);
+      setRutLookupError(null);
+      setRutSearchValue("");
+      if (consumerInvoiceFieldsRef.current) {
+        const consumerDefaults = consumerInvoiceFieldsRef.current;
+        setInvoiceForm((prev) =>
+          prev
+            ? {
+                ...prev,
+                ...consumerDefaults,
+              }
+            : prev
+        );
+      }
+    }
+  };
+
+  const handleRutLookup = async () => {
+    if (!invoiceForm) {
+      setRutLookupError(
+        "El formulario de la factura todavía no está listo. Intenta nuevamente."
+      );
+      return;
+    }
+
+    const trimmedRut = rutSearchValue.trim();
+    if (!trimmedRut) {
+      setRutLookupError("Ingresa un RUT válido para buscar.");
+      return;
+    }
+
+    const empresaId = gymInvoiceConfig?.companyId?.trim();
+    if (!empresaId) {
+      setRutLookupError(
+        "Debes configurar el ID de empresa (empresaid) antes de facturar con RUT."
+      );
+      return;
+    }
+
+    setIsRutLookupLoading(true);
+    setRutLookupError(null);
+
+    try {
+      const params = new URLSearchParams({
+        rut: trimmedRut,
+        empresaid: empresaId,
+      });
+
+      const response = await fetch(
+        `${FACTURA_LIVE_COMPANY_LOOKUP_ENDPOINT}?${params.toString()}`
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `El servicio de facturación devolvió un estado ${response.status}.`
+        );
+      }
+
+      const rawText = await response.text();
+      let parsed: unknown = null;
+
+      try {
+        parsed = JSON.parse(rawText);
+      } catch {
+        const trimmed = rawText.trim();
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+          try {
+            parsed = JSON.parse(trimmed);
+          } catch {
+            parsed = null;
+          }
+        }
+      }
+
+      const infoFromParsed =
+        parsed !== null ? parseFacturaCompanyLookup(parsed) : null;
+      const info = infoFromParsed ?? parseFacturaCompanyLookup(rawText);
+
+      if (!info) {
+        throw new Error(
+          "No se encontró información para el RUT proporcionado."
+        );
+      }
+
+      const normalizedInfo: FacturaCompanyInfo = {
+        ...info,
+        rut: info.rut ?? trimmedRut,
+      };
+
+      setInvoiceForm((prev) =>
+        prev
+          ? applyCompanyInfoToInvoiceForm(prev, normalizedInfo, trimmedRut)
+          : prev
+      );
+      setRutLookupResult(normalizedInfo);
+      setRutLookupError(null);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudo obtener la información de la empresa.";
+      setRutLookupError(message);
+      setRutLookupResult(null);
+    } finally {
+      setIsRutLookupLoading(false);
+    }
   };
 
   const handleSendInvoice = async () => {
@@ -3184,6 +3489,142 @@ export function PaymentManagement({
           </DialogHeader>
           {invoicePayment && invoiceDialogMode === "create" && invoiceForm && (
             <div className="space-y-4 py-2">
+              <div className="space-y-3">
+                <div className="grid gap-2 md:max-w-sm">
+                  <Label htmlFor="invoice-customer-type">
+                    Tipo de facturación
+                  </Label>
+                  <Select
+                    value={invoiceCustomerType}
+                    onValueChange={(value) =>
+                      handleInvoiceCustomerTypeChange(
+                        value as "consumer" | "rut"
+                      )
+                    }
+                  >
+                    <SelectTrigger id="invoice-customer-type">
+                      <SelectValue placeholder="Selecciona cómo facturar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="consumer">Consumidor final</SelectItem>
+                      <SelectItem value="rut">Facturar con RUT</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {invoiceCustomerType === "rut" && (
+                  <div className="space-y-3">
+                    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                      <div className="grid gap-2">
+                        <Label htmlFor="invoice-rut-input">RUT de la empresa</Label>
+                        <Input
+                          id="invoice-rut-input"
+                          value={rutSearchValue}
+                          onChange={(event) => {
+                            setRutSearchValue(event.target.value);
+                            setRutLookupError(null);
+                          }}
+                          placeholder="Ej: 201234560019"
+                          disabled={isRutLookupLoading}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              handleRutLookup();
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="flex md:justify-end">
+                        <Button
+                          type="button"
+                          className="w-full md:w-auto"
+                          onClick={handleRutLookup}
+                          disabled={
+                            isRutLookupLoading ||
+                            !rutSearchValue.trim() ||
+                            !gymInvoiceConfig?.companyId
+                          }
+                        >
+                          {isRutLookupLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Buscando
+                            </>
+                          ) : (
+                            <>
+                              <Search className="mr-2 h-4 w-4" />
+                              Buscar
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    {!gymInvoiceConfig?.companyId && (
+                      <Alert variant="destructive">
+                        <AlertDescription>
+                          Debes configurar el campo empresaid del gimnasio para
+                          habilitar esta búsqueda.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    {rutLookupError && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{rutLookupError}</AlertDescription>
+                      </Alert>
+                    )}
+                    {rutLookupResult && (
+                      <div className="rounded-md border p-3 text-sm space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">
+                            Razón social
+                          </span>
+                          <span className="font-medium text-right">
+                            {rutLookupResult.name ?? "Sin datos"}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">RUT</span>
+                          <span className="font-medium text-right">
+                            {rutLookupResult.rut ?? rutSearchValue.trim()}
+                          </span>
+                        </div>
+                        {(rutLookupResult.address ||
+                          rutLookupResult.city ||
+                          rutLookupResult.state ||
+                          rutLookupResult.country) && (
+                          <div className="flex items-start justify-between gap-4">
+                            <span className="text-muted-foreground">
+                              Ubicación
+                            </span>
+                            <span className="text-right">
+                              {[
+                                rutLookupResult.address,
+                                rutLookupResult.city,
+                                rutLookupResult.state,
+                                rutLookupResult.country,
+                              ]
+                                .flatMap((value) =>
+                                  typeof value === "string" &&
+                                  value.trim().length > 0
+                                    ? [value.trim()]
+                                    : []
+                                )
+                                .join(" - ") || "Sin datos"}
+                            </span>
+                          </div>
+                        )}
+                        {rutLookupResult.additional && (
+                          <div className="flex items-start justify-between gap-4">
+                            <span className="text-muted-foreground">Notas</span>
+                            <span className="text-right max-w-[16rem] break-words">
+                              {rutLookupResult.additional}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="rounded-md border p-3 text-sm space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Socio</span>
