@@ -16,8 +16,19 @@ const toArrayBuffer = (buffer: Buffer): ArrayBuffer =>
     buffer.byteOffset + buffer.byteLength
   ) as ArrayBuffer;
 
-const fromUint8Array = (value: Uint8Array): ArrayBuffer =>
-  value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
+const fromUint8Array = (value: Uint8Array): ArrayBuffer => {
+  const underlying = value.buffer;
+
+  if (
+    value.byteOffset === 0 &&
+    value.byteLength === underlying.byteLength &&
+    underlying instanceof ArrayBuffer
+  ) {
+    return underlying;
+  }
+
+  return value.slice().buffer;
+};
 
 const decodeBase64Pdf = (value: string): ArrayBuffer | null => {
   const trimmed = value.trim();

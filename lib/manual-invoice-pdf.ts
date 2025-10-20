@@ -411,38 +411,48 @@ const parseInvoiceLines = (value: unknown): InvoiceLineItem[] => {
     }
   }
 
-  return segments
-    .map((segment) => {
-      const parts = segment
-        .split("</col/>")
-        .map((part) => part.replace(/<\/?col\/?\>/gi, "").trim());
+  const items: InvoiceLineItem[] = [];
 
-      if (parts.length < 3) return null;
+  segments.forEach((segment) => {
+    const parts = segment
+      .split("</col/>")
+      .map((part) => part.replace(/<\/?col\/?\>/gi, "").trim());
 
-      const quantity = parseNumber(parts[1]);
-      const unitPrice = parseNumber(parts[2]);
-      const discount = parseNumber(parts[3]);
-      const surcharge = parseNumber(parts[4]);
-      const description =
-        sanitizeString(parts[5]) ?? sanitizeString(parts[0]) ?? "Ítem";
-      const taxIndicator = sanitizeString(parts[6]);
-      const unit = sanitizeString(parts[7]);
-      const subtotal = quantity * unitPrice;
-      const total = subtotal - discount + surcharge;
+    if (parts.length < 3) return;
 
-      return {
-        description,
-        quantity,
-        unitPrice,
-        discount,
-        surcharge,
-        subtotal,
-        total,
-        taxIndicator,
-        unit,
-      } satisfies InvoiceLineItem;
-    })
-    .filter((item): item is InvoiceLineItem => item !== null);
+    const quantity = parseNumber(parts[1]);
+    const unitPrice = parseNumber(parts[2]);
+    const discount = parseNumber(parts[3]);
+    const surcharge = parseNumber(parts[4]);
+    const description =
+      sanitizeString(parts[5]) ?? sanitizeString(parts[0]) ?? "Ítem";
+    const taxIndicator = sanitizeString(parts[6]);
+    const unit = sanitizeString(parts[7]);
+    const subtotal = quantity * unitPrice;
+    const total = subtotal - discount + surcharge;
+
+    const item: InvoiceLineItem = {
+      description,
+      quantity,
+      unitPrice,
+      discount,
+      surcharge,
+      subtotal,
+      total,
+    };
+
+    if (taxIndicator !== null) {
+      item.taxIndicator = taxIndicator;
+    }
+
+    if (unit !== null) {
+      item.unit = unit;
+    }
+
+    items.push(item);
+  });
+
+  return items;
 };
 
 const buildPdfBuffer = (
@@ -524,9 +534,7 @@ const buildPdfBuffer = (
   return Buffer.concat(buffers);
 };
 
-const resolveDateValue = (
-  ...values: Array<string | null | undefined>
-): string | null => {
+const resolveDateValue = (...values: unknown[]): string | null => {
   for (const value of values) {
     const candidate = sanitizeString(value);
     if (!candidate) continue;
