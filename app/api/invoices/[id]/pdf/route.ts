@@ -62,6 +62,15 @@ const decodeBase64Pdf = (value: string): ArrayBuffer | null => {
   return null;
 };
 
+const looksLikePdfBuffer = (buffer: ArrayBuffer) => {
+  if (!buffer || buffer.byteLength < 4) {
+    return false;
+  }
+
+  const prefix = Buffer.from(buffer.slice(0, 8)).toString("ascii");
+  return prefix.includes("%PDF");
+};
+
 const fetchRemotePdf = async (url: string): Promise<ArrayBuffer | null> => {
   try {
     const response = await fetch(url, { cache: "no-store" });
@@ -69,7 +78,35 @@ const fetchRemotePdf = async (url: string): Promise<ArrayBuffer | null> => {
       console.error("Remote PDF responded with status", response.status, url);
       return null;
     }
-    return await response.arrayBuffer();
+    const arrayBuffer = await response.arrayBuffer();
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+      console.error("Remote PDF response was empty", url);
+      return null;
+    }
+
+    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+    if (contentType.includes("application/pdf")) {
+      return arrayBuffer;
+    }
+
+    if (looksLikePdfBuffer(arrayBuffer)) {
+      return arrayBuffer;
+    }
+
+    const text = Buffer.from(arrayBuffer).toString("utf-8").trim();
+    if (text) {
+      const decoded = decodeBase64Pdf(text);
+      if (decoded) {
+        return decoded;
+      }
+      console.error(
+        "Remote PDF did not provide a valid PDF document",
+        { contentType, preview: text.slice(0, 120) },
+        url
+      );
+    }
+
+    return null;
   } catch (error) {
     console.error("Error fetching remote PDF", error);
     return null;
