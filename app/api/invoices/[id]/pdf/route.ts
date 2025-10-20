@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { Buffer } from "node:buffer";
 
-import { buildInvoicePdfFileName, findInvoicePdfSource } from "@/lib/invoice-pdf";
+import {
+  buildInvoicePdfFileName,
+  findInvoicePdfSource,
+} from "@/lib/invoice-pdf";
 import { buildManualInvoicePdf } from "@/lib/manual-invoice-pdf";
 import { createClient } from "@/lib/supabase-server";
 
@@ -13,7 +16,7 @@ const toArrayBuffer = (buffer: Buffer): ArrayBuffer =>
     buffer.byteOffset + buffer.byteLength
   ) as ArrayBuffer;
 
-  const fromUint8Array = (value: Uint8Array): ArrayBuffer =>
+const fromUint8Array = (value: Uint8Array): ArrayBuffer =>
   value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
 
 const decodeBase64Pdf = (value: string): ArrayBuffer | null => {
@@ -78,9 +81,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const { data: invoice, error } = await supabase
     .from("invoices")
-    .select(
-      "id, invoice_number, invoice_series, response_payload"
-    )
+    .select("id, gym_id, member_name, total, currency, invoice_number, invoice_series, environment, typecfe, external_invoice_id, issued_at, due_date, request_payload, response_payload")
     .eq("id", invoiceId)
     .maybeSingle();
 
@@ -100,37 +101,64 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const pdfSource = findInvoicePdfSource(invoice.response_payload);
+  const hadExternalSource = Boolean(pdfSource);
+  let pdfBuffer: ArrayBuffer | null = null;
 
-  if (!pdfSource) {
-    return NextResponse.json(
-      {
-        error:
-          "La factura no tiene un PDF disponible todavía. Intenta nuevamente más tarde.",
-      },
-      { status: 404 }
-    );
+  if (pdfSource) {
+    const externalPdf =
+      decodeBase64Pdf(pdfSource) ?? (await fetchRemotePdf(pdfSource));
+    if (externalPdf && externalPdf.byteLength > 0) {
+      pdfBuffer = externalPdf;
+    }
   }
 
-   const pdfBuffer: ArrayBuffer | null =
-    decodeBase64Pdf(pdfSource) ?? (await fetchRemotePdf(pdfSource));
+  if (!pdfBuffer) {
+    let gym: {
+      id: string;
+      name?: string | null;
+      invoice_rutneg?: string | null;
+      invoice_dirneg?: string | null;
+      invoice_cityneg?: string | null;
+      invoice_stateneg?: string | null;
+      invoice_addinfoneg?: string | null;
+    } | null = null;
 
-    if (!pdfBuffer) {
-    return NextResponse.json(
-      {
-        error:
-          "No pudimos descargar el PDF de la factura. Intenta nuevamente en unos minutos.",
-      },
-      { status: 502 }
-    );
+    if (invoice.gym_id) {
+      const { data: gymRecord, error: gymError } = await supabase
+        .from("gyms")
+        .select(
+          "id, name, invoice_rutneg, invoice_dirneg, invoice_cityneg, invoice_stateneg, invoice_addinfoneg"
+        )
+        .eq("id", invoice.gym_id)
+        .maybeSingle();
+
+      if (gymError) {
+        console.error("Error fetching gym for invoice PDF", gymError);
+      } else {
+        gym = gymRecord;
+      }
+    }
+
+  const manualPdf = await buildManualInvoicePdf({
+      invoice,
+      gym,
+    });
+
+    if (manualPdf && manualPdf.byteLength > 0) {
+      pdfBuffer = fromUint8Array(manualPdf);
+    }
   }
 
-    if (pdfBuffer.byteLength === 0) {
+  if (!pdfBuffer || pdfBuffer.byteLength === 0) {
+    const status = hadExternalSource ? 502 : 404;
+    const message = hadExternalSource
+      ? "No pudimos descargar ni reconstruir el PDF de la factura. Intenta nuevamente en unos minutos."
+      : "La factura todavía no cuenta con los datos necesarios para generar un PDF. Intenta nuevamente más tarde.";
     return NextResponse.json(
       {
-        error:
-          "No pudimos descargar el PDF de la factura. Intenta nuevamente en unos minutos.",
+        error: message,
       },
-      { status: 502 }
+      { status }
     );
   }
 
