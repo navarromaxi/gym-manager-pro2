@@ -64,6 +64,62 @@ type NumberFormatOptions = {
   currency?: string | null;
 };
 
+type KeyValueRow = {
+  label: string;
+  value: string;
+  size?: number;
+  labelSize?: number;
+  valueSize?: number;
+  labelFont?: TextFont;
+  valueFont?: TextFont;
+};
+
+type TableColumnDefinition = {
+  title: string;
+  width: number;
+  align?: "left" | "center" | "right";
+  size?: number;
+};
+
+const renderTableCell = (
+  page: PdfPage,
+  columns: TableColumnDefinition[],
+  columnStarts: number[],
+  columnIndex: number,
+  topY: number,
+  padding: number,
+  lines: string[],
+  options: { font?: TextFont; size?: number; align?: "left" | "center" | "right" } = {}
+) => {
+  const column = columns[columnIndex];
+  const size = options.size ?? column.size ?? 10;
+  const font = options.font ?? "regular";
+  const align = options.align ?? column.align ?? "left";
+  const columnStart = columnStarts[columnIndex];
+  const columnWidth = column.width;
+  const columnEnd = columnStart + columnWidth;
+
+  const effectiveLines = lines.length > 0 ? lines : [" "];
+  let textY = topY - padding - size;
+
+  effectiveLines.forEach((line) => {
+    let textX = columnStart + padding;
+    if (align === "right") {
+      const estimated = estimateTextWidth(line, size);
+      textX = columnEnd - padding - estimated;
+      if (textX < columnStart + padding) {
+        textX = columnStart + padding;
+      }
+    } else if (align === "center") {
+      const estimated = estimateTextWidth(line, size);
+      textX = columnStart + columnWidth / 2 - estimated / 2;
+    }
+
+    writeText(page, line, textX, textY, size, font);
+    textY -= size + 2;
+  });
+};
+
 const PAGE_WIDTH = 595.28; // A4 width in points
 const PAGE_HEIGHT = 841.89; // A4 height in points
 const PAGE_MARGIN = 48;
@@ -197,6 +253,175 @@ const writeText = (
   page.contents.push(`1 0 0 1 ${xValue} ${yValue} Tm`);
   page.contents.push(`(${escaped}) Tj`);
   page.contents.push("ET");
+};
+
+const estimateTextWidth = (text: string, size: number) => {
+  if (!text) return 0;
+  return text.length * size * 0.5;
+};
+
+const drawHorizontalLine = (page: PdfPage, x1: number, x2: number, y: number) => {
+  page.contents.push(`${x1.toFixed(2)} ${y.toFixed(2)} m`);
+  page.contents.push(`${x2.toFixed(2)} ${y.toFixed(2)} l`);
+  page.contents.push("S");
+};
+
+const drawVerticalLine = (
+  page: PdfPage,
+  x: number,
+  yTop: number,
+  yBottom: number
+) => {
+  page.contents.push(`${x.toFixed(2)} ${yTop.toFixed(2)} m`);
+  page.contents.push(`${x.toFixed(2)} ${yBottom.toFixed(2)} l`);
+  page.contents.push("S");
+};
+
+const drawRectangle = (
+  page: PdfPage,
+  x: number,
+  yTop: number,
+  width: number,
+  height: number
+) => {
+  const yBottom = yTop - height;
+  drawHorizontalLine(page, x, x + width, yTop);
+  drawHorizontalLine(page, x, x + width, yBottom);
+  drawVerticalLine(page, x, yTop, yBottom);
+  drawVerticalLine(page, x + width, yTop, yBottom);
+};
+
+const renderTwoColumnTable = (
+  page: PdfPage,
+  pages: PdfPage[],
+  rows: KeyValueRow[],
+  options: {
+    title?: string;
+    gapAfter?: number;
+    labelWidth?: number;
+    valueWidth?: number;
+    fontSize?: number;
+    headerSize?: number;
+  } = {}
+) => {
+  if (!options.title && rows.length === 0) {
+    return page;
+  }
+
+  const fontSize = options.fontSize ?? 10;
+  const headerSize = options.headerSize ?? 12;
+  const labelWidth = options.labelWidth ?? 160;
+  const valueWidth = options.valueWidth ?? PAGE_WIDTH - 2 * PAGE_MARGIN - labelWidth;
+  const tableWidth = labelWidth + valueWidth;
+  const cellPadding = 6;
+  const headerHeight = options.title ? headerSize + cellPadding * 2 : 0;
+
+  const rowHeights = rows.map((row) => {
+    const labelFontSize = row.labelSize ?? row.size ?? fontSize;
+    const valueFontSize = row.valueSize ?? row.size ?? fontSize;
+    const labelLines = wrapText(
+      row.label,
+      Math.max(1, labelWidth - cellPadding * 2),
+      labelFontSize
+    );
+    const valueLines = wrapText(
+      row.value,
+      Math.max(1, valueWidth - cellPadding * 2),
+      valueFontSize
+    );
+    const labelCount = labelLines.length > 0 ? labelLines.length : 1;
+    const valueCount = valueLines.length > 0 ? valueLines.length : 1;
+    const labelHeight =
+      labelCount * (labelFontSize + 2) - 2 + cellPadding * 2;
+    const valueHeight =
+      valueCount * (valueFontSize + 2) - 2 + cellPadding * 2;
+    return Math.max(20, labelHeight, valueHeight);
+  });
+
+  const totalHeight =
+    headerHeight + rowHeights.reduce((sum, height) => sum + height, 0);
+  if (totalHeight <= 0) {
+    return page;
+  }
+
+  let currentPage = ensureSpace(page, pages, totalHeight);
+  const startY = currentPage.cursorY;
+  const startX = PAGE_MARGIN;
+
+  currentPage.contents.push("0.5 w");
+  drawRectangle(currentPage, startX, startY, tableWidth, totalHeight);
+
+  const dividerX = startX + labelWidth;
+  drawVerticalLine(currentPage, dividerX, startY, startY - totalHeight);
+
+  let cursorY = startY;
+
+  if (options.title) {
+    const headerBottom = cursorY - headerHeight;
+    drawHorizontalLine(currentPage, startX, startX + tableWidth, headerBottom);
+    const titleY = cursorY - cellPadding - headerSize + 2;
+    writeText(currentPage, options.title, startX + cellPadding, titleY, headerSize, "bold");
+    cursorY = headerBottom;
+  }
+
+  rows.forEach((row, index) => {
+    const rowHeight = rowHeights[index];
+    const rowTop = cursorY;
+    const rowBottom = rowTop - rowHeight;
+
+    drawHorizontalLine(currentPage, startX, startX + tableWidth, rowBottom);
+
+    const labelFontSize = row.labelSize ?? row.size ?? fontSize;
+    const valueFontSize = row.valueSize ?? row.size ?? fontSize;
+    const labelLines = wrapText(
+      row.label,
+      Math.max(1, labelWidth - cellPadding * 2),
+      labelFontSize
+    );
+    const valueLines = wrapText(
+      row.value,
+      Math.max(1, valueWidth - cellPadding * 2),
+      valueFontSize
+    );
+
+    let labelY = rowTop - cellPadding - labelFontSize;
+    labelLines.forEach((line) => {
+      writeText(
+        currentPage,
+        line,
+        startX + cellPadding,
+        labelY,
+        labelFontSize,
+        row.labelFont ?? "bold"
+      );
+      labelY -= labelFontSize + 2;
+    });
+
+    let valueY = rowTop - cellPadding - valueFontSize;
+    valueLines.forEach((line) => {
+      writeText(
+        currentPage,
+        line,
+        dividerX + cellPadding,
+        valueY,
+        valueFontSize,
+        row.valueFont ?? "regular"
+      );
+      valueY -= valueFontSize + 2;
+    });
+
+    cursorY = rowBottom;
+  });
+
+  currentPage.contents.push("1 w");
+
+  currentPage.cursorY = startY - totalHeight;
+  const gapAfter = options.gapAfter ?? 12;
+  if (gapAfter > 0) {
+    currentPage = addGap(currentPage, pages, gapAfter);
+  }
+
+  return currentPage;
 };
 
 const addGap = (page: PdfPage, pages: PdfPage[], gap: number) => {
@@ -554,6 +779,121 @@ const resolveDateValue = (...values: unknown[]): string | null => {
   return null;
 };
 
+const describeTypecfe = (value: number | null | undefined): string => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "CFE";
+  }
+
+  switch (value) {
+    case 101:
+      return "e-Factura";
+    case 102:
+      return "Nota de crédito e-Factura";
+    case 103:
+      return "Nota de débito e-Factura";
+    case 111:
+      return "e-Ticket";
+    case 112:
+      return "Nota de crédito e-Ticket";
+    case 113:
+      return "Nota de débito e-Ticket";
+    default:
+      return `CFE ${value}`;
+  }
+};
+
+const resolveTaxRate = (indicator: string | null | undefined): number | null => {
+  if (!indicator) return null;
+  const normalized = indicator.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const percentMatch = normalized.match(/(\d{1,2})(?:[.,](\d+))?\s*%/);
+  if (percentMatch) {
+    const integerPart = Number(percentMatch[1]);
+    if (Number.isFinite(integerPart)) {
+      return integerPart;
+    }
+  }
+
+  if (normalized.includes("bás") || normalized.includes("bas")) {
+    return 22;
+  }
+  if (normalized.includes("mín") || normalized.includes("min")) {
+    return 10;
+  }
+  if (normalized.includes("22")) {
+    return 22;
+  }
+  if (normalized.includes("10")) {
+    return 10;
+  }
+  if (
+    normalized.includes("0%") ||
+    normalized.includes("exent") ||
+    normalized.includes("no grav") ||
+    normalized.includes("exon")
+  ) {
+    return 0;
+  }
+
+  return null;
+};
+
+type TaxSummary = {
+  label: string;
+  rate: number | null;
+  base: number;
+  total: number;
+  taxAmount: number;
+};
+
+const buildTaxSummaries = (lines: InvoiceLineItem[]): TaxSummary[] => {
+  const summaryMap = new Map<string, TaxSummary>();
+
+  lines.forEach((line) => {
+    const key = line.taxIndicator ?? "Sin indicador";
+    const existing = summaryMap.get(key);
+    const rate = existing?.rate ?? resolveTaxRate(line.taxIndicator);
+    const base = line.subtotal;
+    const total = line.total;
+    const taxAmount = Math.max(0, total - base);
+
+    if (existing) {
+      existing.base += base;
+      existing.total += total;
+      existing.taxAmount += taxAmount;
+      if (existing.rate === null && rate !== null) {
+        existing.rate = rate;
+      }
+    } else {
+      summaryMap.set(key, {
+        label: key,
+        rate,
+        base,
+        total,
+        taxAmount,
+      });
+    }
+  });
+
+  const summaries = Array.from(summaryMap.values());
+  summaries.forEach((summary) => {
+    if (
+      summary.taxAmount <= 0.01 &&
+      summary.rate !== null &&
+      summary.rate > 0 &&
+      summary.base > 0
+    ) {
+      const expected = summary.base * (summary.rate / 100);
+      if (Number.isFinite(expected) && expected > 0) {
+        summary.taxAmount = expected;
+      }
+    }
+  });
+
+  return summaries;
+};
+
 const buildInvoiceLinesSection = (
   page: PdfPage,
   pages: PdfPage[],
@@ -563,66 +903,201 @@ const buildInvoiceLinesSection = (
   if (lines.length === 0) {
     return addTextBlock(page, pages, "No se encontraron ítems en el comprobante.", {
       size: 11,
-      afterGap: 6,
+      afterGap: 10,
     });
   }
 
+   const columns: TableColumnDefinition[] = [
+    { title: "#", width: 20, align: "center", size: 10 },
+    { title: "IVA", width: 50, align: "center", size: 10 },
+    { title: "Producto / Servicio", width: 190, align: "left", size: 10 },
+    { title: "Cant.", width: 46, align: "right", size: 10 },
+    { title: "Precio Unit.", width: 62, align: "right", size: 10 },
+    { title: "Monto", width: 60, align: "right", size: 10 },
+    { title: "Monto IVA incl.", width: 70, align: "right", size: 10 },
+  ];
+
+  const startX = PAGE_MARGIN;
+  const tableWidth = columns.reduce((sum, column) => sum + column.width, 0);
+  const endX = startX + tableWidth;
+  const cellPadding = 6;
+  const headerHeight = 24;
+
+  const columnStarts: number[] = [];
+  let columnX = startX;
+  columns.forEach((column) => {
+    columnStarts.push(columnX);
+    columnX += column.width;
+  });
+
   let currentPage = page;
+  let isFirstRow = true;
+
+   const wrapForColumn = (text: string, column: TableColumnDefinition, size: number) =>
+    wrapText(text, Math.max(1, column.width - cellPadding * 2), size);
+
+    const drawRowLines = (topY: number, bottomY: number, drawTop: boolean) => {
+    currentPage.contents.push("0.5 w");
+    if (drawTop) {
+      drawHorizontalLine(currentPage, startX, endX, topY);
+    }
+    drawHorizontalLine(currentPage, startX, endX, bottomY);
+    drawVerticalLine(currentPage, startX, topY, bottomY);
+    drawVerticalLine(currentPage, endX, topY, bottomY);
+    for (let index = 1; index < columns.length; index += 1) {
+      const x = columnStarts[index];
+      drawVerticalLine(currentPage, x, topY, bottomY);
+    }
+    currentPage.contents.push("1 w");
+  };
+
+     const ensureSpaceForRow = (
+    rowHeight: number,
+    options: { skipHeader?: boolean } = {}
+  ) => {
+    if (currentPage.cursorY - rowHeight < PAGE_MARGIN) {
+      currentPage = addNewPage(pages);
+      isFirstRow = true;
+      if (!options.skipHeader) {
+        renderHeaderRow();
+      }
+    }
+    };
+
+    const renderHeaderRow = () => {
+    ensureSpaceForRow(headerHeight, { skipHeader: true });
+    const topY = currentPage.cursorY;
+    const bottomY = topY - headerHeight;
+    drawRowLines(topY, bottomY, true);
+    columns.forEach((column, index) => {
+      const size = column.size ?? 10;
+      const lines = wrapForColumn(column.title, column, size);
+      renderTableCell(currentPage, columns, columnStarts, index, topY, cellPadding, lines, {
+        font: "bold",
+        size,
+      });
+    });
+    currentPage.cursorY = bottomY;
+    isFirstRow = false;
+  };
+
+  renderHeaderRow();
 
   lines.forEach((line, index) => {
-    const title = `${index + 1}. ${line.description}`;
-    currentPage = addTextBlock(currentPage, pages, title, {
-      font: "bold",
-      size: 11,
-    });
+    const quantityText = formatNumber(line.quantity);
+    const unitText = formatCurrency(line.unitPrice, { currency });
+    const subtotalText = formatCurrency(line.subtotal, { currency });
+    const totalText = formatCurrency(line.total, { currency });
 
-    const quantityText = `Cantidad: ${formatNumber(line.quantity)}${
-      line.unit ? ` ${line.unit}` : ""
-    }`;
-    const unitText = `Precio unitario: ${formatCurrency(line.unitPrice, {
-      currency,
-    })}`;
-    const totalText = `Total de la línea: ${formatCurrency(line.total, {
-      currency,
-    })}`;
-    currentPage = addTextBlock(
-      currentPage,
-      pages,
-      `${quantityText} | ${unitText} | ${totalText}`,
-      {
-        size: 10,
-      }
-    );
-
-    if (line.discount || line.surcharge) {
-      const adjustments: string[] = [];
-      if (line.discount) {
-        adjustments.push(
-          `Descuento: ${formatCurrency(line.discount, { currency })}`
-        );
-      }
-      if (line.surcharge) {
-        adjustments.push(
-          `Recargo: ${formatCurrency(line.surcharge, { currency })}`
-        );
-      }
-      currentPage = addTextBlock(currentPage, pages, adjustments.join(" | "), {
-        size: 10,
-      });
+    const descriptionParts: string[] = [];
+    const description = line.description || "Ítem";
+    descriptionParts.push(description);
+    if (line.unit) {
+      descriptionParts.push(`Unidad: ${line.unit}`);
     }
-
-    if (line.taxIndicator) {
-      currentPage = addTextBlock(
-        currentPage,
-        pages,
-        `Indicador tributario: ${line.taxIndicator}`,
-        { size: 10 }
+    if (line.discount) {
+      descriptionParts.push(
+        `Descuento: ${formatCurrency(line.discount, { currency })}`
+      );
+    }
+     if (line.surcharge) {
+      descriptionParts.push(
+        `Recargo: ${formatCurrency(line.surcharge, { currency })}`
       );
     }
 
-    currentPage = addGap(currentPage, pages, 6);
-  });
+    const descriptionLines = descriptionParts.flatMap((part) =>
+      wrapForColumn(part, columns[2], 10)
+    );
 
+    const rowHeight = Math.max(24, descriptionLines.length * (10 + 2) + cellPadding * 2);
+
+    ensureSpaceForRow(rowHeight);
+    const topY = currentPage.cursorY;
+    const bottomY = topY - rowHeight;
+    drawRowLines(topY, bottomY, isFirstRow);
+
+    renderTableCell(
+      currentPage,
+      columns,
+      columnStarts,
+      0,
+      topY,
+      cellPadding,
+      [String(index + 1)],
+      { font: "bold", size: 10 }
+    );
+    renderTableCell(
+      currentPage,
+      columns,
+      columnStarts,
+      1,
+      topY,
+      cellPadding,
+      line.taxIndicator ? wrapForColumn(line.taxIndicator, columns[1], 10) : ["-"],
+      { size: 10 }
+    );
+
+    renderTableCell(
+      currentPage,
+      columns,
+      columnStarts,
+      2,
+      topY,
+      cellPadding,
+      descriptionLines,
+      { size: 10 }
+    );
+
+    const quantityLine = line.unit ? `${quantityText} ${line.unit}` : quantityText;
+    renderTableCell(
+      currentPage,
+      columns,
+      columnStarts,
+      3,
+      topY,
+      cellPadding,
+      [quantityLine],
+      { size: 10, align: "right" }
+    );
+
+    renderTableCell(
+      currentPage,
+      columns,
+      columnStarts,
+      4,
+      topY,
+      cellPadding,
+      [unitText],
+      { size: 10, align: "right" }
+    );
+
+    renderTableCell(
+      currentPage,
+      columns,
+      columnStarts,
+      5,
+      topY,
+      cellPadding,
+      [subtotalText],
+      { size: 10, align: "right" }
+    );
+
+    renderTableCell(
+      currentPage,
+      columns,
+      columnStarts,
+      6,
+      topY,
+      cellPadding,
+      [totalText],
+      { size: 10, align: "right" }
+    );
+
+    currentPage.cursorY = bottomY;
+    isFirstRow = false;
+  });
+  currentPage = addGap(currentPage, pages, 12);
   return currentPage;
 };
 
@@ -760,247 +1235,254 @@ export const buildManualInvoicePdf = async ({
   ]
     .filter(Boolean)
     .join(", ");
+
   const gymAdditionalInfo = sanitizeString(gym?.invoice_addinfoneg);
+
+  const environment = sanitizeString(invoice.environment);
+
+  const resolvedTypecfe =
+    typeof invoice.typecfe === "number" && Number.isFinite(invoice.typecfe)
+      ? invoice.typecfe
+      : parseNumber((requestPayload as UnknownRecord)?.typecfe);
+  const typecfeDescription = describeTypecfe(
+    Number.isFinite(resolvedTypecfe) && resolvedTypecfe !== 0
+      ? resolvedTypecfe
+      : null
+  );
+
+  const taxSummaries = buildTaxSummaries(lineItems);
 
   const pages: PdfPage[] = [createPage()];
   let currentPage = pages[0];
 
-  currentPage = addTextBlock(currentPage, pages, "Factura electrónica", {
-    font: "bold",
-    size: 16,
-  });
-  currentPage = addTextBlock(currentPage, pages, gymName, {
-    font: "bold",
-    size: 14,
-  });
-  if (gymRut) {
-    currentPage = addTextBlock(currentPage, pages, `RUT: ${gymRut}`, {
-      size: 11,
-    });
+  const headingHeight = 54;
+  if (currentPage.cursorY - headingHeight < PAGE_MARGIN) {
+    currentPage = addNewPage(pages);
   }
-  if (gymAddress) {
-    currentPage = addTextBlock(currentPage, pages, gymAddress, {
-      size: 11,
-    });
-  }
-  if (gymAdditionalInfo) {
-    currentPage = addTextBlock(currentPage, pages, gymAdditionalInfo, {
-      size: 10,
-    });
-  }
-
-  currentPage = addSeparator(currentPage, pages);
-
-  currentPage = addTextBlock(currentPage, pages, "Datos del cliente", {
-    font: "bold",
-    size: 13,
-  });
-  currentPage = addTextBlock(currentPage, pages, `Nombre: ${memberName}`, {
-    size: 11,
-  });
-  if (customerDocument) {
-    currentPage = addTextBlock(
+  const headingTop = currentPage.cursorY;
+  writeText(currentPage, gymName, PAGE_MARGIN, headingTop, 18, "bold");
+  writeText(
+    currentPage,
+    "Factura electrónica",
+    PAGE_MARGIN,
+    headingTop - 20,
+    14,
+    "bold"
+  );
+  if (typecfeDescription) {
+    writeText(
       currentPage,
-      pages,
-      `Documento: ${customerDocument}`,
-      { size: 11 }
+      typecfeDescription,
+      PAGE_MARGIN,
+      headingTop - 38,
+      11,
+      "regular"
     );
   }
-  if (customerAddress) {
-    currentPage = addTextBlock(currentPage, pages, `Dirección: ${customerAddress}`, {
-      size: 11,
+  currentPage.cursorY = headingTop - headingHeight;
+  currentPage.contents.push("0.5 w");
+  drawHorizontalLine(
+    currentPage,
+    PAGE_MARGIN,
+    PAGE_WIDTH - PAGE_MARGIN,
+    currentPage.cursorY + 10
+  );
+  currentPage.contents.push("1 w");
+  currentPage.cursorY -= 14;
+
+  const emitterRows: KeyValueRow[] = [
+    {
+      label: "RUT emisor",
+      value: gymRut ?? "No informado",
+    },
+    {
+      label: "Dirección",
+      value: gymAddress || "No informado",
+    },
+  ];
+  if (gymAdditionalInfo) {
+    emitterRows.push({
+      label: "Información adicional",
+      value: gymAdditionalInfo,
     });
   }
-  if (periodStart || periodEnd) {
-    const periodParts = [
-      periodStart ? `desde ${periodStart}` : null,
-      periodEnd ? `hasta ${periodEnd}` : null,
-    ]
-      .filter(Boolean)
-      .join(" ");
-    if (periodParts) {
-      currentPage = addTextBlock(
-        currentPage,
-        pages,
-        `Período de referencia: ${periodParts}`,
-        { size: 11 }
-      );
-    }
-  }
-
-  currentPage = addSeparator(currentPage, pages);
-
-  currentPage = addTextBlock(currentPage, pages, "Detalles de la factura", {
-    font: "bold",
-    size: 13,
+  currentPage = renderTwoColumnTable(currentPage, pages, emitterRows, {
+    title: "Datos del emisor",
   });
 
-  const serieText = invoiceSeries ? `${invoiceSeries} - ` : "";
-  currentPage = addTextBlock(
-    currentPage,
-    pages,
-    `Número de factura: ${serieText}${invoiceNumber}`,
-    { size: 11 }
-  );
+  const periodParts = [
+    periodStart ? `Desde ${periodStart}` : null,
+    periodEnd ? `Hasta ${periodEnd}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  if (reference) {
-    currentPage = addTextBlock(currentPage, pages, `Referencia interna: ${reference}`, {
-      size: 11,
-    });
-  }
+  const invoiceRows: KeyValueRow[] = [
+    { label: "Tipo de CFE", value: typecfeDescription },
+    { label: "Serie", value: invoiceSeries ?? "-" },
+    { label: "Número", value: `${invoiceNumber}` },
+    { label: "Moneda", value: currency },
+  ];
 
   if (issueDate) {
-    currentPage = addTextBlock(
-      currentPage,
-      pages,
-      `Fecha de emisión: ${issueDate}`,
-      { size: 11 }
-    );
+    invoiceRows.push({ label: "Fecha de emisión", value: issueDate });
   }
 
   if (dueDate) {
-    currentPage = addTextBlock(
-      currentPage,
-      pages,
-      `Fecha de vencimiento: ${dueDate}`,
-      { size: 11 }
-    );
+    invoiceRows.push({ label: "Fecha de vencimiento", value: dueDate });
   }
-
-  currentPage = addTextBlock(
-    currentPage,
-    pages,
-    `Moneda: ${currency}`,
-    { size: 11 }
-  );
+  if (reference) {
+    invoiceRows.push({ label: "Referencia interna", value: reference });
+  }
 
   if (indicadorFacturacion) {
-    currentPage = addTextBlock(
-      currentPage,
-      pages,
-      `Indicador de facturación: ${indicadorFacturacion}`,
-      { size: 11 }
-    );
+    invoiceRows.push({
+      label: "Indicador de facturación",
+      value: indicadorFacturacion,
+    });
   }
 
-  const environment = sanitizeString(invoice.environment);
   if (environment) {
-    currentPage = addTextBlock(
-      currentPage,
-      pages,
-      `Ambiente: ${environment}`,
-      { size: 11 }
-    );
+    invoiceRows.push({ label: "Ambiente", value: environment });
   }
 
-  currentPage = addSeparator(currentPage, pages);
-
-  currentPage = addTextBlock(currentPage, pages, "Detalle de ítems", {
-    font: "bold",
-    size: 13,
+  currentPage = renderTwoColumnTable(currentPage, pages, invoiceRows, {
+    title: "Datos del comprobante",
   });
-  currentPage = buildInvoiceLinesSection(
-    currentPage,
-    pages,
-    lineItems,
-    currency
-  );
 
-  currentPage = addSeparator(currentPage, pages, { gapBefore: 4, gapAfter: 8 });
+  const receptorRows: KeyValueRow[] = [
+    { label: "Receptor", value: memberName },
+    {
+      label: "Documento",
+      value: customerDocument ?? "Consumidor final",
+    },
+    {
+      label: "Dirección",
+      value: customerAddress || "No informado",
+    },
+  ];
 
-  currentPage = addTextBlock(currentPage, pages, "Totales", {
-    font: "bold",
-    size: 13,
+  if (periodParts) {
+    receptorRows.push({
+      label: "Período de referencia",
+      value: periodParts,
+    });
+  }
+
+  currentPage = renderTwoColumnTable(currentPage, pages, receptorRows, {
+    title: "Datos del receptor",
   });
-  currentPage = addTextBlock(
-    currentPage,
-    pages,
-    `Subtotal: ${formatCurrency(aggregates.subtotal, { currency })}`,
-    { size: 11 }
-  );
+
+  currentPage = buildInvoiceLinesSection(currentPage, pages, lineItems, currency);
+
+  const totalsRows: KeyValueRow[] = [
+    {
+      label: "Subtotal",
+      value: formatCurrency(aggregates.subtotal, { currency }),
+    },
+  ];
+
   if (aggregates.discount) {
-    currentPage = addTextBlock(
-      currentPage,
-      pages,
-      `Descuentos: ${formatCurrency(aggregates.discount, { currency })}`,
-      { size: 11 }
-    );
+    totalsRows.push({
+      label: "Descuentos",
+      value: formatCurrency(aggregates.discount, { currency }),
+    });
   }
   if (aggregates.surcharge) {
-    currentPage = addTextBlock(
-      currentPage,
-      pages,
-      `Recargos: ${formatCurrency(aggregates.surcharge, { currency })}`,
-      { size: 11 }
-    );
-  }
-  currentPage = addTextBlock(
-    currentPage,
-    pages,
-    `Total: ${formatCurrency(invoiceTotal, { currency })}`,
-    { font: "bold", size: 12 }
-  );
-
-  currentPage = addSeparator(currentPage, pages, { gapBefore: 6, gapAfter: 8 });
-
-  currentPage = addTextBlock(
-    currentPage,
-    pages,
-    "Datos de autorización (CAE)",
-    { font: "bold", size: 13 }
-  );
-  currentPage = addTextBlock(
-    currentPage,
-    pages,
-    `CAE: ${caeNumber}`,
-    { size: 11 }
-  );
-  if (caeId && caeId !== caeNumber) {
-    currentPage = addTextBlock(currentPage, pages, `Identificador CAE: ${caeId}`, {
-      size: 11,
+    totalsRows.push({
+      label: "Recargos",
+      value: formatCurrency(aggregates.surcharge, { currency }),
     });
+  }
+   taxSummaries.forEach((summary) => {
+    if (summary.rate === null) {
+      totalsRows.push({
+        label: `Total ${summary.label}`,
+        value: formatCurrency(summary.total, { currency }),
+      });
+      return;
+    }
+
+    const rateLabel = `${summary.rate}%`;
+    totalsRows.push({
+      label: `Sub Total IVA ${rateLabel}`,
+      value: formatCurrency(summary.base, { currency }),
+    });
+    if (summary.taxAmount > 0.01) {
+      totalsRows.push({
+        label: `IVA ${rateLabel}`,
+        value: formatCurrency(summary.taxAmount, { currency }),
+      });
+    }
+    totalsRows.push({
+      label: `Monto total IVA ${rateLabel}`,
+      value: formatCurrency(summary.base + summary.taxAmount, { currency }),
+    });
+  });
+
+   totalsRows.push({
+    label: "Total a pagar",
+    value: formatCurrency(invoiceTotal, { currency }),
+    size: 12,
+    labelFont: "bold",
+    valueFont: "bold",
+  });
+
+  currentPage = renderTwoColumnTable(currentPage, pages, totalsRows, {
+    title: "Totales",
+  });
+
+  const caeRows: KeyValueRow[] = [
+    { label: "CAE", value: caeNumber },
+  ];
+  if (caeId && caeId !== caeNumber) {
+    caeRows.push({ label: "Identificador CAE", value: caeId })
   }
   if (caeExpiration) {
-    currentPage = addTextBlock(
-      currentPage,
-      pages,
-      `Vencimiento del CAE: ${caeExpiration}`,
-      { size: 11 }
-    );
+    caeRows.push({ label: "Vencimiento del CAE", value: caeExpiration });
   }
   if (caeLink) {
-    currentPage = addTextBlock(
-      currentPage,
-      pages,
-      `Enlace de verificación: ${caeLink}`,
-      { size: 10 }
-    );
+    caeRows.push({ label: "Enlace de verificación", value: caeLink });
   }
 
+  currentPage = renderTwoColumnTable(currentPage, pages, caeRows, {
+    title: "Datos de autorización (CAE)",
+  });
+
   if (additionalInfo) {
-    currentPage = addSeparator(currentPage, pages);
-    currentPage = addTextBlock(
+    currentPage = renderTwoColumnTable(
       currentPage,
       pages,
-      "Información adicional",
-      { font: "bold", size: 13 }
+       [
+        {
+          label: "Detalle",
+          value: additionalInfo,
+          labelFont: "bold",
+        },
+      ],
+      {
+        title: "Información adicional",
+        labelWidth: 140,
+      }
     );
-    currentPage = addTextBlock(currentPage, pages, additionalInfo, {
-      size: 11,
-    });
   }
 
   if (termsConditions) {
-    currentPage = addSeparator(currentPage, pages);
-    currentPage = addTextBlock(
+    currentPage = renderTwoColumnTable(
       currentPage,
       pages,
-      "Términos y condiciones",
-      { font: "bold", size: 13 }
+      [
+        {
+          label: "Condiciones",
+          value: termsConditions,
+          labelFont: "bold",
+        },
+      ],
+      {
+        title: "Términos y condiciones",
+        labelWidth: 160,
+      }
     );
-    currentPage = addTextBlock(currentPage, pages, termsConditions, {
-      size: 11,
-    });
   }
 
   currentPage = addSeparator(currentPage, pages, { gapBefore: 10, gapAfter: 6 });
