@@ -1,9 +1,34 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
 
 import { CLASS_RECEIPTS_BUCKET } from "@/lib/storage";
 import { createClient } from "@/lib/supabase-server";
+
+async function ensureReceiptBucket(
+  supabase: SupabaseClient,
+  bucketId: string
+) {
+  const { data, error } = await supabase.storage.getBucket(bucketId);
+
+  if (error && !error.message?.includes("not found")) {
+    throw error;
+  }
+
+  if (!data) {
+    const { error: createError } = await supabase.storage.createBucket(
+      bucketId,
+      {
+        public: true,
+      }
+    );
+
+    if (createError && !createError.message?.includes("already exists")) {
+      throw createError;
+    }
+  }
+}
 
 const MAX_RECEIPT_SIZE_MB = 5;
 const MAX_RECEIPT_SIZE_BYTES = MAX_RECEIPT_SIZE_MB * 1024 * 1024;
@@ -190,6 +215,19 @@ export async function POST(request: Request) {
     let receiptStoragePath: string | null = null;
 
     if (receiptFile) {
+      try {
+        await ensureReceiptBucket(supabase, CLASS_RECEIPTS_BUCKET);
+      } catch (bucketError) {
+        console.error("Error ensuring receipts bucket", bucketError);
+        return NextResponse.json(
+          {
+            error:
+              "No se pudo preparar el almacenamiento de comprobantes. Intenta nuevamente en unos segundos.",
+          },
+          { status: 500 }
+        );
+      }
+
       const arrayBuffer = await receiptFile.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       const originalExtension = receiptFile.name
