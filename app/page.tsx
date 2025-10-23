@@ -426,10 +426,10 @@ export default function GymManagementSystem() {
           )
           .eq("gym_id", gymId)
           .order("visit_date", { ascending: false }),
-          supabase
+        supabase
           .from("class_sessions")
           .select(
-            "id, gym_id, title, date, start_time, capacity, notes, created_at"
+            "id, gym_id, title, date, start_time, capacity, notes, created_at, accept_receipts"
           )
           .eq("gym_id", gymId)
           .order("date", { ascending: true })
@@ -437,7 +437,7 @@ export default function GymManagementSystem() {
         supabase
           .from("class_registrations")
           .select(
-            "id, session_id, gym_id, full_name, email, phone, created_at"
+            "id, session_id, gym_id, full_name, email, phone, created_at, receipt_url, receipt_storage_path"
           )
           .eq("gym_id", gymId),
       ]);
@@ -548,7 +548,7 @@ export default function GymManagementSystem() {
       supabase
         .from("class_sessions")
         .select(
-          "id, gym_id, title, date, start_time, capacity, notes, created_at"
+          "id, gym_id, title, date, start_time, capacity, notes, created_at, accept_receipts"
         )
         .eq("gym_id", gymData.id)
         .order("date", { ascending: true })
@@ -556,7 +556,7 @@ export default function GymManagementSystem() {
       supabase
         .from("class_registrations")
         .select(
-          "id, session_id, gym_id, full_name, email, phone, created_at"
+          "id, session_id, gym_id, full_name, email, phone, created_at, receipt_url, receipt_storage_path"
         )
         .eq("gym_id", gymData.id),
     ]);

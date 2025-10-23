@@ -1,25 +1,75 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
+import { extname } from "node:path";
 
+import { CLASS_RECEIPTS_BUCKET } from "@/lib/storage";
 import { createClient } from "@/lib/supabase-server";
+
+const MAX_RECEIPT_SIZE_MB = 5;
+const MAX_RECEIPT_SIZE_BYTES = MAX_RECEIPT_SIZE_MB * 1024 * 1024;
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const {
-      sessionId,
-      gymId,
-      fullName,
-      email,
-      phone,
-    }: {
-      sessionId?: string;
-      gymId?: string;
-      fullName?: string;
-      email?: string | null;
-      phone?: string | null;
-    } = body ?? {};
+    const contentType = request.headers.get("content-type") ?? "";
+    let sessionId: string | undefined;
+    let gymId: string | undefined;
+    let fullName: string | undefined;
+    let email: string | undefined;
+    let phone: string | undefined;
+    let receiptFile: File | null = null;
 
-    if (!sessionId || !gymId || !fullName?.trim()) {
+    if (contentType.includes("application/json")) {
+      const body = (await request.json().catch(() => null)) as
+        | Record<string, unknown>
+        | null;
+      if (body) {
+        sessionId =
+          typeof body.sessionId === "string" ? body.sessionId : undefined;
+        gymId = typeof body.gymId === "string" ? body.gymId : undefined;
+        fullName =
+          typeof body.fullName === "string" ? body.fullName : undefined;
+        email = typeof body.email === "string" ? body.email : undefined;
+        phone = typeof body.phone === "string" ? body.phone : undefined;
+      }
+    } else {
+      const formData = await request.formData().catch(() => null);
+      if (formData) {
+        const sessionIdEntry = formData.get("sessionId");
+        if (typeof sessionIdEntry === "string") {
+          sessionId = sessionIdEntry;
+        }
+        const gymIdEntry = formData.get("gymId");
+        if (typeof gymIdEntry === "string") {
+          gymId = gymIdEntry;
+        }
+        const fullNameEntry = formData.get("fullName");
+        if (typeof fullNameEntry === "string") {
+          fullName = fullNameEntry;
+        }
+        const emailEntry = formData.get("email");
+        if (typeof emailEntry === "string") {
+          email = emailEntry;
+        }
+        const phoneEntry = formData.get("phone");
+        if (typeof phoneEntry === "string") {
+          phone = phoneEntry;
+        }
+        const receiptEntry = formData.get("receipt");
+        if (receiptEntry instanceof File && receiptEntry.size > 0) {
+          receiptFile = receiptEntry;
+        }
+      }
+    }
+
+    const normalizedSessionId = sessionId?.trim() ?? "";
+    const normalizedGymId = gymId?.trim() ?? "";
+    const normalizedFullName = fullName?.trim() ?? "";
+    const normalizedEmail =
+      email && email.trim().length > 0 ? email.trim() : null;
+    const normalizedPhone =
+      phone && phone.trim().length > 0 ? phone.trim() : null;
+
+    if (!normalizedSessionId || !normalizedGymId || !normalizedFullName) {
       return NextResponse.json(
         {
           error:
@@ -29,13 +79,37 @@ export async function POST(request: Request) {
       );
     }
 
+    if (receiptFile) {
+      if (receiptFile.size > MAX_RECEIPT_SIZE_BYTES) {
+        return NextResponse.json(
+          {
+            error: `El comprobante supera el tamaño máximo de ${MAX_RECEIPT_SIZE_MB} MB.`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const isImage = receiptFile.type?.startsWith("image/") ?? false;
+      const isPdf = receiptFile.type === "application/pdf";
+
+      if (!isImage && !isPdf) {
+        return NextResponse.json(
+          {
+            error:
+              "El comprobante debe ser un archivo de imagen o un PDF válido.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     const supabase = createClient();
 
     const { data: session, error: sessionError } = await supabase
       .from("class_sessions")
-      .select("id, gym_id, title, capacity, date, start_time")
-      .eq("id", sessionId)
-      .eq("gym_id", gymId)
+      .select("id, gym_id, title, capacity, date, start_time, accept_receipts")
+      .eq("id", normalizedSessionId)
+      .eq("gym_id", normalizedGymId)
       .maybeSingle();
 
     if (sessionError) {
@@ -55,6 +129,10 @@ export async function POST(request: Request) {
         },
         { status: 404 }
       );
+    }
+
+    if (receiptFile && !session.accept_receipts) {
+      receiptFile = null;
     }
 
     const sessionDateTimeRaw = `${session.date}T${session.start_time}`;
@@ -85,8 +163,8 @@ export async function POST(request: Request) {
     const { count: registrationsCount, error: countError } = await supabase
       .from("class_registrations")
       .select("id", { head: true, count: "exact" })
-      .eq("session_id", sessionId)
-      .eq("gym_id", gymId);
+      .eq("session_id", normalizedSessionId)
+      .eq("gym_id", normalizedGymId);
 
     if (countError) {
       console.error("Error counting class registrations", countError);
@@ -108,20 +186,78 @@ export async function POST(request: Request) {
       );
     }
 
+    let receiptUrl: string | null = null;
+    let receiptStoragePath: string | null = null;
+
+    if (receiptFile) {
+      const arrayBuffer = await receiptFile.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const originalExtension = receiptFile.name
+        ? extname(receiptFile.name)
+        : "";
+      const fallbackExtension =
+        receiptFile.type === "application/pdf" ? ".pdf" : ".jpg";
+      const extension = originalExtension || fallbackExtension;
+      const normalizedExtension = extension.startsWith(".")
+        ? extension
+        : `.${extension}`;
+      const storagePath = `${normalizedGymId}/${normalizedSessionId}/${randomUUID()}${normalizedExtension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(CLASS_RECEIPTS_BUCKET)
+        .upload(storagePath, buffer, {
+          contentType: receiptFile.type || "application/octet-stream",
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error("Error uploading receipt file", uploadError);
+        return NextResponse.json(
+          {
+            error:
+              "No se pudo guardar el comprobante. Intenta nuevamente en unos segundos.",
+          },
+          { status: 500 }
+        );
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from(CLASS_RECEIPTS_BUCKET)
+        .getPublicUrl(storagePath);
+
+      receiptUrl = publicUrlData?.publicUrl ?? null;
+      receiptStoragePath = storagePath;
+    }
+
     const { data: registration, error: insertError } = await supabase
       .from("class_registrations")
       .insert({
-        session_id: sessionId,
-        gym_id: gymId,
-        full_name: fullName.trim(),
-        email: email?.trim() || null,
-        phone: phone?.trim() || null,
+        session_id: normalizedSessionId,
+        gym_id: normalizedGymId,
+        full_name: normalizedFullName,
+        email: normalizedEmail,
+        phone: normalizedPhone,
+        receipt_url: receiptUrl,
+        receipt_storage_path: receiptStoragePath,
       })
-      .select("id, session_id, gym_id, full_name, email, phone, created_at")
+      .select(
+        "id, session_id, gym_id, full_name, email, phone, created_at, receipt_url, receipt_storage_path"
+      )
       .single();
 
     if (insertError) {
       console.error("Error inserting class registration", insertError);
+      if (receiptStoragePath) {
+        await supabase.storage
+          .from(CLASS_RECEIPTS_BUCKET)
+          .remove([receiptStoragePath])
+          .catch((cleanupError) =>
+            console.error(
+              "Error removing receipt after failed registration",
+              cleanupError
+            )
+          );
+      }
       return NextResponse.json(
         {
           error:

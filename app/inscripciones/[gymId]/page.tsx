@@ -39,6 +39,9 @@ const INITIAL_FORM_STATE: RegistrationFormState = {
   phone: "",
 };
 
+const MAX_RECEIPT_SIZE_MB = 5;
+const MAX_RECEIPT_SIZE_BYTES = MAX_RECEIPT_SIZE_MB * 1024 * 1024;
+
 function PublicClassRegistrationPageContent() {
   const params = useParams<{ gymId: string }>();
   const gymId = params?.gymId;
@@ -56,6 +59,9 @@ function PublicClassRegistrationPageContent() {
   const [formError, setFormError] = useState<string | null>(null);
   const [gymLogoUrl, setGymLogoUrl] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [receiptInputKey, setReceiptInputKey] = useState(0);
 
   const registrationsBySession = useMemo(() => {
     const counts = new Map<string, ClassRegistration[]>();
@@ -137,7 +143,7 @@ function PublicClassRegistrationPageContent() {
             supabase
               .from("class_sessions")
               .select(
-                "id, gym_id, title, date, start_time, capacity, notes, created_at"
+                "id, gym_id, title, date, start_time, capacity, notes, created_at, accept_receipts"
               )
               .eq("gym_id", gymId ?? "")
               .order("date", { ascending: true })
@@ -145,7 +151,7 @@ function PublicClassRegistrationPageContent() {
             supabase
               .from("class_registrations")
               .select(
-                "id, session_id, gym_id, full_name, email, phone, created_at"
+                "id, session_id, gym_id, full_name, email, phone, created_at, receipt_url, receipt_storage_path"
               )
               .eq("gym_id", gymId ?? ""),
             supabase
@@ -206,6 +212,12 @@ function PublicClassRegistrationPageContent() {
 
 
   }, [fetchData]);
+
+  useEffect(() => {
+    setReceiptFile(null);
+    setReceiptError(null);
+    setReceiptInputKey((prev) => prev + 1);
+  }, [selectedSessionId]);
 
   useEffect(() => {
     if (!gymId) {
@@ -280,6 +292,34 @@ function PublicClassRegistrationPageContent() {
     setFormState((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleReceiptFileChange = (file: File | null) => {
+    if (!file) {
+      setReceiptFile(null);
+      setReceiptError(null);
+      return;
+    }
+
+    const isImage = file.type?.startsWith("image/") ?? false;
+    const isPdf = file.type === "application/pdf";
+
+    if (!isImage && !isPdf) {
+      setReceiptFile(null);
+      setReceiptError("El archivo debe ser una imagen o un PDF.");
+      return;
+    }
+
+    if (file.size > MAX_RECEIPT_SIZE_BYTES) {
+      setReceiptFile(null);
+      setReceiptError(
+        `El archivo supera el máximo permitido de ${MAX_RECEIPT_SIZE_MB} MB.`
+      );
+      return;
+    }
+
+    setReceiptError(null);
+    setReceiptFile(file);
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSuccessMessage(null);
@@ -305,18 +345,36 @@ function PublicClassRegistrationPageContent() {
     setSubmitting(true);
 
     try {
+      if (!gymId) {
+        setFormError("No se pudo identificar el gimnasio.");
+        return;
+      }
+
+      if (receiptError) {
+        setFormError(receiptError);
+        return;
+      }
+
+      const trimmedEmail = formState.email.trim();
+      const trimmedPhone = formState.phone.trim();
+
+      const formData = new FormData();
+      formData.append("sessionId", selectedSession.id);
+      formData.append("gymId", gymId);
+      formData.append("fullName", formState.fullName.trim());
+      if (trimmedEmail) {
+        formData.append("email", trimmedEmail);
+      }
+      if (trimmedPhone) {
+        formData.append("phone", trimmedPhone);
+      }
+      if (receiptFile) {
+        formData.append("receipt", receiptFile);
+      }
+
       const response = await fetch("/api/class-registrations", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          sessionId: selectedSession.id,
-          gymId,
-          fullName: formState.fullName.trim(),
-          email: formState.email.trim() || null,
-          phone: formState.phone.trim() || null,
-        }),
+        body: formData,
       });
 
       if (response.status === 409) {
@@ -329,7 +387,7 @@ function PublicClassRegistrationPageContent() {
         return;
       }
 
-       if (!response.ok) {
+      if (!response.ok) {
         const errorData = (await response.json().catch(() => null)) as
           | { error?: string }
           | null;
@@ -350,6 +408,9 @@ function PublicClassRegistrationPageContent() {
         ).toLocaleDateString()} a las ${selectedSession.start_time} hs.`
       );
       setFormState(INITIAL_FORM_STATE);
+      setReceiptFile(null);
+      setReceiptError(null);
+      setReceiptInputKey((prev) => prev + 1);
     } catch (submitError) {
       console.error("Error registrando al socio", submitError);
       if (submitError instanceof Error && submitError.message) {
@@ -501,6 +562,12 @@ function PublicClassRegistrationPageContent() {
                           {selectedSession.notes}
                         </p>
                       )}
+                      {selectedSession.accept_receipts && (
+                        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-primary">
+                          Esta clase solicita que adjuntes el comprobante de
+                          pago al confirmar tu lugar.
+                        </div>
+                      )}
                        {hasSelectedSessionStarted && (
                         <Alert variant="destructive">
                           <AlertDescription className="text-sm">
@@ -548,6 +615,44 @@ function PublicClassRegistrationPageContent() {
                       />
                     </div>
                   </div>
+
+                  {selectedSession?.accept_receipts && (
+                    <div className="space-y-2">
+                      <Label htmlFor="payment-receipt">
+                        Comprobante de pago (imagen o PDF)
+                      </Label>
+                      <Input
+                        key={receiptInputKey}
+                        id="payment-receipt"
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={(event) =>
+                          handleReceiptFileChange(
+                            event.target.files?.[0] ?? null
+                          )
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Adjunta tu comprobante para agilizar la validación. Tamaño
+                        máximo {MAX_RECEIPT_SIZE_MB} MB.
+                      </p>
+                      {receiptFile && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="truncate">{receiptFile.name}</span>
+                          <button
+                            type="button"
+                            className="text-xs font-medium text-primary underline hover:text-primary/80"
+                            onClick={() => handleReceiptFileChange(null)}
+                          >
+                            Quitar
+                          </button>
+                        </div>
+                      )}
+                      {receiptError && (
+                        <p className="text-sm text-destructive">{receiptError}</p>
+                      )}
+                    </div>
+                  )}
 
                    {(formError || successMessage) && (
                     <Alert variant={formError ? "destructive" : "default"}>

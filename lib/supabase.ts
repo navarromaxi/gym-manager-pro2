@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 import type { ProspectStatusUI } from "./prospect-status"
 
+export { CLASS_RECEIPTS_BUCKET } from "./storage"
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
@@ -256,6 +258,7 @@ export interface ClassSession {
   capacity: number
   notes?: string | null
   created_at?: string | null
+  accept_receipts: boolean
 }
 
 export interface ClassRegistration {
@@ -266,4 +269,6 @@ export interface ClassRegistration {
   email?: string | null
   phone?: string | null
   created_at?: string | null
+  receipt_url?: string | null
+  receipt_storage_path?: string | null
 }

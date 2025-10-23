@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
@@ -64,6 +65,7 @@ interface ClassSessionFormState {
   start_time: string;
   capacity: number;
   notes: string;
+  accept_receipts: boolean;
 }
 
 const INITIAL_FORM_STATE: ClassSessionFormState = {
@@ -72,6 +74,7 @@ const INITIAL_FORM_STATE: ClassSessionFormState = {
   start_time: "",
   capacity: 20,
   notes: "",
+  accept_receipts: false,
 };
 
 export function ClassRegistrationManagement({
@@ -144,14 +147,16 @@ export function ClassRegistrationManagement({
       supabase
         .from("class_sessions")
         .select(
-          "id, gym_id, title, date, start_time, capacity, notes, created_at"
+          "id, gym_id, title, date, start_time, capacity, notes, created_at, accept_receipts"
         )
         .eq("gym_id", gymId)
         .order("date", { ascending: true })
         .order("start_time", { ascending: true }),
       supabase
         .from("class_registrations")
-        .select("id, session_id, gym_id, full_name, email, phone, created_at")
+        .select(
+          "id, session_id, gym_id, full_name, email, phone, created_at, receipt_url, receipt_storage_path"
+        )
         .eq("gym_id", gymId),
     ]);
 
@@ -162,11 +167,25 @@ export function ClassRegistrationManagement({
     setRegistrations((registrationsResponse.data ?? []) as ClassRegistration[]);
   };
 
-  const handleChange = (field: keyof ClassSessionFormState, value: string) => {
-    setFormState((prev) => ({
-      ...prev,
-      [field]: field === "capacity" ? Math.max(1, Number(value) || 1) : value,
-    }));
+  const handleChange = <K extends keyof ClassSessionFormState>(
+    field: K,
+    value: ClassSessionFormState[K]
+  ) => {
+    setFormState((prev) => {
+      if (field === "capacity") {
+        const numericValue =
+          typeof value === "number" ? value : Number(value) || 1;
+        return {
+          ...prev,
+          capacity: Math.max(1, Math.floor(numericValue)),
+        };
+      }
+
+      return {
+        ...prev,
+        [field]: value,
+      };
+    });
   };
 
   const resetForm = () => {
@@ -219,6 +238,7 @@ export function ClassRegistrationManagement({
           startTime: formState.start_time,
           capacity: formState.capacity,
           notes: formState.notes.trim() || null,
+          acceptReceipts: formState.accept_receipts,
         }),
       });
 
@@ -397,6 +417,9 @@ export function ClassRegistrationManagement({
         const formattedDate = registration.created_at
           ? new Date(registration.created_at).toLocaleString()
           : "";
+        const receiptCell = registration.receipt_url
+          ? `<a href="${escapeHtml(registration.receipt_url)}" target="_blank" rel="noopener noreferrer">Ver comprobante</a>`
+          : "-";
 
         return `<tr>
             <td>${index + 1}</td>
@@ -404,13 +427,14 @@ export function ClassRegistrationManagement({
             <td>${escapeHtml(registration.email ?? "")}</td>
             <td>${escapeHtml(registration.phone ?? "")}</td>
             <td>${escapeHtml(formattedDate)}</td>
+            <td>${receiptCell}</td>
           </tr>`;
       });
 
       if (tableRows.length === 0) {
         tableRows.push(
           `<tr>
-            <td colspan="5">Sin inscriptos aún</td>
+            <td colspan="6">Sin inscriptos aún</td>
           </tr>`
         );
       }
@@ -429,6 +453,7 @@ export function ClassRegistrationManagement({
                   <th>Email</th>
                   <th>Teléfono</th>
                   <th>Fecha de inscripción</th>
+                  <th>Comprobante</th>
                 </tr>
               </thead>
               <tbody>
@@ -554,7 +579,7 @@ export function ClassRegistrationManagement({
                 min={1}
                 value={formState.capacity}
                 onChange={(event) =>
-                  handleChange("capacity", event.target.value)
+                  handleChange("capacity", Number(event.target.value))
                 }
               />
             </div>
@@ -567,6 +592,26 @@ export function ClassRegistrationManagement({
                 value={formState.notes}
                 onChange={(event) => handleChange("notes", event.target.value)}
               />
+            </div>
+
+            <div className="md:col-span-2 flex items-start gap-3 rounded-lg border border-dashed border-primary/30 bg-muted/30 p-4">
+              <Checkbox
+                id="accept-receipts"
+                checked={formState.accept_receipts}
+                onCheckedChange={(checked) =>
+                  handleChange("accept_receipts", checked === true)
+                }
+              />
+              <div className="space-y-1">
+                <Label htmlFor="accept-receipts" className="font-semibold">
+                  Aceptar comprobantes
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Cuando está activo, los socios podrán adjuntar una imagen o
+                  PDF del pago al inscribirse. El comprobante quedará disponible
+                  en la lista de inscriptos.
+                </p>
+              </div>
             </div>
 
             <div className="md:col-span-2 flex items-center justify-end gap-3">
@@ -639,6 +684,7 @@ export function ClassRegistrationManagement({
                       <TableHead>Hora</TableHead>
                       <TableHead>Inscriptos</TableHead>
                       <TableHead>Notas para los socios</TableHead>
+                      <TableHead>Comprobantes</TableHead>
                       <TableHead className="w-[260px]">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -680,6 +726,17 @@ export function ClassRegistrationManagement({
                           </TableCell>
                           <TableCell className="max-w-xs whitespace-pre-wrap text-sm text-muted-foreground">
                             {session.notes?.trim() ? session.notes : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {session.accept_receipts ? (
+                              <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">
+                                Solicita comprobante
+                              </Badge>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">
+                                No solicitado
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-2">
@@ -755,6 +812,19 @@ export function ClassRegistrationManagement({
                 })()}
               </DialogDescription>
             )}
+            {(() => {
+              if (!selectedSessionId) return null;
+              const selectedSession = sessions.find(
+                (session) => session.id === selectedSessionId
+              );
+              if (!selectedSession?.accept_receipts) return null;
+              return (
+                <p className="text-sm text-muted-foreground">
+                  Esta clase solicita que los socios adjunten el comprobante de
+                  pago al registrarse.
+                </p>
+              );
+            })()}
           </DialogHeader>
           <div className="max-h-[50vh] overflow-y-auto rounded-md border">
             {(() => {
@@ -779,6 +849,7 @@ export function ClassRegistrationManagement({
                       <TableHead>Email</TableHead>
                       <TableHead>Teléfono</TableHead>
                       <TableHead>Fecha de inscripción</TableHead>
+                      <TableHead>Comprobante</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -798,6 +869,27 @@ export function ClassRegistrationManagement({
                           {registration.created_at
                             ? new Date(registration.created_at).toLocaleString()
                             : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {registration.receipt_url ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              asChild
+                            >
+                              <a
+                                href={registration.receipt_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Ver
+                              </a>
+                            </Button>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              No adjunto
+                            </span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

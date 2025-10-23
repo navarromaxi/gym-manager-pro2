@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { CLASS_RECEIPTS_BUCKET } from "@/lib/storage";
 import { createClient } from "@/lib/supabase-server";
 
 const createSessionSchema = z.object({
@@ -10,6 +11,7 @@ const createSessionSchema = z.object({
   startTime: z.string().min(1, "El horario es obligatorio"),
   capacity: z.number().int().positive("La capacidad debe ser mayor a 0"),
   notes: z.string().nullable().optional(),
+  acceptReceipts: z.boolean().optional().default(false),
 });
 
 const deleteSessionSchema = z.object({
@@ -30,6 +32,12 @@ export async function POST(request: Request) {
         typeof body?.notes === "string" && body.notes.trim().length > 0
           ? body.notes.trim()
           : null,
+      acceptReceipts:
+        typeof body?.acceptReceipts === "boolean"
+          ? body.acceptReceipts
+          : typeof body?.acceptReceipts === "string"
+          ? body.acceptReceipts.toLowerCase() === "true"
+          : undefined,
     });
 
     if (!parsed.success) {
@@ -55,9 +63,10 @@ export async function POST(request: Request) {
         start_time: parsed.data.startTime,
         capacity: parsed.data.capacity,
         notes: parsed.data.notes ?? null,
+        accept_receipts: parsed.data.acceptReceipts ?? false,
       })
       .select(
-        "id, gym_id, title, date, start_time, capacity, notes, created_at"
+        "id, gym_id, title, date, start_time, capacity, notes, created_at, accept_receipts"
       )
       .single();
 
@@ -134,6 +143,28 @@ export async function DELETE(request: Request) {
       );
     }
 
+    const { data: registrationReceipts, error: receiptsLookupError } =
+      await supabase
+        .from("class_registrations")
+        .select("receipt_storage_path")
+        .eq("session_id", sessionToDelete.id)
+        .eq("gym_id", parsed.data.gymId);
+
+    if (receiptsLookupError) {
+      console.error("Error fetching receipts before deletion", receiptsLookupError);
+      return NextResponse.json(
+        {
+          error:
+            "No se pudieron revisar los comprobantes de la clase. Intenta nuevamente más tarde.",
+        },
+        { status: 500 }
+      );
+    }
+
+    const receiptPaths = (registrationReceipts ?? [])
+      .map((item) => item.receipt_storage_path)
+      .filter((path): path is string => typeof path === "string" && path.length > 0);
+
     const { error: registrationsError } = await supabase
       .from("class_registrations")
       .delete()
@@ -154,12 +185,12 @@ export async function DELETE(request: Request) {
     const sessionDeleteResponse = await supabase
       .from("class_sessions")
       .delete()
-       .eq("id", sessionToDelete.id)
+      .eq("id", sessionToDelete.id)
       .eq("gym_id", parsed.data.gymId)
       .select("id")
       .maybeSingle();
 
-     if (sessionDeleteResponse.error) {
+    if (sessionDeleteResponse.error) {
       console.error("Error deleting class session", sessionDeleteResponse.error);
       return NextResponse.json(
         {
@@ -169,13 +200,23 @@ export async function DELETE(request: Request) {
         { status: 500 }
       );
     }
-     if (!sessionDeleteResponse.data) {
+    if (!sessionDeleteResponse.data) {
       return NextResponse.json(
         {
           error: "No se encontró la clase para eliminar.",
         },
         { status: 404 }
       );
+    }
+
+    if (receiptPaths.length > 0) {
+      const { error: storageError } = await supabase.storage
+        .from(CLASS_RECEIPTS_BUCKET)
+        .remove(receiptPaths);
+
+      if (storageError) {
+        console.error("Error removing receipt files", storageError);
+      }
     }
 
     return NextResponse.json({ success: true }, { status: 200 });
