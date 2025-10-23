@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
+import { z } from "zod";
 
 import { CLASS_RECEIPTS_BUCKET } from "@/lib/storage";
 import { createClient } from "@/lib/supabase-server";
@@ -32,6 +33,13 @@ async function ensureReceiptBucket(
 
 const MAX_RECEIPT_SIZE_MB = 5;
 const MAX_RECEIPT_SIZE_BYTES = MAX_RECEIPT_SIZE_MB * 1024 * 1024;
+
+const deleteRegistrationSchema = z.object({
+  gymId: z.string().min(1, "El identificador del gimnasio es obligatorio"),
+  registrationId: z
+    .string()
+    .min(1, "El identificador de la inscripción es obligatorio"),
+});
 
 export async function POST(request: Request) {
   try {
@@ -312,6 +320,106 @@ export async function POST(request: Request) {
       {
         error:
           "Ocurrió un error inesperado. Intenta nuevamente en unos segundos.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json().catch(() => null);
+    const parsed = deleteRegistrationSchema.safeParse({
+      gymId: body?.gymId,
+      registrationId: body?.registrationId,
+    });
+
+    if (!parsed.success) {
+      const message = parsed.error.issues.map((issue) => issue.message).join(" ");
+      return NextResponse.json(
+        {
+          error:
+            message ||
+            "Los datos enviados para eliminar la inscripción no son válidos.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createClient();
+
+    const { data: registration, error: lookupError } = await supabase
+      .from("class_registrations")
+      .select("id, receipt_storage_path")
+      .eq("id", parsed.data.registrationId)
+      .eq("gym_id", parsed.data.gymId)
+      .maybeSingle();
+
+    if (lookupError) {
+      console.error(
+        "Error fetching class registration before deletion",
+        lookupError
+      );
+      return NextResponse.json(
+        {
+          error:
+            "No se pudo validar la inscripción a eliminar. Intenta nuevamente más tarde.",
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!registration) {
+      return NextResponse.json(
+        {
+          error: "La inscripción no existe o ya fue eliminada.",
+        },
+        { status: 404 }
+      );
+    }
+
+    const { error: deleteError } = await supabase
+      .from("class_registrations")
+      .delete()
+      .eq("id", registration.id)
+      .eq("gym_id", parsed.data.gymId);
+
+    if (deleteError) {
+      console.error("Error deleting class registration", deleteError);
+      return NextResponse.json(
+        {
+          error:
+            "No se pudo eliminar la inscripción. Intenta nuevamente más tarde.",
+        },
+        { status: 500 }
+      );
+    }
+
+    if (registration.receipt_storage_path) {
+      const { error: storageError } = await supabase.storage
+        .from(CLASS_RECEIPTS_BUCKET)
+        .remove([registration.receipt_storage_path]);
+
+      if (storageError) {
+        console.error(
+          "Error removing receipt file after deleting registration",
+          storageError
+        );
+      }
+    }
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const message = error.issues.map((issue) => issue.message).join(" ");
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    console.error("Unexpected error deleting class registration", error);
+    return NextResponse.json(
+      {
+        error:
+          "Ocurrió un error inesperado al eliminar la inscripción. Intenta nuevamente más tarde.",
       },
       { status: 500 }
     );
