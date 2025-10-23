@@ -485,18 +485,14 @@ function PublicClassRegistrationPageContent() {
           <>
              <Card className="border-none shadow-lg">
               <CardHeader className="space-y-2 text-center md:text-left">
-                <CardTitle className="text-2xl font-semibold text-gray-900">
+                <CardTitle className="text-2xl font-semibold text-white-900">
                   Reserva tu lugar
                 </CardTitle>
-                <CardDescription className="text-sm text-muted-foreground">
-                  Elige una clase y completa tus datos. Recibirás confirmación
-                  inmediata.
-                </CardDescription>
               </CardHeader>
               <CardContent className="px-4 pb-6 pt-0 sm:px-6">
                 <form className="space-y-6" onSubmit={handleSubmit}>
                   <div className="space-y-2">
-                    <Label>Clase</Label>
+                    <Label>Elige Clase/Evento</Label>
                     <Select
                       value={selectedSessionId}
                       onValueChange={setSelectedSessionId}
