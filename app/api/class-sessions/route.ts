@@ -143,6 +143,8 @@ export async function DELETE(request: Request) {
       );
     }
 
+    
+
     const { data: registrationReceipts, error: receiptsLookupError } =
       await supabase
         .from("class_registrations")

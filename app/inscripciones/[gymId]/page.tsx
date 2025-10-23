@@ -342,6 +342,14 @@ function PublicClassRegistrationPageContent() {
       return;
     }
 
+     if (selectedSession.accept_receipts && !receiptFile) {
+      const message =
+        "Adjunta el comprobante de pago para completar tu inscripción.";
+      setReceiptError(message);
+      setFormError(message);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -454,10 +462,6 @@ function PublicClassRegistrationPageContent() {
           <h1 className="text-3xl font-bold text-gray-900">
             {gymName ? `${gymName}` : "Reserva tu clase"}
           </h1>
-          <p className="text-muted-foreground">
-            Elegí la clase que quieres tomar y deja tus datos para asegurar tu
-            lugar.
-          </p>
         </header>
 
         {loading ? (
@@ -626,6 +630,7 @@ function PublicClassRegistrationPageContent() {
                         id="payment-receipt"
                         type="file"
                         accept="image/*,.pdf"
+                        required={selectedSession?.accept_receipts ?? false}
                         onChange={(event) =>
                           handleReceiptFileChange(
                             event.target.files?.[0] ?? null
@@ -655,7 +660,14 @@ function PublicClassRegistrationPageContent() {
                   )}
 
                    {(formError || successMessage) && (
-                    <Alert variant={formError ? "destructive" : "default"}>
+                    <Alert
+                      variant={formError ? "destructive" : "default"}
+                      className={
+                        formError
+                          ? undefined
+                          : "border-green-200 bg-green-50 text-green-800 [&>svg]:text-green-600"
+                      }
+                    >
                       <AlertDescription>
                         {formError ? formError : successMessage}
                       </AlertDescription>

@@ -103,7 +103,9 @@ export function ClassRegistrationManagement({
     null
   );
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-
+  const [deletingRegistrationId, setDeletingRegistrationId] = useState<string | null>(
+    null
+  );
   useEffect(() => {
     if (typeof window !== "undefined") {
       setShareBaseUrl(window.location.origin);
@@ -396,6 +398,63 @@ export function ClassRegistrationManagement({
     setIsRegistrationsDialogOpen(open);
     if (!open) {
       setSelectedSessionId(null);
+    }
+  };
+
+
+  const handleDeleteRegistration = async (registrationId: string) => {
+    if (!gymId) return;
+
+    const confirmDelete = window.confirm(
+      "¿Seguro que deseas eliminar esta inscripción?"
+    );
+    if (!confirmDelete) return;
+
+    const previousRegistrations = registrations;
+    setDeletingRegistrationId(registrationId);
+    setRegistrations((prev) =>
+      prev.filter((registration) => registration.id !== registrationId)
+    );
+
+    try {
+      const response = await fetch("/api/class-registrations", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          gymId,
+          registrationId,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { success?: boolean; error?: string }
+        | null;
+
+      if (!response.ok || payload?.error) {
+        const message =
+          payload?.error ||
+          "No se pudo eliminar la inscripción. Intenta nuevamente.";
+        throw new Error(message);
+      }
+
+      setFeedback({
+        type: "success",
+        message: "Inscripción eliminada correctamente.",
+      });
+    } catch (error) {
+      console.error("Error eliminando la inscripción", error);
+      setRegistrations(previousRegistrations);
+      setFeedback({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No se pudo eliminar la inscripción. Intenta nuevamente.",
+      });
+    } finally {
+      setDeletingRegistrationId(null);
     }
   };
 
@@ -850,6 +909,7 @@ export function ClassRegistrationManagement({
                       <TableHead>Teléfono</TableHead>
                       <TableHead>Fecha de inscripción</TableHead>
                       <TableHead>Comprobante</TableHead>
+                      <TableHead className="w-40">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -890,6 +950,23 @@ export function ClassRegistrationManagement({
                               No adjunto
                             </span>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() =>
+                              handleDeleteRegistration(registration.id)
+                            }
+                            disabled={
+                              deletingRegistrationId === registration.id
+                            }
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            {deletingRegistrationId === registration.id
+                              ? "Eliminando..."
+                              : "Eliminar"}
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
