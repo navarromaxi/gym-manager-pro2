@@ -32,7 +32,6 @@ import {
   Users,
   DollarSign,
   TrendingUp,
-  AlertTriangle,
   Filter,
   RefreshCw,
   UserCheck,
@@ -208,6 +207,8 @@ function toLocalMidnight(d: Date) {
   x.setHours(0, 0, 0, 0);
   return x;
 }
+const MS_PER_DAY = 86_400_000;
+
 function parseFlexibleDate(raw?: string | null) {
   if (!raw) return null;
   const trimmed = raw.trim();
@@ -225,6 +226,21 @@ function parseFlexibleDate(raw?: string | null) {
 function parseDateSafe(s?: string | null) {
   const parsed = parseFlexibleDate(s);
   return parsed ? toLocalMidnight(parsed) : null;
+}
+
+function addMonthsClamped(date: Date, months: number) {
+  const base = toLocalMidnight(date);
+  const dayOfMonth = base.getDate();
+  const result = new Date(base);
+  result.setDate(1);
+  result.setMonth(result.getMonth() + months);
+  const lastDayOfTargetMonth = new Date(
+    result.getFullYear(),
+    result.getMonth() + 1,
+    0
+  ).getDate();
+  result.setDate(Math.min(dayOfMonth, lastDayOfTargetMonth));
+  return toLocalMidnight(result);
 }
 
 function downloadBlob(content: Blob, filename: string) {
@@ -1110,6 +1126,140 @@ const isWithinPeriod = (date: Date) => {
     };
   }).reverse();
 
+  type MemberCoverageRange = { memberId: string; start: Date; end: Date };
+
+  const memberById = new Map(membersWithDerived.map((member) => [member.id, member]));
+
+  const paymentsByMember = new Map<string, Date[]>();
+  payments.forEach((payment) => {
+    const memberId = memberIdOf(payment);
+    if (!memberId) return;
+    if (payment.type !== "plan" && payment.type !== "custom_plan") return;
+    const parsedDate = parseFlexibleDate(payment.date);
+    if (!parsedDate) return;
+    const normalizedDate = toLocalMidnight(parsedDate);
+    if (!paymentsByMember.has(memberId)) {
+      paymentsByMember.set(memberId, []);
+    }
+    paymentsByMember.get(memberId)!.push(normalizedDate);
+  });
+
+  const membershipCoverageRanges: MemberCoverageRange[] = [];
+  const membersWithPaymentCoverage = new Set<string>();
+
+  paymentsByMember.forEach((dates, memberId) => {
+    const sortedDates = dates.sort((a, b) => a.getTime() - b.getTime());
+    const member = memberById.get(memberId);
+
+    for (let index = 0; index < sortedDates.length; index += 1) {
+      const start = sortedDates[index];
+      const nextDate = sortedDates[index + 1];
+      const approximateEnd = addMonthsClamped(start, 1);
+
+      let endCandidate: Date | null = null;
+      if (nextDate && nextDate.getTime() > start.getTime()) {
+        endCandidate = nextDate;
+      } else if (member?._next && member._next.getTime() > start.getTime()) {
+        endCandidate = member._next;
+      }
+
+      const end = toLocalMidnight(
+        endCandidate
+          ? new Date(Math.min(endCandidate.getTime(), approximateEnd.getTime()))
+          : approximateEnd
+      );
+
+      if (end.getTime() > start.getTime()) {
+        membershipCoverageRanges.push({ memberId, start, end });
+        membersWithPaymentCoverage.add(memberId);
+      }
+    }
+  });
+
+  membersWithDerived.forEach((member) => {
+    if (!member.id) return;
+    if (membersWithPaymentCoverage.has(member.id)) return;
+
+    const joinDate = parseDateSafe(pick(member as any, "join_date", "joinDate"));
+    const lastPaymentDate = parseDateSafe(
+      pick(member as any, "last_payment", "lastPayment")
+    );
+    const fallbackStart = lastPaymentDate ?? joinDate;
+
+    let fallbackEnd = member._next ?? parseDateSafe(pick(member as any, "plan_end_date", "planEndDate"));
+    if (!fallbackEnd && fallbackStart) {
+      fallbackEnd = addMonthsClamped(fallbackStart, 1);
+    }
+
+    if (fallbackStart && fallbackEnd && fallbackEnd.getTime() > fallbackStart.getTime()) {
+      membershipCoverageRanges.push({
+        memberId: member.id,
+        start: fallbackStart,
+        end: fallbackEnd,
+      });
+    }
+  });
+
+  const last13Months = Array.from({ length: 13 }, (_, index) => {
+    const base = toLocalMidnight(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() - index, 1)
+    );
+    const end = toLocalMidnight(
+      new Date(base.getFullYear(), base.getMonth() + 1, 1)
+    );
+    const rawLabel = base.toLocaleDateString("es-ES", {
+      month: "long",
+      year: "numeric",
+    });
+    const label = rawLabel.charAt(0).toUpperCase() + rawLabel.slice(1);
+    const key = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}`;
+    const daysInMonth = Math.max(
+      1,
+      Math.round((end.getTime() - base.getTime()) / MS_PER_DAY)
+    );
+
+    return { key, label, start: base, end, daysInMonth };
+  }).reverse();
+
+  const totalActiveDaysByMonth = new Map<string, number>();
+  membershipCoverageRanges.forEach((range) => {
+    last13Months.forEach((month) => {
+      if (range.end.getTime() <= month.start.getTime()) return;
+      if (range.start.getTime() >= month.end.getTime()) return;
+
+      const overlapStart =
+        range.start.getTime() > month.start.getTime() ? range.start : month.start;
+      const overlapEnd =
+        range.end.getTime() < month.end.getTime() ? range.end : month.end;
+      const diffMs = overlapEnd.getTime() - overlapStart.getTime();
+      if (diffMs <= 0) return;
+
+      const diffDays = diffMs / MS_PER_DAY;
+      totalActiveDaysByMonth.set(
+        month.key,
+        (totalActiveDaysByMonth.get(month.key) ?? 0) + diffDays
+      );
+    });
+  });
+
+  const averageActiveMembersByMonth = last13Months.map((month) => {
+    const totalActiveDays = totalActiveDaysByMonth.get(month.key) ?? 0;
+    const average = totalActiveDays / month.daysInMonth;
+    const roundedAverage = Math.round(average * 10) / 10;
+    const averageAsInteger = Math.round(average);
+
+    return {
+      month: month.label,
+      average,
+      roundedAverage,
+      averageAsInteger,
+    };
+  });
+
+  const hasAverageActiveData = averageActiveMembersByMonth.some(
+    (entry) => entry.roundedAverage > 0
+  );
+
   const customRangeLabel = useMemo(() => {
     if (customRange?.from && customRange?.to) {
       const from = toLocalMidnight(customRange.from).toLocaleDateString("es-ES");
@@ -1796,88 +1946,55 @@ const isWithinPeriod = (date: Date) => {
         </CardContent>
       </Card>
 
-      {/* Alerts and Warnings */}
+      {/* Monthly average of active members */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            <AlertTriangle className="mr-2 h-5 w-5" />
-            Alertas Importantes
+            <Users className="mr-2 h-5 w-5" />
+            Promedio de socios por mes
           </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Socios activos promedio durante los últimos 13 meses.
+          </p>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {upcomingExpirations.length > 0 && (
-              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-orange-800">
-                      Vencimientos Próximos
-                    </h4>
-                    <p className="text-sm text-orange-600">
-                      {upcomingExpirations.length} socios con plan por vencer en
-                      los próximos 7 días
-                    </p>
-                  </div>
-                  <Badge className="bg-orange-500 text-white">
-                    {upcomingExpirations.length}
-                  </Badge>
-                </div>
-              </div>
-            )}
-
-            {overdueMembers.length > 0 && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-red-800">Socios Morosos</h4>
-                    <p className="text-sm text-red-600">
-                      {overdueMembers.length} socios con pagos vencidos
-                    </p>
-                  </div>
-                  <Badge className="bg-red-500 text-white">
-                    {overdueMembers.length}
-                  </Badge>
-                </div>
-              </div>
-            )}
-
-            {renewalStats.renewalRate < 50 &&
-              renewalStats.totalEligible > 0 && (
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-yellow-800">
-                        Baja Tasa de Renovación
-                      </h4>
-                      <p className="text-sm text-yellow-600">
-                        Solo el {renewalStats.renewalRate}% de los socios
-                        elegibles renovaron su plan
-                      </p>
-                    </div>
-                    <Badge className="bg-yellow-500 text-white">
-                      {renewalStats.renewalRate}%
-                    </Badge>
-                  </div>
-                </div>
-              )}
-
-            {upcomingExpirations.length === 0 &&
-              overdueMembers.length === 0 &&
-              renewalStats.renewalRate >= 50 && (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center">
-                    <div>
-                      <h4 className="font-medium text-green-800">
-                        Todo en Orden
-                      </h4>
-                      <p className="text-sm text-green-600">
-                        No hay alertas importantes en este momento
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-          </div>
+          {hasAverageActiveData ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Mes</TableHead>
+                    <TableHead className="text-right">
+                      Promedio de socios activos
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {averageActiveMembersByMonth.map((entry) => (
+                    <TableRow key={entry.month}>
+                      <TableCell className="font-medium">
+                        {entry.month}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {entry.averageAsInteger} socios
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          ({entry.roundedAverage.toLocaleString("es-ES", {
+                            minimumFractionDigits: 1,
+                            maximumFractionDigits: 1,
+                          })})
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No hay datos suficientes para calcular el promedio de socios
+              activos por mes.
+            </p>
+          )}
         </CardContent>
       </Card>
 

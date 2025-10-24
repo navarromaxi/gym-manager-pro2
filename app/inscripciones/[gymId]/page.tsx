@@ -586,15 +586,14 @@ function PublicClassRegistrationPageContent() {
                       )}
                       {selectedSession.accept_receipts && (
                         <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-primary">
-                          Esta clase solicita que adjuntes el comprobante de
+                          Se solicita que adjuntes el comprobante de
                           pago al confirmar tu lugar.
                         </div>
                       )}
                        {hasSelectedSessionStarted && (
                         <Alert variant="destructive">
                           <AlertDescription className="text-sm">
-                            Usted no se ha podido anotar a esta clase, la misma
-                            ya ha iniciado.
+                            No has podido anotarte, el evento ya ha iniciado.
                           </AlertDescription>
                         </Alert>
                       )}
