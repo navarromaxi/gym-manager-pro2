@@ -1529,7 +1529,7 @@ export function MemberManagement({
                       </div>
                       {customPlan && customPlanEndDate && (
                         <div className="ml-4 text-sm text-muted-foreground">
-                          Personalizado - {customPlanEndDate}
+                          {(customPlan.name?.trim() || "Personalizado")} - {customPlanEndDate}
                         </div>
                       )}
                     </TableCell>

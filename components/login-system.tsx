@@ -242,14 +242,14 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
           <div className="mx-auto mb-4 w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
             <Building2 className="h-6 w-6 text-white" />
           </div>
-          <CardTitle className="text-2xl font-bold">GymManagerPro 2.0</CardTitle>
-          <p className="text-muted-foreground">Gestión para Gimnasios</p>
+          <CardTitle className="text-2xl font-bold">ManagerPro 2.0</CardTitle>
+          <p className="text-muted-foreground">Gestión integral de Software</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               {/* Etiqueta puede decir "Usuario del Gimnasio", pero debe ser EMAIL */}
-              <Label htmlFor="email">Usuario del Gimnasio (Email)</Label>
+              <Label htmlFor="email">Usuario(Email)</Label>
               <div className="relative">
                 <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
