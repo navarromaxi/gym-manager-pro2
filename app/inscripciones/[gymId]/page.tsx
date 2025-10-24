@@ -138,8 +138,7 @@ function PublicClassRegistrationPageContent() {
       }
 
       try {
-        const [sessionsResponse, registrationsResponse, gymResponse] =
-          await Promise.all([
+        const [sessionsResponse, registrationsResponse] = await Promise.all([
             supabase
               .from("class_sessions")
               .select(
@@ -154,11 +153,6 @@ function PublicClassRegistrationPageContent() {
                 "id, session_id, gym_id, full_name, email, phone, created_at, receipt_url, receipt_storage_path"
               )
               .eq("gym_id", gymId ?? ""),
-            supabase
-              .from("gyms")
-              .select("name, logo_url")
-              .eq("id", gymId ?? "")
-              .maybeSingle(),
           ]);
 
         if (sessionsResponse.error) throw sessionsResponse.error;
@@ -169,15 +163,43 @@ function PublicClassRegistrationPageContent() {
           (registrationsResponse.data ?? []) as ClassRegistration[]
         );
 
-        if (gymResponse?.error) throw gymResponse.error;
+        let resolvedGymName: string | null | undefined = undefined;
+        let resolvedGymLogoUrl: string | null | undefined = undefined;
 
-        if (gymResponse.data?.name) {
-          setGymName(gymResponse.data.name);
+        try {
+          const response = await fetch(`/api/public-gyms/${gymId}`, {
+            method: "GET",
+            cache: "no-store",
+          });
+
+          if (response.ok) {
+            const payload = (await response.json()) as {
+              data?: { name?: string | null; logoUrl?: string | null };
+            };
+
+            resolvedGymName = payload.data?.name ?? null;
+            resolvedGymLogoUrl = payload.data?.logoUrl ?? null;
+          } else if (response.status === 404) {
+            resolvedGymName = null;
+            resolvedGymLogoUrl = null;
+          } else {
+            const errorPayload = (await response
+              .json()
+              .catch(() => null)) as { error?: string } | null;
+            throw new Error(
+              errorPayload?.error ??
+                "No se pudo obtener la información del gimnasio."
+            );
+          }
+        } catch (gymInfoError) {
+          console.error("Error fetching gym info", gymInfoError);
         }
-        if (gymResponse.data?.logo_url) {
-          setGymLogoUrl(gymResponse.data.logo_url);
-        } else {
-          setGymLogoUrl(null);
+
+        if (resolvedGymName !== undefined) {
+          setGymName(resolvedGymName);
+        }
+        if (resolvedGymLogoUrl !== undefined) {
+          setGymLogoUrl(resolvedGymLogoUrl);
         }
       } catch (fetchError) {
         console.error("Error cargando la información", fetchError);
