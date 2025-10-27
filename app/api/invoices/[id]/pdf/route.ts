@@ -138,6 +138,10 @@ export async function GET(_request: Request, context: RouteContext) {
   const requestBody = new URLSearchParams();
   requestBody.set("facturaid", facturaId);
   requestBody.set("userid", userId);
+  const environment = toTrimmedString(invoice.environment);
+  if (environment) {
+    requestBody.set("environment", environment);
+  }
 
   let pdfResponse: Response;
   try {
