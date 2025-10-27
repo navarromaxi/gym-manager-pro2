@@ -9,6 +9,27 @@ export const dynamic = "force-dynamic";
 const FACTURALIVE_PDF_ENDPOINT =
   "https://facturalive.com/pdf/output/generate_factura.php";
 
+const normalizeEnvironment = (value: unknown): "TEST" | "PROD" | null => {
+  if (typeof value !== "string") return null;
+
+  const normalized = value.trim().toUpperCase();
+  if (["PROD", "PRODUCCION", "PRODUCCIÓN", "PRODUCTION"].includes(normalized)) {
+    return "PROD";
+  }
+
+  if (
+    ["TEST", "HOMOLOGACION", "HOMOLOGACIÓN", "HOMOLOGA", "HOMO"].includes(
+      normalized
+    )
+  ) {
+    return "TEST";
+  }
+
+  return null;
+};
+
+const DEFAULT_ENVIRONMENT: "TEST" = "TEST";
+
 const toTrimmedString = (value: unknown): string | null => {
   if (typeof value === "string") {
     const trimmed = value.trim();
@@ -108,7 +129,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const { data: gym, error: gymError } = await supabase
     .from("gyms")
-    .select("invoice_user_id")
+    .select("invoice_user_id, invoice_environment")
     .eq("id", invoice.gym_id)
     .maybeSingle();
 
@@ -138,10 +159,12 @@ export async function GET(_request: Request, context: RouteContext) {
   const requestBody = new URLSearchParams();
   requestBody.set("facturaid", facturaId);
   requestBody.set("userid", userId);
-  const environment = toTrimmedString(invoice.environment);
-  if (environment) {
-    requestBody.set("environment", environment);
-  }
+
+  const environment =
+    normalizeEnvironment(invoice.environment) ??
+    normalizeEnvironment(gym?.invoice_environment) ??
+    DEFAULT_ENVIRONMENT;
+  requestBody.set("environment", environment);
 
   let pdfResponse: Response;
   try {
