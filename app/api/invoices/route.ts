@@ -370,37 +370,36 @@ function enforceCfeConsistency(p: Record<string, string>) {
     p.rutneg = p.rutneg.toString().replace(/\D+/g, "");
   }
 
-  // Si el request pide explícitamente 111:
-  //  - si hay RUT, lo MANTENEMOS (quirk de FacturaLive) y seteamos typedoc=2
-  //  - si NO hay RUT, no mandamos typedoc
+  // Si el request pide explícitamente 111: debe venir RUT
   if (requested === "111") {
-    p.typecfe = "111";
-    if (hasRut) {
-      p.typedoc = "2";
-    } else {
-      delete p.typedoc;
+    if (!hasRut) {
+      throw new Error(
+        "Para e-Factura (typecfe=111) es obligatorio enviar rutneg."
+      );
     }
+    p.typecfe = "111";
+    p.typedoc = "2";
     return;
   }
 
-  // Si el request pide explícitamente 101: debe venir RUT
+  // Si el request pide explícitamente 101: no debe venir RUT
   if (requested === "101") {
-    if (!hasRut) {
+    if (hasRut) {
       throw new Error(
-        "Para e-Factura (typecfe=101) es obligatorio enviar rutneg."
+        "Para e-Ticket (typecfe=101) no debe enviarse rutneg."
       );
     }
     p.typecfe = "101";
-    p.typedoc = "2";
+    delete p.typedoc;
     return;
   }
 
   // Si no especificaron typecfe, inferimos por presencia de RUT
   if (hasRut) {
-    p.typecfe = "101";
+    p.typecfe = "111";
     p.typedoc = "2";
   } else {
-    p.typecfe = "111";
+    p.typecfe = "101";
     delete p.typedoc;
   }
 }
@@ -682,7 +681,7 @@ export async function POST(request: Request) {
       typecfe:
         typeof invoice.typecfe === "number" && Number.isFinite(invoice.typecfe)
           ? invoice.typecfe
-          : resolvedCredentials.typecfe ?? 111,
+          : resolvedCredentials.typecfe ?? 101,
       ordencompra: invoice.ordencompra ?? "",
       lugarentrega: invoice.lugarentrega ?? "",
       periododesde: invoice.periododesde ?? "",
@@ -750,7 +749,7 @@ export async function POST(request: Request) {
 
     try {
       enforceCfeConsistency(payload);
-      if (payload.typecfe === "111") {
+      if (payload.typecfe === "101") {
         payload.periododesde = "";
         payload.periodohasta = "";
       }
@@ -773,7 +772,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: String(consistencyErr),
-          hint: "Si usás e-Ticket (111) no mandes RUT/typedoc. Si usás e-Factura (101) mandá rutneg y typedoc=2.",
+          hint: "Si usás e-Factura (111) mandá rutneg y typedoc=2. Si usás e-Ticket (101) no mandes RUT/typedoc.",
           debugSteps,
         },
         { status: 400 }
@@ -1108,7 +1107,7 @@ const encodedBody = encoded.toString();
       typecfe:
         typeof invoice.typecfe === "number" && Number.isFinite(invoice.typecfe)
           ? invoice.typecfe
-          : resolvedCredentials.typecfe ?? 111,
+          : resolvedCredentials.typecfe ?? 101,
       issued_at: invoiceIssueDate ?? today,
       due_date: invoiceDueDate,
       request_payload: payloadForStorage,

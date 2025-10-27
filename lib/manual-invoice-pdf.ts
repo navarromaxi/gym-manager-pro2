@@ -786,13 +786,13 @@ const describeTypecfe = (value: number | null | undefined): string => {
 
   switch (value) {
     case 101:
-      return "e-Factura";
+      return "e-Ticket";
     case 102:
       return "Nota de crédito e-Factura";
     case 103:
       return "Nota de débito e-Factura";
     case 111:
-      return "e-Ticket";
+      return "e-Factura";
     case 112:
       return "Nota de crédito e-Ticket";
     case 113:

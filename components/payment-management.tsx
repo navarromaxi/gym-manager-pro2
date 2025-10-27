@@ -699,7 +699,7 @@ const buildDefaultInvoiceForm = (
     ? gymConfig.currency.trim()
     : "UYU";
   const defaultCotizacion = toNumberOrNull(gymConfig?.cotizacion) ?? 1;
-  const defaultTypecfe = toNumberOrNull(gymConfig?.typecfe) ?? 111;
+  const defaultTypecfe = toNumberOrNull(gymConfig?.typecfe) ?? 101;
   const defaultTipoTraslado = toNumberOrNull(gymConfig?.tipoTraslado) ?? 1;
   const defaultRutneg = sanitizeConfigString(gymConfig?.rutneg);
   const defaultDirneg = sanitizeConfigString(gymConfig?.dirneg);
