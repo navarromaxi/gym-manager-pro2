@@ -1076,6 +1076,7 @@ const encodedBody = encoded.toString();
       (parsedResponse as any)?.idCFE ??
       (parsedResponse as any)?.CAE_ID ??
       (parsedResponse as any)?.external_invoice_id ??
+      (parsedResponse as any)?.facturaid ??
       null;
 
     const selection =

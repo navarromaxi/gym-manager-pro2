@@ -1,116 +1,48 @@
 import { NextResponse } from "next/server";
 import { Buffer } from "node:buffer";
 
-import {
-  buildInvoicePdfFileName,
-  findInvoicePdfSource,
-} from "@/lib/invoice-pdf";
-import { buildManualInvoicePdf } from "@/lib/manual-invoice-pdf";
+import { buildInvoicePdfFileName } from "@/lib/invoice-pdf";
 import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
-const toArrayBuffer = (buffer: Buffer): ArrayBuffer =>
-  buffer.buffer.slice(
-    buffer.byteOffset,
-    buffer.byteOffset + buffer.byteLength
-  ) as ArrayBuffer;
+const FACTURALIVE_PDF_ENDPOINT =
+  "https://facturalive.com/pdf/output/generate_factura.php";
 
-const fromUint8Array = (value: Uint8Array): ArrayBuffer => {
-  const underlying = value.buffer;
-
-  if (
-    value.byteOffset === 0 &&
-    value.byteLength === underlying.byteLength &&
-    underlying instanceof ArrayBuffer
-  ) {
-    return underlying;
+const toTrimmedString = (value: unknown): string | null => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
   }
 
-  return value.slice().buffer;
-};
-
-const decodeBase64Pdf = (value: string): ArrayBuffer | null => {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-
-  if (/^data:application\/pdf;base64,/i.test(trimmed)) {
-    const [, base64] = trimmed.split(",", 2);
-    if (!base64) return null;
-    try {
-      const buffer = Buffer.from(base64, "base64");
-      return toArrayBuffer(buffer);
-    } catch (error) {
-      console.error("Error decoding data URL PDF", error);
-      return null;
-    }
-  }
-
-  if (!trimmed.includes("http")) {
-    const sanitized = trimmed.replace(/\s+/g, "");
-    if (/^[A-Za-z0-9+/=]+$/.test(sanitized)) {
-      try {
-        const buffer = Buffer.from(sanitized, "base64");
-        return toArrayBuffer(buffer);
-      } catch (error) {
-        console.error("Error decoding base64 PDF", error);
-        return null;
-      }
-    }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
   }
 
   return null;
 };
 
-const looksLikePdfBuffer = (buffer: ArrayBuffer) => {
-  if (!buffer || buffer.byteLength < 4) {
-    return false;
-  }
-
-  const prefix = Buffer.from(buffer.slice(0, 8)).toString("ascii");
-  return prefix.includes("%PDF");
-};
-
-const fetchRemotePdf = async (url: string): Promise<ArrayBuffer | null> => {
-  try {
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) {
-      console.error("Remote PDF responded with status", response.status, url);
-      return null;
-    }
-    const arrayBuffer = await response.arrayBuffer();
-    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-      console.error("Remote PDF response was empty", url);
-      return null;
-    }
-
-    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-    if (contentType.includes("application/pdf")) {
-      return arrayBuffer;
-    }
-
-    if (looksLikePdfBuffer(arrayBuffer)) {
-      return arrayBuffer;
-    }
-
-    const text = Buffer.from(arrayBuffer).toString("utf-8").trim();
-    if (text) {
-      const decoded = decodeBase64Pdf(text);
-      if (decoded) {
-        return decoded;
-      }
-      console.error(
-        "Remote PDF did not provide a valid PDF document",
-        { contentType, preview: text.slice(0, 120) },
-        url
-      );
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Error fetching remote PDF", error);
+const extractFacturaId = (payload: unknown): string | null => {
+  if (!payload || typeof payload !== "object") {
     return null;
   }
+
+  const candidates = [
+    (payload as Record<string, unknown>).facturaid,
+    (payload as Record<string, unknown>).facturaId,
+    (payload as Record<string, unknown>).FacturaId,
+    (payload as Record<string, unknown>).FacturaID,
+    (payload as Record<string, unknown>).FACTURAID,
+  ];
+
+  for (const candidate of candidates) {
+    const resolved = toTrimmedString(candidate);
+    if (resolved) {
+      return resolved;
+    }
+  }
+
+  return null;
 };
 
 type RouteContext = { params: Promise<{ id?: string }> };
@@ -129,7 +61,9 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const { data: invoice, error } = await supabase
     .from("invoices")
-    .select("id, gym_id, member_name, total, currency, invoice_number, invoice_series, environment, typecfe, external_invoice_id, issued_at, due_date, request_payload, response_payload")
+    .select(
+      "id, gym_id, member_name, total, currency, invoice_number, invoice_series, environment, typecfe, external_invoice_id, issued_at, due_date, request_payload, response_payload"
+    )
     .eq("id", invoiceId)
     .maybeSingle();
 
@@ -148,65 +82,119 @@ export async function GET(_request: Request, context: RouteContext) {
     );
   }
 
-  const pdfSource = findInvoicePdfSource(invoice.response_payload);
-  const hadExternalSource = Boolean(pdfSource);
-  let pdfBuffer: ArrayBuffer | null = null;
+  const facturaId =
+    extractFacturaId(invoice.response_payload) ??
+    toTrimmedString(invoice.external_invoice_id);
 
-  if (pdfSource) {
-    const externalPdf =
-      decodeBase64Pdf(pdfSource) ?? (await fetchRemotePdf(pdfSource));
-    if (externalPdf && externalPdf.byteLength > 0) {
-      pdfBuffer = externalPdf;
-    }
-  }
-
-  if (!pdfBuffer) {
-    let gym: {
-      id: string;
-      name?: string | null;
-      invoice_rutneg?: string | null;
-      invoice_dirneg?: string | null;
-      invoice_cityneg?: string | null;
-      invoice_stateneg?: string | null;
-      invoice_addinfoneg?: string | null;
-    } | null = null;
-
-    if (invoice.gym_id) {
-      const { data: gymRecord, error: gymError } = await supabase
-        .from("gyms")
-        .select(
-          "id, name, invoice_rutneg, invoice_dirneg, invoice_cityneg, invoice_stateneg, invoice_addinfoneg"
-        )
-        .eq("id", invoice.gym_id)
-        .maybeSingle();
-
-      if (gymError) {
-        console.error("Error fetching gym for invoice PDF", gymError);
-      } else {
-        gym = gymRecord;
-      }
-    }
-
-  const manualPdf = await buildManualInvoicePdf({
-      invoice,
-      gym,
-    });
-
-    if (manualPdf && manualPdf.byteLength > 0) {
-      pdfBuffer = fromUint8Array(manualPdf);
-    }
-  }
-
-  if (!pdfBuffer || pdfBuffer.byteLength === 0) {
-    const status = hadExternalSource ? 502 : 404;
-    const message = hadExternalSource
-      ? "No pudimos descargar ni reconstruir el PDF de la factura. Intenta nuevamente en unos minutos."
-      : "La factura todavía no cuenta con los datos necesarios para generar un PDF. Intenta nuevamente más tarde.";
+  if (!facturaId) {
     return NextResponse.json(
       {
-        error: message,
+        error:
+          "No encontramos el identificador de la factura para descargarla. Vuelve a emitirla o contacta al soporte para revisarlo.",
       },
-      { status }
+      { status: 404 }
+    );
+  }
+
+  if (!invoice.gym_id) {
+    return NextResponse.json(
+      {
+        error:
+          "La factura no está asociada a un gimnasio válido para solicitar el PDF.",
+      },
+      { status: 400 }
+    );
+  }
+
+  const { data: gym, error: gymError } = await supabase
+    .from("gyms")
+    .select("invoice_user_id")
+    .eq("id", invoice.gym_id)
+    .maybeSingle();
+
+  if (gymError) {
+    console.error("Error fetching gym for invoice PDF", gymError);
+    return NextResponse.json(
+      {
+        error:
+          "No pudimos obtener la configuración de facturación del gimnasio para descargar la factura.",
+      },
+      { status: 500 }
+    );
+  }
+
+  const userId = toTrimmedString(gym?.invoice_user_id);
+
+  if (!userId) {
+    return NextResponse.json(
+      {
+        error:
+          "El gimnasio no tiene configurado el usuario de FacturaLive. Configura invoice_user_id en Supabase e intenta nuevamente.",
+      },
+      { status: 400 }
+    );
+  }
+
+  const requestBody = new URLSearchParams();
+  requestBody.set("facturaid", facturaId);
+  requestBody.set("userid", userId);
+
+  let pdfResponse: Response;
+  try {
+    pdfResponse = await fetch(FACTURALIVE_PDF_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: requestBody.toString(),
+    });
+  } catch (externalError) {
+    console.error(
+      "Error connecting to FacturaLive PDF endpoint",
+      externalError
+    );
+    return NextResponse.json(
+      {
+        error:
+          "No pudimos conectar con el servicio de FacturaLive para descargar la factura. Intenta nuevamente en unos minutos.",
+      },
+      { status: 502 }
+    );
+  }
+
+  if (!pdfResponse.ok) {
+    let details: string | null = null;
+    try {
+      const text = (await pdfResponse.text())?.trim();
+      if (text) {
+        details = text.slice(0, 200);
+      }
+    } catch (readError) {
+      console.error(
+        "Error reading error response from FacturaLive PDF endpoint",
+        readError
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error:
+          "FacturaLive devolvió un estado inesperado al solicitar el PDF de la factura. Intenta nuevamente en unos minutos.",
+        details,
+      },
+      { status: 502 }
+    );
+  }
+
+  const pdfArrayBuffer = await pdfResponse.arrayBuffer();
+
+  if (!pdfArrayBuffer || pdfArrayBuffer.byteLength === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "FacturaLive devolvió un archivo vacío al solicitar el PDF de la factura. Intenta nuevamente.",
+      },
+      { status: 502 }
     );
   }
 
@@ -222,9 +210,7 @@ export async function GET(_request: Request, context: RouteContext) {
   headers.set("X-Invoice-Filename", fileName);
   headers.set("Cache-Control", "no-store");
 
-  const pdfBody = Buffer.from(pdfBuffer);
-
-  return new NextResponse(pdfBody, {
+  return new NextResponse(Buffer.from(pdfArrayBuffer), {
     status: 200,
     headers,
   });
