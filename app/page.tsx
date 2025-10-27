@@ -299,7 +299,7 @@ export default function GymManagementSystem() {
     supabase
       .from("gyms")
       .select(
-        "logo_url, invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado, invoice_rutneg, invoice_dirneg, invoice_cityneg, invoice_stateneg, invoice_addinfoneg"
+        "logo_url, invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_typecfe, invoice_tipo_traslado, invoice_rutneg, invoice_dirneg, invoice_cityneg, invoice_stateneg, invoice_addinfoneg"
       )
       .eq("id", data.id)
       .single()

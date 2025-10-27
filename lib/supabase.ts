@@ -35,7 +35,6 @@ export interface GymInvoiceConfig {
   customerId?: string | null
   series?: string | null
   currency?: string | null
-  cotizacion?: number | null
   typecfe?: number | null
   tipoTraslado?: number | null
 }
@@ -87,7 +86,6 @@ export const mapGymInvoiceConfig = (
   customerId: parseOptionalString(row.invoice_customer_id),
   series: parseOptionalString(row.invoice_series),
   currency: parseOptionalString(row.invoice_currency),
-  cotizacion: parseOptionalNumber(row.invoice_cotizacion),
   typecfe: parseOptionalNumber(row.invoice_typecfe),
   tipoTraslado: parseOptionalNumber(row.invoice_tipo_traslado),
 })

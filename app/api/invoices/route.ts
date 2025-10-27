@@ -47,7 +47,6 @@ const FACTURA_FIELD_ORDER: string[] = [
   "additionalinfo",
   "terms_conditions",
   "payment_type",
-  "cotizacion",
   "typecfe",
   "ordencompra",
   "lugarentrega",
@@ -79,7 +78,6 @@ type ResolvedCredentials = {
   customerId: number | null;
   series: string | null;
   currency: string | null;
-  cotizacion: number | null;
   typecfe: number | null;
   tipoTraslado: number | null;
   paymentType: number | null;
@@ -518,7 +516,7 @@ export async function POST(request: Request) {
     const { data: gymConfigRow, error: gymConfigError } = await supabase
       .from("gyms")
       .select(
-        "invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_password, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_cotizacion, invoice_typecfe, invoice_tipo_traslado, invoice_payment_type, invoice_rutneg, invoice_dirneg, invoice_cityneg, invoice_stateneg, invoice_addinfoneg, invoice_facturaext"
+        "invoice_user_id, invoice_company_id, invoice_branch_code, invoice_branch_id, invoice_password, invoice_environment, invoice_customer_id, invoice_series, invoice_currency, invoice_typecfe, invoice_tipo_traslado, invoice_payment_type, invoice_rutneg, invoice_dirneg, invoice_cityneg, invoice_stateneg, invoice_addinfoneg, invoice_facturaext"
       )
       .eq("id", gymId)
       .maybeSingle();
@@ -580,7 +578,6 @@ export async function POST(request: Request) {
       customerId: parseOptionalNumber(gymConfigRow?.invoice_customer_id),
       series: parseOptionalString(gymConfigRow?.invoice_series),
       currency: parseOptionalString(gymConfigRow?.invoice_currency),
-      cotizacion: parseOptionalNumber(gymConfigRow?.invoice_cotizacion),
       typecfe: parseOptionalNumber(gymConfigRow?.invoice_typecfe),
       tipoTraslado: parseOptionalNumber(gymConfigRow?.invoice_tipo_traslado),
       paymentType: parseOptionalNumber(gymConfigRow?.invoice_payment_type),
@@ -662,10 +659,7 @@ export async function POST(request: Request) {
           : resolvedCredentials.series ?? "A-A-A",
       fechavencimiento: invoiceDueDate ?? "",
       fechafacturacion: invoiceIssueDate ?? today,
-      moneda:
-        typeof invoice.moneda === "string" && invoice.moneda.trim().length > 0
-          ? invoice.moneda
-          : resolvedCredentials.currency ?? "UYU",
+      moneda: "UYU",
       additionalinfo: invoice.additionalinfo ?? "",
       terms_conditions: invoice.terms_conditions ?? "",
       payment_type:
@@ -673,11 +667,6 @@ export async function POST(request: Request) {
         Number.isFinite(invoice.payment_type)
           ? invoice.payment_type
           : resolvedCredentials.paymentType ?? 1,
-      cotizacion:
-        typeof invoice.cotizacion === "number" &&
-        Number.isFinite(invoice.cotizacion)
-          ? invoice.cotizacion
-          : resolvedCredentials.cotizacion ?? 1,
       typecfe:
         typeof invoice.typecfe === "number" && Number.isFinite(invoice.typecfe)
           ? invoice.typecfe
@@ -743,7 +732,12 @@ export async function POST(request: Request) {
           : undefined,
     };
 
-    const payload = buildFacturaPayload(invoice, defaults);
+    const sanitizedInvoicePayload: InvoicePayload = {
+      ...invoice,
+      moneda: "UYU",
+    };
+
+    const payload = buildFacturaPayload(sanitizedInvoicePayload, defaults);
 
     const facturaEndpoint = resolveFacturaEndpoint(effectiveEnvironment);
 

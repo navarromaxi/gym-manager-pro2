@@ -108,7 +108,6 @@ interface InvoiceFormState {
   additionalinfo: string;
   terms_conditions: string;
   payment_type: number;
-  cotizacion: number;
   typecfe: number;
   ordencompra: string;
   lugarentrega: string;
@@ -695,10 +694,7 @@ const buildDefaultInvoiceForm = (
   const defaultSeries = gymConfig?.series?.trim()
     ? gymConfig.series.trim()
     : "A-A-A";
-  const defaultCurrency = gymConfig?.currency?.trim()
-    ? gymConfig.currency.trim()
-    : "UYU";
-  const defaultCotizacion = toNumberOrNull(gymConfig?.cotizacion) ?? 1;
+  const defaultCurrency = "UYU";
   const defaultTypecfe = toNumberOrNull(gymConfig?.typecfe) ?? 101;
   const defaultTipoTraslado = toNumberOrNull(gymConfig?.tipoTraslado) ?? 1;
   const defaultRutneg = sanitizeConfigString(gymConfig?.rutneg);
@@ -718,7 +714,6 @@ const buildDefaultInvoiceForm = (
     additionalinfo: "",
     terms_conditions: "",
     payment_type: mapPaymentMethodToFacturaPaymentType(payment.method),
-    cotizacion: defaultCotizacion,
     typecfe: defaultTypecfe,
     ordencompra: "",
     lugarentrega: "",
@@ -3947,9 +3942,7 @@ export function PaymentManagement({
                   <Input
                     id="invoice-moneda"
                     value={invoiceForm.moneda}
-                    onChange={(event) =>
-                      handleInvoiceFieldChange("moneda", event.target.value)
-                    }
+                    readOnly
                   />
                 </div>
                 <div className="grid gap-2">
@@ -3974,21 +3967,6 @@ export function PaymentManagement({
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="invoice-cotizacion">Cotización</Label>
-                  <Input
-                    id="invoice-cotizacion"
-                    type="number"
-                    step="0.01"
-                    value={invoiceForm.cotizacion}
-                    onChange={(event) =>
-                      handleInvoiceFieldChange(
-                        "cotizacion",
-                        Number(event.target.value) || 0
-                      )
-                    }
-                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="invoice-typecfe">Tipo CFE</Label>
