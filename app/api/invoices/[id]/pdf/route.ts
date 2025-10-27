@@ -166,6 +166,15 @@ export async function GET(_request: Request, context: RouteContext) {
     DEFAULT_ENVIRONMENT;
   requestBody.set("environment", environment);
 
+  const debugContext = {
+    invoiceId,
+    gymId: invoice.gym_id,
+    facturaId,
+    userId,
+    environment,
+    requestBody: requestBody.toString(),
+  };
+
   let pdfResponse: Response;
   try {
     pdfResponse = await fetch(FACTURALIVE_PDF_ENDPOINT, {
@@ -178,12 +187,14 @@ export async function GET(_request: Request, context: RouteContext) {
   } catch (externalError) {
     console.error(
       "Error connecting to FacturaLive PDF endpoint",
-      externalError
+      externalError,
+      debugContext
     );
     return NextResponse.json(
       {
         error:
           "No pudimos conectar con el servicio de FacturaLive para descargar la factura. Intenta nuevamente en unos minutos.",
+        context: debugContext,
       },
       { status: 502 }
     );
@@ -199,15 +210,27 @@ export async function GET(_request: Request, context: RouteContext) {
     } catch (readError) {
       console.error(
         "Error reading error response from FacturaLive PDF endpoint",
-        readError
+        readError,
+        debugContext
       );
     }
+
+    console.error(
+      "FacturaLive devolvió un estado inesperado al solicitar el PDF",
+      {
+        status: pdfResponse.status,
+        statusText: pdfResponse.statusText,
+        details,
+        ...debugContext,
+      }
+    );
 
     return NextResponse.json(
       {
         error:
           "FacturaLive devolvió un estado inesperado al solicitar el PDF de la factura. Intenta nuevamente en unos minutos.",
         details,
+        context: debugContext,
       },
       { status: 502 }
     );
@@ -216,10 +239,15 @@ export async function GET(_request: Request, context: RouteContext) {
   const pdfArrayBuffer = await pdfResponse.arrayBuffer();
 
   if (!pdfArrayBuffer || pdfArrayBuffer.byteLength === 0) {
+    console.error(
+      "FacturaLive devolvió un archivo vacío al solicitar el PDF",
+      debugContext
+    );
     return NextResponse.json(
       {
         error:
           "FacturaLive devolvió un archivo vacío al solicitar el PDF de la factura. Intenta nuevamente.",
+        context: debugContext,
       },
       { status: 502 }
     );
