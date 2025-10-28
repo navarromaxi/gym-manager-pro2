@@ -20,25 +20,58 @@ export const toTrimmedString = (value: unknown): string | null => {
   return null;
 };
 
-export const extractFacturaId = (payload: unknown): string | null => {
-  if (!payload || typeof payload !== "object") return null;
+export const extractFacturaId = (
+  payload: unknown,
+  depth = 0
+): string | null => {
+  if (depth > 6 || payload == null) return null;
+
+  if (typeof payload === "string") {
+    const trimmed = payload.trim();
+    if (looksNumeric(trimmed)) {
+      return onlyDigits(trimmed);
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === "object") {
+        return extractFacturaId(parsed, depth + 1);
+      }
+    } catch (_error) {
+      // Ignore JSON parse errors from raw payloads
+    }
+
+    return null;
+  }
+
+  if (typeof payload !== "object") return null;
 
   const record = payload as Record<string, unknown>;
-  const candidatesRaw = [
+  const directCandidates = [
     record.facturaid,
     record.facturaId,
     record.FacturaId,
     record.FacturaID,
     record.FACTURAID,
-    (record.data as any)?.facturaid,
-    (record.result as any)?.facturaid,
-    (record.response as any)?.facturaid,
   ].map(toTrimmedString);
 
-  for (const candidate of candidatesRaw) {
+  for (const candidate of directCandidates) {
     if (!candidate) continue;
     const digits = onlyDigits(candidate);
     if (looksNumeric(digits)) return digits;
+  }
+
+  const nestedSources: unknown[] = [
+    record.data,
+    record.result,
+    record.response,
+    record.parsed,
+    record.raw,
+  ];
+
+  for (const source of nestedSources) {
+    const resolved = extractFacturaId(source, depth + 1);
+    if (resolved) return resolved;
   }
 
   return null;
