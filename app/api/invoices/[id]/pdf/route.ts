@@ -5,6 +5,8 @@ import { buildInvoicePdfFileName } from "@/lib/invoice-pdf";
 import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const FACTURALIVE_PDF_ENDPOINT =
   "https://facturalive.com/pdf/output/generate_factura.php";
@@ -30,41 +32,46 @@ const normalizeEnvironment = (value: unknown): "TEST" | "PROD" | null => {
 
 const DEFAULT_ENVIRONMENT: "TEST" = "TEST";
 
+const onlyDigits = (s: string) => s.replace(/\D+/g, "");
+const looksNumeric = (s: string | null) =>
+  !!s && /^\d{1,20}$/.test(s.trim());
+
 const toTrimmedString = (value: unknown): string | null => {
   if (typeof value === "string") {
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
   }
-
   if (typeof value === "number" && Number.isFinite(value)) {
     return String(value);
   }
-
   return null;
 };
 
 const extractFacturaId = (payload: unknown): string | null => {
-  if (!payload || typeof payload !== "object") {
-    return null;
-  }
+  if (!payload || typeof payload !== "object") return null;
 
-  const candidates = [
-    (payload as Record<string, unknown>).facturaid,
-    (payload as Record<string, unknown>).facturaId,
-    (payload as Record<string, unknown>).FacturaId,
-    (payload as Record<string, unknown>).FacturaID,
-    (payload as Record<string, unknown>).FACTURAID,
-  ];
+  const r = payload as Record<string, unknown>;
+  const candidatesRaw = [
+    r.facturaid,
+    r.facturaId,
+    r.FacturaId,
+    r.FacturaID,
+    r.FACTURAID,
+    // Por si viene anidado, probamos rutas comunes:
+    (r.data as any)?.facturaid,
+    (r.result as any)?.facturaid,
+    (r.response as any)?.facturaid,
+  ].map(toTrimmedString);
 
-  for (const candidate of candidates) {
-    const resolved = toTrimmedString(candidate);
-    if (resolved) {
-      return resolved;
-    }
+  for (const c of candidatesRaw) {
+    if (!c) continue;
+    const digits = onlyDigits(c);
+    if (looksNumeric(digits)) return digits;
   }
 
   return null;
 };
+
 
 type RouteContext = { params: Promise<{ id?: string }> };
 
@@ -156,57 +163,56 @@ export async function GET(_request: Request, context: RouteContext) {
     );
   }
 
-  const requestBody = new FormData();
-  requestBody.set("facturaid", facturaId);
-  requestBody.set("userid", userId);
-
   const environment =
-    normalizeEnvironment(invoice.environment) ??
-    normalizeEnvironment(gym?.invoice_environment) ??
-    DEFAULT_ENVIRONMENT;
-  requestBody.set("environment", environment);
+  normalizeEnvironment(invoice.environment) ??
+  normalizeEnvironment(gym?.invoice_environment) ??
+  DEFAULT_ENVIRONMENT;
 
-  const debugContext = {
-    invoiceId,
-    gymId: invoice.gym_id,
-    facturaId,
-    userId,
-    environment,
-    requestBody: Array.from(requestBody.entries()).reduce<Record<string, string>>(
-      (acc, [key, value]) => {
-        acc[key] =
-          typeof value === "string"
-            ? value
-            : value instanceof File
-            ? value.name
-            : String(value);
-        return acc;
-      },
-      {}
-    ),
-  };
+// Enviar como application/x-www-form-urlencoded (NO multipart)
+const bodyParams = new URLSearchParams();
+bodyParams.set("facturaid", facturaId);   // <- el ID numérico que te devuelve FacturaLive
+bodyParams.set("userid", userId);         // 1021 en tu caso
+bodyParams.set("environment", environment); // "TEST" o "PROD"
 
-  let pdfResponse: Response;
-  try {
-    pdfResponse = await fetch(FACTURALIVE_PDF_ENDPOINT, {
-      method: "POST",
-      body: requestBody,
-    });
-  } catch (externalError) {
-    console.error(
-      "Error connecting to FacturaLive PDF endpoint",
-      externalError,
-      debugContext
-    );
-    return NextResponse.json(
-      {
-        error:
-          "No pudimos conectar con el servicio de FacturaLive para descargar la factura. Intenta nuevamente en unos minutos.",
-        context: debugContext,
-      },
-      { status: 502 }
-    );
-  }
+const debugContext = {
+  invoiceId,
+  gymId: invoice.gym_id,
+  facturaId,
+  userId,
+  environment,
+  requestBody: Object.fromEntries(bodyParams.entries()),
+};
+
+let pdfResponse: Response;
+try {
+  pdfResponse = await fetch(FACTURALIVE_PDF_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Accept": "application/pdf,application/octet-stream;q=0.9,*/*;q=0.8",
+      "User-Agent": "GymManagerPro/2.0 (+vercel)",
+    },
+    body: bodyParams.toString(),
+    // (opcional) evita warnings en algunos runtimes
+    // @ts-ignore
+    duplex: "half",
+  });
+} catch (externalError) {
+  console.error(
+    "Error connecting to FacturaLive PDF endpoint",
+    externalError,
+    debugContext
+  );
+  return NextResponse.json(
+    {
+      error:
+        "No pudimos conectar con el servicio de FacturaLive para descargar la factura. Intenta nuevamente en unos minutos.",
+      context: debugContext,
+    },
+    { status: 502 }
+  );
+}
+
 
   if (!pdfResponse.ok) {
     let details: string | null = null;
