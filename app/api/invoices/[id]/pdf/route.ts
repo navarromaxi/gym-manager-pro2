@@ -164,54 +164,57 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const environment =
-  normalizeEnvironment(invoice.environment) ??
-  normalizeEnvironment(gym?.invoice_environment) ??
-  DEFAULT_ENVIRONMENT;
+    normalizeEnvironment(invoice.environment) ??
+    normalizeEnvironment(gym?.invoice_environment) ??
+    DEFAULT_ENVIRONMENT;
 
-// Enviar como application/x-www-form-urlencoded (NO multipart)
-const bodyParams = new URLSearchParams();
-bodyParams.set("facturaid", facturaId);   // <- el ID numérico que te devuelve FacturaLive
-bodyParams.set("userid", userId);         // 1021 en tu caso
-bodyParams.set("environment", environment); // "TEST" o "PROD"
+  // Enviar como application/x-www-form-urlencoded (NO multipart)
+  const bodyParams = new URLSearchParams();
+  bodyParams.set("facturaid", facturaId); // <- el ID numérico que te devuelve FacturaLive
+  bodyParams.set("userid", userId); // 1021 en tu caso
+  bodyParams.set("environment", environment); // "TEST" o "PROD"
 
-const debugContext = {
-  invoiceId,
-  gymId: invoice.gym_id,
-  facturaId,
-  userId,
-  environment,
-  requestBody: Object.fromEntries(bodyParams.entries()),
-};
+  const debugContext = {
+    invoiceId,
+    gymId: invoice.gym_id,
+    facturaId,
+    userId,
+    environment,
+    requestBody: Object.fromEntries(bodyParams.entries()),
+    requestBodyRaw: bodyParams.toString(),
+  };
 
-let pdfResponse: Response;
-try {
-  pdfResponse = await fetch(FACTURALIVE_PDF_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Accept": "application/pdf,application/octet-stream;q=0.9,*/*;q=0.8",
-      "User-Agent": "GymManagerPro/2.0 (+vercel)",
-    },
-    body: bodyParams.toString(),
-    // (opcional) evita warnings en algunos runtimes
-    // @ts-ignore
-    duplex: "half",
-  });
-} catch (externalError) {
-  console.error(
-    "Error connecting to FacturaLive PDF endpoint",
-    externalError,
-    debugContext
-  );
-  return NextResponse.json(
-    {
-      error:
-        "No pudimos conectar con el servicio de FacturaLive para descargar la factura. Intenta nuevamente en unos minutos.",
-      context: debugContext,
-    },
-    { status: 502 }
-  );
-}
+  console.info("Solicitando PDF de factura en FacturaLive", debugContext);
+
+  let pdfResponse: Response;
+  try {
+    pdfResponse = await fetch(FACTURALIVE_PDF_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/pdf,application/octet-stream;q=0.9,*/*;q=0.8",
+        "User-Agent": "GymManagerPro/2.0 (+vercel)",
+      },
+      body: bodyParams.toString(),
+      // (opcional) evita warnings en algunos runtimes
+      // @ts-ignore
+      duplex: "half",
+    });
+  } catch (externalError) {
+    console.error(
+      "Error connecting to FacturaLive PDF endpoint",
+      externalError,
+      debugContext
+    );
+    return NextResponse.json(
+      {
+        error:
+          "No pudimos conectar con el servicio de FacturaLive para descargar la factura. Intenta nuevamente en unos minutos.",
+        context: debugContext,
+      },
+      { status: 502 }
+    );
+  }
 
 
   if (!pdfResponse.ok) {
@@ -251,6 +254,11 @@ try {
   }
 
   const pdfArrayBuffer = await pdfResponse.arrayBuffer();
+
+  console.info("FacturaLive devolvió PDF correctamente", {
+    ...debugContext,
+    contentLength: pdfArrayBuffer.byteLength,
+  });
 
   if (!pdfArrayBuffer || pdfArrayBuffer.byteLength === 0) {
     console.error(
