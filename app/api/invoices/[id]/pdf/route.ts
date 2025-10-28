@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Buffer } from "node:buffer";
 
 import { buildInvoicePdfFileName } from "@/lib/invoice-pdf";
+import { extractFacturaId, toTrimmedString } from "@/lib/invoice-utils";
 import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -31,46 +32,6 @@ const normalizeEnvironment = (value: unknown): "TEST" | "PROD" | null => {
 };
 
 const DEFAULT_ENVIRONMENT: "TEST" = "TEST";
-
-const onlyDigits = (s: string) => s.replace(/\D+/g, "");
-const looksNumeric = (s: string | null) =>
-  !!s && /^\d{1,20}$/.test(s.trim());
-
-const toTrimmedString = (value: unknown): string | null => {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : null;
-  }
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return String(value);
-  }
-  return null;
-};
-
-const extractFacturaId = (payload: unknown): string | null => {
-  if (!payload || typeof payload !== "object") return null;
-
-  const r = payload as Record<string, unknown>;
-  const candidatesRaw = [
-    r.facturaid,
-    r.facturaId,
-    r.FacturaId,
-    r.FacturaID,
-    r.FACTURAID,
-    // Por si viene anidado, probamos rutas comunes:
-    (r.data as any)?.facturaid,
-    (r.result as any)?.facturaid,
-    (r.response as any)?.facturaid,
-  ].map(toTrimmedString);
-
-  for (const c of candidatesRaw) {
-    if (!c) continue;
-    const digits = onlyDigits(c);
-    if (looksNumeric(digits)) return digits;
-  }
-
-  return null;
-};
 
 
 type RouteContext = { params: Promise<{ id?: string }> };

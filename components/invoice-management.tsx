@@ -17,8 +17,9 @@ import {
 } from "@/components/ui/table";
 import { RefreshCcw, Download } from "lucide-react";
 
-import { supabase } from "@/lib/supabase";
 import type { Invoice } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
+import { resolveInvoiceNumber } from "@/lib/invoice-utils";
 import { buildInvoicePdfFileName } from "@/lib/invoice-pdf";
 
 interface InvoiceManagementProps {
@@ -81,9 +82,13 @@ export function InvoiceManagement({
     const toDate = endDate ? parseISODate(endDate) : null;
 
     return invoices.filter((invoice) => {
+      const resolvedInvoiceNumber =
+        resolveInvoiceNumber(invoice) ?? "";
+
       if (normalizedSearch.length > 0) {
         const haystack = [
           invoice.member_name,
+          resolvedInvoiceNumber,
           invoice.invoice_number ?? "",
           invoice.invoice_series ?? "",
           invoice.status ?? "",
@@ -281,8 +286,11 @@ export function InvoiceManagement({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredInvoices.map((invoice) => (
-                    <TableRow key={invoice.id}>
+                  filteredInvoices.map((invoice) => {
+                    const resolvedInvoiceNumber =
+                      resolveInvoiceNumber(invoice);
+                    return (
+                      <TableRow key={invoice.id}>
                       <TableCell>{formatDisplayDate(invoice.issued_at)}</TableCell>
                       <TableCell className="font-medium">
                         {invoice.member_name}
@@ -296,7 +304,7 @@ export function InvoiceManagement({
                           {invoice.status || "Sin estado"}
                         </Badge>
                       </TableCell>
-                      <TableCell>{invoice.invoice_number ?? "-"}</TableCell>
+                      <TableCell>{resolvedInvoiceNumber ?? "-"}</TableCell>
                       <TableCell>{invoice.invoice_series ?? "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
@@ -321,7 +329,8 @@ export function InvoiceManagement({
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
