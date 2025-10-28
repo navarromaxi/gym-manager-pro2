@@ -156,7 +156,7 @@ export async function GET(_request: Request, context: RouteContext) {
     );
   }
 
-  const requestBody = new URLSearchParams();
+  const requestBody = new FormData();
   requestBody.set("facturaid", facturaId);
   requestBody.set("userid", userId);
 
@@ -172,17 +172,25 @@ export async function GET(_request: Request, context: RouteContext) {
     facturaId,
     userId,
     environment,
-    requestBody: requestBody.toString(),
+    requestBody: Array.from(requestBody.entries()).reduce<Record<string, string>>(
+      (acc, [key, value]) => {
+        acc[key] =
+          typeof value === "string"
+            ? value
+            : value instanceof File
+            ? value.name
+            : String(value);
+        return acc;
+      },
+      {}
+    ),
   };
 
   let pdfResponse: Response;
   try {
     pdfResponse = await fetch(FACTURALIVE_PDF_ENDPOINT, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: requestBody.toString(),
+      body: requestBody,
     });
   } catch (externalError) {
     console.error(
