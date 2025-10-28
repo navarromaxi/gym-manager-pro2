@@ -428,10 +428,23 @@ const applyCompanyInfoToInvoiceForm = (
     return `${computedAdditional} | ${existingAdditional}`;
   })();
 
+  const resolvedRutValue =
+    info.rut ?? fallbackRut ?? (invoice.rutneg ? invoice.rutneg.toString() : "");
+  const normalizedRut =
+    typeof resolvedRutValue === "string"
+      ? resolvedRutValue.replace(/\D+/g, "")
+      : "";
+
   return {
     ...invoice,
+    typecfe: 111,
+    typedoc: invoice.typedoc && invoice.typedoc > 0 ? invoice.typedoc : 2,
     nomneg: info.name ?? info.tradeName ?? invoice.nomneg,
-    rutneg: info.rut ?? fallbackRut ?? invoice.rutneg,
+    rutneg:
+      normalizedRut ||
+      (typeof invoice.rutneg === "string"
+        ? invoice.rutneg.replace(/\D+/g, "")
+        : ""),
     dirneg: resolvedAddress || invoice.dirneg,
     cityneg: info.city ?? invoice.cityneg,
     stateneg: info.state ?? invoice.stateneg,
@@ -1030,21 +1043,50 @@ export function PaymentManagement({
   const handleInvoiceCustomerTypeChange = (value: "consumer" | "rut") => {
     setInvoiceCustomerType(value);
 
+    setInvoiceForm((prev) => {
+      if (!prev) {
+        return prev;
+      }
+
+      if (value === "consumer") {
+        const fallbackConsumerName =
+          invoicePayment?.member_name && invoicePayment.member_name.trim().length > 0
+            ? invoicePayment.member_name
+            : prev.nomneg;
+
+        const consumerDefaults = consumerInvoiceFieldsRef.current ?? {
+          nomneg: fallbackConsumerName,
+          rutneg: "",
+          dirneg: "",
+          cityneg: "",
+          stateneg: "",
+          clicountry: "UY",
+          addinfoneg: "",
+        };
+
+        return {
+          ...prev,
+          ...consumerDefaults,
+          rutneg:
+            typeof consumerDefaults.rutneg === "string"
+              ? consumerDefaults.rutneg
+              : "",
+          typecfe: 101,
+          typedoc: 0,
+        };
+      }
+
+      return {
+        ...prev,
+        typecfe: 111,
+        typedoc: prev.typedoc && prev.typedoc > 0 ? prev.typedoc : 2,
+      };
+    });
+
     if (value === "consumer") {
       setRutLookupResult(null);
       setRutLookupError(null);
       setRutSearchValue("");
-      if (consumerInvoiceFieldsRef.current) {
-        const consumerDefaults = consumerInvoiceFieldsRef.current;
-        setInvoiceForm((prev) =>
-          prev
-            ? {
-                ...prev,
-                ...consumerDefaults,
-              }
-            : prev
-        );
-      }
     }
   };
 
