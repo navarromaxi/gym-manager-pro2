@@ -781,6 +781,9 @@ export function MemberManagement({
         m.id === memberId ? { ...m, followed_up: true } : m
       );
       setMembers(updatedMembers);
+      setDismissedLongPlanMemberIds((prev) =>
+        prev.includes(memberId) ? prev : [...prev, memberId]
+      );
       setRefreshKey((prev) => prev + 1); // Forzar rerender
     } catch (error) {
       console.error("Error al marcar como contactado:", error);

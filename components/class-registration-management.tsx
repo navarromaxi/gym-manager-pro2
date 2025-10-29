@@ -12,6 +12,7 @@ import {
   Clock,
   Copy,
   Download,
+  Edit,
   RefreshCw,
   Trash2,
   Users,
@@ -106,6 +107,11 @@ export function ClassRegistrationManagement({
   const [deletingRegistrationId, setDeletingRegistrationId] = useState<string | null>(
     null
   );
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editFormState, setEditFormState] =
+    useState<ClassSessionFormState>(INITIAL_FORM_STATE);
+  const [updating, setUpdating] = useState(false);
   useEffect(() => {
     if (typeof window !== "undefined") {
       setShareBaseUrl(window.location.origin);
@@ -169,29 +175,85 @@ export function ClassRegistrationManagement({
     setRegistrations((registrationsResponse.data ?? []) as ClassRegistration[]);
   };
 
-  const handleChange = <K extends keyof ClassSessionFormState>(
-    field: K,
-    value: ClassSessionFormState[K]
+  const createFormStateUpdater = (
+    setter: Dispatch<SetStateAction<ClassSessionFormState>>
   ) => {
-    setFormState((prev) => {
-      if (field === "capacity") {
-        const numericValue =
-          typeof value === "number" ? value : Number(value) || 1;
+    return <K extends keyof ClassSessionFormState>(
+      field: K,
+      value: ClassSessionFormState[K]
+    ) => {
+      setter((prev) => {
+        if (field === "capacity") {
+          const numericValue =
+            typeof value === "number" ? value : Number(value) || 1;
+          return {
+            ...prev,
+            capacity: Math.max(1, Math.floor(numericValue)),
+          };
+        }
+
         return {
           ...prev,
-          capacity: Math.max(1, Math.floor(numericValue)),
+          [field]: value,
         };
-      }
-
-      return {
-        ...prev,
-        [field]: value,
-      };
-    });
+      });
+    };
   };
+
+  const handleChange = createFormStateUpdater(setFormState);
+  const handleEditChange = createFormStateUpdater(setEditFormState);
 
   const resetForm = () => {
     setFormState(INITIAL_FORM_STATE);
+  };
+
+  const resetEditForm = () => {
+    setEditFormState(INITIAL_FORM_STATE);
+  };
+
+  const closeEditDialog = () => {
+    setIsEditDialogOpen(false);
+    setEditingSessionId(null);
+    resetEditForm();
+  };
+
+  const validateFormState = (state: ClassSessionFormState) => {
+    if (!state.title.trim()) {
+      return "Ingresa un título para la clase.";
+    }
+
+    if (!state.date) {
+      return "Selecciona una fecha para la clase.";
+    }
+
+    if (!state.start_time) {
+      return "Selecciona un horario de inicio.";
+    }
+
+    return null;
+  };
+
+  const handleEditDialogChange = (open: boolean) => {
+    if (open) {
+      setIsEditDialogOpen(true);
+      return;
+    }
+
+    closeEditDialog();
+  };
+
+  const handleOpenEditDialog = (session: ClassSession) => {
+    setEditingSessionId(session.id);
+    setEditFormState({
+      title: session.title,
+      date: session.date,
+      start_time: session.start_time,
+      capacity: session.capacity,
+      notes: session.notes ?? "",
+      accept_receipts: session.accept_receipts ?? false,
+    });
+    setFeedback(null);
+    setIsEditDialogOpen(true);
   };
 
   const handleCreateSession = async (
@@ -200,26 +262,11 @@ export function ClassRegistrationManagement({
     event.preventDefault();
     if (!gymId) return;
 
-    if (!formState.title.trim()) {
+    const validationError = validateFormState(formState);
+    if (validationError) {
       setFeedback({
         type: "error",
-        message: "Ingresa un título para la clase.",
-      });
-      return;
-    }
-
-    if (!formState.date) {
-      setFeedback({
-        type: "error",
-        message: "Selecciona una fecha para la clase.",
-      });
-      return;
-    }
-
-    if (!formState.start_time) {
-      setFeedback({
-        type: "error",
-        message: "Selecciona un horario de inicio.",
+        message: validationError,
       });
       return;
     }
@@ -280,6 +327,84 @@ export function ClassRegistrationManagement({
       });
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleUpdateSession = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+    if (!gymId || !editingSessionId) return;
+
+    const validationError = validateFormState(editFormState);
+    if (validationError) {
+      setFeedback({
+        type: "error",
+        message: validationError,
+      });
+      return;
+    }
+
+    setUpdating(true);
+    setFeedback(null);
+
+    try {
+      const response = await fetch("/api/class-sessions", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          gymId,
+          sessionId: editingSessionId,
+          title: editFormState.title.trim(),
+          date: editFormState.date,
+          startTime: editFormState.start_time,
+          capacity: editFormState.capacity,
+          notes: editFormState.notes.trim() || null,
+          acceptReceipts: editFormState.accept_receipts,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { data: ClassSession; error?: string }
+        | { error?: string }
+        | null;
+
+      if (!response.ok) {
+        const error = payload && "error" in payload ? payload.error : undefined;
+        throw new Error(
+          error || "No se pudo actualizar la clase. Intenta nuevamente más tarde."
+        );
+      }
+
+      if (!payload || !("data" in payload)) {
+        throw new Error(
+          "No se pudo actualizar la clase. Intenta nuevamente más tarde."
+        );
+      }
+
+      const { data } = payload;
+
+      setSessions((prev) =>
+        prev.map((session) => (session.id === data.id ? data : session))
+      );
+      setFeedback({
+        type: "success",
+        message: "Clase actualizada correctamente.",
+      });
+      closeEditDialog();
+    } catch (error) {
+      console.error("Error actualizando la clase", error);
+      setFeedback({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No se pudo actualizar la clase. Revisa la conexión e intenta nuevamente.",
+      });
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -823,6 +948,15 @@ export function ClassRegistrationManagement({
                               </Button>
                               <Button
                                 type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenEditDialog(session)}
+                              >
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar
+                              </Button>
+                              <Button
+                                type="button"
                                 variant="destructive"
                                 size="sm"
                                 onClick={() => handleDeleteSession(session.id)}
@@ -843,6 +977,120 @@ export function ClassRegistrationManagement({
           </Card>
         )}
       </div>
+
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={handleEditDialogChange}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar clase</DialogTitle>
+            <DialogDescription>
+              Actualiza el nombre, la fecha, el horario, el cupo o las notas del
+              evento.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateSession} className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="md:col-span-2 space-y-2">
+                <Label htmlFor="edit-class-title">Nombre de la clase</Label>
+                <Input
+                  id="edit-class-title"
+                  value={editFormState.title}
+                  onChange={(event) =>
+                    handleEditChange("title", event.target.value)
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-class-date">Fecha</Label>
+                <Input
+                  id="edit-class-date"
+                  type="date"
+                  value={editFormState.date}
+                  onChange={(event) =>
+                    handleEditChange("date", event.target.value)
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-class-time">Horario</Label>
+                <Input
+                  id="edit-class-time"
+                  type="time"
+                  value={editFormState.start_time}
+                  onChange={(event) =>
+                    handleEditChange("start_time", event.target.value)
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-class-capacity">Cupo máximo</Label>
+                <Input
+                  id="edit-class-capacity"
+                  type="number"
+                  min={1}
+                  value={editFormState.capacity}
+                  onChange={(event) =>
+                    handleEditChange("capacity", Number(event.target.value))
+                  }
+                />
+              </div>
+
+              <div className="md:col-span-2 space-y-2">
+                <Label htmlFor="edit-class-notes">Notas (opcional)</Label>
+                <Textarea
+                  id="edit-class-notes"
+                  placeholder="Agrega detalles como nivel de la clase, qué llevar, etc."
+                  value={editFormState.notes}
+                  onChange={(event) =>
+                    handleEditChange("notes", event.target.value)
+                  }
+                />
+              </div>
+
+              <div className="md:col-span-2 flex items-start gap-3 rounded-lg border border-dashed border-primary/30 bg-muted/30 p-4">
+                <Checkbox
+                  id="edit-accept-receipts"
+                  checked={editFormState.accept_receipts}
+                  onCheckedChange={(checked) =>
+                    handleEditChange("accept_receipts", checked === true)
+                  }
+                />
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="edit-accept-receipts"
+                    className="font-semibold"
+                  >
+                    Aceptar comprobantes
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Cuando está activo, los socios podrán adjuntar una imagen o
+                    PDF del pago al inscribirse. El comprobante quedará disponible
+                    en la lista de inscriptos.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeEditDialog}
+                disabled={updating}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={updating}>
+                {updating ? "Guardando..." : "Guardar cambios"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={isRegistrationsDialogOpen}
