@@ -1131,7 +1131,7 @@ export default function GymManagementSystem() {
               { id: "prospects", label: "Interesados" },
               { id: "inactives", label: "Inactivos" },
               { id: "plans", label: "Planes" },
-              { id: "custom_plans", label: "Personalizados" },
+              { id: "custom_plans", label: "Plan Complementario" },
               { id: "one_time_payments", label: "Pago único" },
               { id: "class_registrations", label: "Clases/Evento" },
               { id: "activities", label: "Actividades" },

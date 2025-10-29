@@ -1,7 +1,11 @@
 "use client";
-import { useEffect } from "react";
+import {
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { supabase } from "@/lib/supabase";
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,10 +69,21 @@ interface Activity {
 
 interface PlanManagementProps {
   plans: Plan[];
-  setPlans: (plans: Plan[]) => void;
+  setPlans: Dispatch<SetStateAction<Plan[]>>;
   activities: Activity[];
   gymId: string; // ✅ AGREGALO AQUÍ
 }
+
+const normalizePlan = (plan: any): Plan => ({
+  ...plan,
+  price:
+    typeof plan?.price === "string" ? parseFloat(plan.price) : plan?.price ?? 0,
+  duration:
+    typeof plan?.duration === "string"
+      ? Number.parseInt(plan.duration, 10)
+      : plan?.duration ?? 0,
+  activities: Array.isArray(plan?.activities) ? plan.activities : [],
+});
 
 export function PlanManagement({
   plans,
@@ -95,6 +110,10 @@ export function PlanManagement({
   );
 
   useEffect(() => {
+    if (!gymId) {
+      return;
+    }
+
     const fetchActivities = async () => {
       const { data, error } = await supabase
         .from("activities")
@@ -110,7 +129,7 @@ export function PlanManagement({
     };
 
     fetchActivities();
-  }, []);
+  }, [gymId]);
 
   // 🔍 FILTRADO
   const filteredPlans = plans.filter(
@@ -121,6 +140,10 @@ export function PlanManagement({
 
   // ✅ CARGAR PLANES DESDE SUPABASE
   useEffect(() => {
+    if (!gymId) {
+      return;
+    }
+
     const fetchPlans = async () => {
       const { data, error } = await supabase
         .from("plans")
@@ -133,15 +156,20 @@ export function PlanManagement({
       }
 
       if (data) {
-        setPlans(data as Plan[]);
+        setPlans(data.map(normalizePlan));
       }
     };
 
     fetchPlans();
-  }, []);
+  }, [gymId, setPlans]);
 
   // ✅ GUARDAR PLAN NUEVO
   const handleAddPlan = async () => {
+    if (!gymId) {
+      console.warn("No se puede crear un plan sin gymId");
+      return;
+    }
+
     const newId = `${gymId}_plan_${Date.now()}`;
 
     const plan: any = {
@@ -156,14 +184,20 @@ export function PlanManagement({
       is_active: true, // ✅ nombre correcto
     };
 
-    const { error } = await supabase.from("plans").insert([plan]);
+    const { error, data } = await supabase
+      .from("plans")
+      .insert([plan])
+      .select()
+      .single();
 
     if (error) {
       console.error("Error al guardar el plan en Supabase:", error);
       return;
     }
 
-    setPlans([...plans, plan]);
+    const normalized = data ? normalizePlan(data) : plan;
+
+    setPlans((prevPlans) => [...prevPlans, normalized]);
     setNewPlan({
       name: "",
       description: "",
@@ -176,7 +210,7 @@ export function PlanManagement({
   };
 
   const handleEditPlan = async () => {
-    if (!editingPlan) return;
+    if (!editingPlan || !gymId) return;
 
     const updates = {
       name: editingPlan.name,
@@ -187,36 +221,52 @@ export function PlanManagement({
       activities: editingPlan.activities,
     };
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("plans")
       .update(updates)
       .eq("id", editingPlan.id)
-      .eq("gym_id", gymId);
+      .eq("gym_id", gymId)
+      .select()
+      .single();
 
     if (error) {
       console.error("Error al actualizar el plan en Supabase:", error);
       return;
     }
 
-    setPlans(
-      plans.map((p) => (p.id === editingPlan.id ? { ...p, ...updates } : p))
+    const normalized = data ? normalizePlan(data) : { ...editingPlan, ...updates };
+
+    setPlans((prevPlans) =>
+      prevPlans.map((p) => (p.id === editingPlan.id ? normalized : p))
     );
     setIsEditDialogOpen(false);
     setEditingPlan(null);
   };
 
   const handleDeletePlan = async (id: string) => {
-    const { error } = await supabase.from("plans").delete().eq("id", id);
+    if (!gymId) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("plans")
+      .delete()
+      .eq("id", id)
+      .eq("gym_id", gymId);
 
     if (error) {
       console.error("Error al eliminar plan de Supabase:", error);
       return;
     }
 
-    setPlans(plans.filter((p) => p.id !== id));
+    setPlans((prevPlans) => prevPlans.filter((p) => p.id !== id));
   };
 
   const togglePlanStatus = async (id: string) => {
+    if (!gymId) {
+      return;
+    }
+
     const plan = plans.find((p) => p.id === id);
     if (!plan) return;
 
@@ -233,8 +283,8 @@ export function PlanManagement({
       return;
     }
 
-    setPlans(
-      plans.map((p) => (p.id === id ? { ...p, is_active: newStatus } : p))
+    setPlans((prevPlans) =>
+      prevPlans.map((p) => (p.id === id ? { ...p, is_active: newStatus } : p))
     );
   };
 
