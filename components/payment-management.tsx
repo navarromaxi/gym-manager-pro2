@@ -842,12 +842,14 @@ export function PaymentManagement({
     startDate: new Date().toLocaleDateString("en-CA"),
     type: "new_plan" as "new_plan" | "existing_plan" | "product",
     description: "",
+    planAmount: 0,
     amount: 0,
     installments: 1,
     nextInstallmentDue: new Date().toLocaleDateString("en-CA"),
   });
   const previousInstallmentsRef = useRef(newPayment.installments);
   const previousPlanIdRef = useRef(newPayment.planId);
+  const previousPlanAmountRef = useRef(newPayment.planAmount);
   const [planContract, setPlanContract] = useState<PlanContract | null>(null);
   const [methodFilter, setMethodFilter] = useState("all");
   const [installmentFilter, setInstallmentFilter] = useState("all");
@@ -1423,6 +1425,12 @@ export function PaymentManagement({
   };
 
   const getPlanPrice = (payment: Payment) => {
+    const memberForPayment = members.find(
+      (member) => member.id === payment.member_id
+    );
+    if (memberForPayment && typeof memberForPayment.plan_price === "number") {
+      return memberForPayment.plan_price;
+    }
     if (payment.plan_id) {
       const planById = plans.find((plan) => plan.id === payment.plan_id);
       if (planById) return planById.price;
@@ -2024,6 +2032,10 @@ export function PaymentManagement({
       : plans.find((p) => p.id === newPayment.planId);
   const balanceDueActual = selectedMember?.balance_due || 0;
   const remainingBalance = Math.max(balanceDueActual - newPayment.amount, 0);
+  const planAmountForNewPlan =
+    newPayment.type === "new_plan"
+      ? (newPayment.planAmount ?? selectedPlan?.price ?? 0)
+      : 0;
   const shouldAskNextInstallmentDue =
     newPayment.type === "existing_plan" &&
     balanceDueActual > 0 &&
@@ -2033,7 +2045,7 @@ export function PaymentManagement({
     newPayment.type === "new_plan" && selectedPlan
       ? planContract
         ? balanceDueActual
-        : Math.max(selectedPlan.price + balanceDueActual, 0)
+        : Math.max(planAmountForNewPlan + balanceDueActual, 0)
       : 0;
 
   const calculatedPlanEndDate = useMemo(() => {
@@ -2055,28 +2067,37 @@ export function PaymentManagement({
   useEffect(() => {
     const prevInstallments = previousInstallmentsRef.current;
     const prevPlanId = previousPlanIdRef.current;
+    const prevPlanAmount = previousPlanAmountRef.current;
     const planChanged =
       newPayment.type === "new_plan" &&
       newPayment.planId &&
       newPayment.planId !== prevPlanId;
+    const planAmountChanged =
+      newPayment.type === "new_plan" &&
+      newPayment.planAmount !== prevPlanAmount;
 
     if (
       newPayment.type === "new_plan" &&
       selectedPlan &&
       newPayment.installments === 1 &&
-      (newPayment.amount === 0 || prevInstallments !== 1 || planChanged)
+      (newPayment.amount === 0 ||
+        prevInstallments !== 1 ||
+        planChanged ||
+        (planAmountChanged && newPayment.amount === prevPlanAmount))
     ) {
       setNewPayment((prev) => ({
         ...prev,
-        amount: selectedPlan.price,
+        amount: prev.planAmount ?? selectedPlan?.price ?? 0,
       }));
     }
 
     previousInstallmentsRef.current = newPayment.installments;
     previousPlanIdRef.current = newPayment.planId;
+    previousPlanAmountRef.current = newPayment.planAmount;
   }, [
     newPayment.amount,
     newPayment.installments,
+    newPayment.planAmount,
     newPayment.planId,
     newPayment.type,
     selectedPlan,
@@ -2091,6 +2112,10 @@ export function PaymentManagement({
 
       if (newPayment.type === "new_plan") {
         if (!selectedPlan) return;
+        if (newPayment.planAmount < 0) {
+          alert("El monto del plan no puede ser negativo");
+          return;
+        }
         if (newPayment.amount < 0) {
           alert("El monto no puede ser negativo");
           return;
@@ -2151,6 +2176,9 @@ export function PaymentManagement({
           setPlanContract(currentContract);
         }
 
+        const planAmountValue =
+          newPayment.planAmount ?? selectedPlan.price ?? 0;
+
         const paymentDescription =
           newPayment.description.trim() || selectedPlan.name;
 
@@ -2204,14 +2232,14 @@ export function PaymentManagement({
             : newPayment.nextInstallmentDue || nextPaymentISO;
 
         const newBalance = isFirstInstallment
-          ? balanceDueActual + selectedPlan.price - newPayment.amount
+          ? balanceDueActual + planAmountValue - newPayment.amount
           : balanceDueActual - newPayment.amount;
 
         const { error: memberError } = await supabase
           .from("members")
           .update({
             plan: selectedPlan.name,
-            plan_price: selectedPlan.price,
+            plan_price: planAmountValue,
             balance_due: Math.max(newBalance, 0),
             last_payment: newPayment.startDate,
             next_payment: nextPaymentISO,
@@ -2224,7 +2252,7 @@ export function PaymentManagement({
         const updatedMember = {
           ...selectedMember,
           plan: selectedPlan.name,
-          plan_price: selectedPlan.price,
+          plan_price: planAmountValue,
           balance_due: Math.max(newBalance, 0),
           last_payment: newPayment.startDate,
           next_payment: nextPaymentISO,
@@ -2374,6 +2402,7 @@ export function PaymentManagement({
         startDate: new Date().toLocaleDateString("en-CA"),
         type: "new_plan",
         description: "",
+        planAmount: 0,
         amount: 0,
         installments: 1,
         nextInstallmentDue: new Date().toLocaleDateString("en-CA"),
@@ -2632,6 +2661,7 @@ export function PaymentManagement({
                                 ...newPayment,
                                 memberId: member.id,
                                 planId: "",
+                                planAmount: 0,
                                 installments: 1,
                                 nextInstallmentDue:
                                   member.next_installment_due ||
@@ -2668,6 +2698,7 @@ export function PaymentManagement({
                         type: value as "new_plan" | "existing_plan" | "product",
                         planId: "",
                         description: "",
+                        planAmount: 0,
                         amount: 0,
                         installments: 1,
                         nextInstallmentDue: new Date().toLocaleDateString(
@@ -2705,11 +2736,24 @@ export function PaymentManagement({
                             newPayment.startDate,
                             selectedPlanOption
                           );
-                          setNewPayment({
-                            ...newPayment,
-                            planId: value,
-                            installments: 1,
-                            nextInstallmentDue: computedNext,
+                          setNewPayment((prev) => {
+                            const defaultPlanAmount =
+                              selectedPlanOption?.price ?? 0;
+                            const shouldSyncAmount =
+                              prev.installments === 1 &&
+                              (prev.amount === 0 ||
+                                prev.planId !== value ||
+                                prev.amount === prev.planAmount);
+                            return {
+                              ...prev,
+                              planId: value,
+                              planAmount: defaultPlanAmount,
+                              installments: 1,
+                              amount: shouldSyncAmount
+                                ? defaultPlanAmount
+                                : prev.amount,
+                              nextInstallmentDue: computedNext,
+                            };
                           });
                           if (newPayment.memberId && contractTable) {
                             let resolvedContracts: RawPlanContract[] | null = null;
@@ -2763,6 +2807,9 @@ export function PaymentManagement({
                                   prev.nextInstallmentDue ||
                                   selectedMember?.next_installment_due ||
                                   computedNext,
+                                planAmount:
+                                  selectedMember?.plan_price ??
+                                  prev.planAmount,
                               }));
                             }
                           } else {
@@ -2828,7 +2875,34 @@ export function PaymentManagement({
                     )}
                     {newPayment.planId && (
                       <div className="grid gap-2">
-                        <Label htmlFor="amount">Monto</Label>
+                        <Label htmlFor="planAmount">Monto del plan</Label>
+                        <Input
+                          id="planAmount"
+                          type="number"
+                          value={newPayment.planAmount}
+                          min={0}
+                          onChange={(e) => {
+                            const value = Number(e.target.value);
+                            setNewPayment((prev) => {
+                              const shouldSyncAmount =
+                                prev.installments === 1 &&
+                                (prev.amount === 0 ||
+                                  prev.amount === prev.planAmount);
+                              return {
+                                ...prev,
+                                planAmount: value,
+                                amount: shouldSyncAmount
+                                  ? value
+                                  : prev.amount,
+                              };
+                            });
+                          }}
+                        />
+                      </div>
+                    )}
+                    {newPayment.planId && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="amount">Monto a pagar</Label>
                         <Input
                           id="amount"
                           type="number"
