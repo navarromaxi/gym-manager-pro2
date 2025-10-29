@@ -858,6 +858,10 @@ export function MemberManagement({
       const member = members.find((m) => m.id === memberId);
       if (!member) continue;
 
+      if (member.followed_up) {
+        continue;
+      }
+
       const normalizedPlanName = payment.plan?.trim().toLowerCase();
       const memberPlanName = member.plan?.trim().toLowerCase();
       const plan =
