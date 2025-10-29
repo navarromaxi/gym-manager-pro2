@@ -2529,12 +2529,19 @@ export function PaymentManagement({
 
       const remainingPayments = payments.filter((p) => p.id !== payment.id);
 
+      setPayments(remainingPayments);
+
       if (payment.type === "plan") {
-        await revertMemberAfterPlanDeletion(payment, remainingPayments);
+        try {
+          await revertMemberAfterPlanDeletion(payment, remainingPayments);
+        } catch (memberUpdateError) {
+          console.error(
+            "Error actualizando el socio tras eliminar el pago:",
+            memberUpdateError
+          );
+        }
         await adjustContractAfterPlanDeletion(payment);
       }
-
-      setPayments(remainingPayments);
     } catch (error) {
       console.error("Error eliminando pago:", error);
       alert("Error al eliminar el pago. Inténtalo de nuevo.");
