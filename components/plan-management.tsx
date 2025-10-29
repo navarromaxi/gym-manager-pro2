@@ -175,10 +175,32 @@ export function PlanManagement({
     setIsAddDialogOpen(false);
   };
 
-  const handleEditPlan = () => {
+  const handleEditPlan = async () => {
     if (!editingPlan) return;
 
-    setPlans(plans.map((p) => (p.id === editingPlan.id ? editingPlan : p)));
+    const updates = {
+      name: editingPlan.name,
+      description: editingPlan.description,
+      price: editingPlan.price,
+      duration: editingPlan.duration,
+      duration_type: editingPlan.duration_type,
+      activities: editingPlan.activities,
+    };
+
+    const { error } = await supabase
+      .from("plans")
+      .update(updates)
+      .eq("id", editingPlan.id)
+      .eq("gym_id", gymId);
+
+    if (error) {
+      console.error("Error al actualizar el plan en Supabase:", error);
+      return;
+    }
+
+    setPlans(
+      plans.map((p) => (p.id === editingPlan.id ? { ...p, ...updates } : p))
+    );
     setIsEditDialogOpen(false);
     setEditingPlan(null);
   };
@@ -194,9 +216,25 @@ export function PlanManagement({
     setPlans(plans.filter((p) => p.id !== id));
   };
 
-  const togglePlanStatus = (id: string) => {
+  const togglePlanStatus = async (id: string) => {
+    const plan = plans.find((p) => p.id === id);
+    if (!plan) return;
+
+    const newStatus = !plan.is_active;
+
+    const { error } = await supabase
+      .from("plans")
+      .update({ is_active: newStatus })
+      .eq("id", id)
+      .eq("gym_id", gymId);
+
+    if (error) {
+      console.error("Error al actualizar el estado del plan en Supabase:", error);
+      return;
+    }
+
     setPlans(
-      plans.map((p) => (p.id === id ? { ...p, is_active: !p.is_active } : p))
+      plans.map((p) => (p.id === id ? { ...p, is_active: newStatus } : p))
     );
   };
 
@@ -446,7 +484,7 @@ export function PlanManagement({
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setEditingPlan(plan);
+                          setEditingPlan({ ...plan });
                           setIsEditDialogOpen(true);
                         }}
                       >
