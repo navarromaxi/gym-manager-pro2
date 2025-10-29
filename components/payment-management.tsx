@@ -97,6 +97,59 @@ type ReferenceFilterOption =
 
 const PAYMENTS_PER_BATCH = 10;
 
+type RawPlanContract = PlanContract & {
+  created_at?: string | null;
+  start_date?: string | null;
+  startDate?: string | null;
+};
+
+const parseTimestamp = (value?: string | null): number => {
+  if (!value) return Number.NaN;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? Number.NaN : parsed;
+};
+
+const getContractTimestamp = (contract: RawPlanContract): number => {
+  const startDate = parseTimestamp(contract.start_date);
+  if (Number.isFinite(startDate)) {
+    return startDate;
+  }
+
+  const altStartDate = parseTimestamp(contract.startDate);
+  if (Number.isFinite(altStartDate)) {
+    return altStartDate;
+  }
+
+  const createdAt = parseTimestamp(contract.created_at);
+  if (Number.isFinite(createdAt)) {
+    return createdAt;
+  }
+
+  const idParts = contract.id.split("_");
+  const possibleTimestamp = Number.parseInt(idParts[idParts.length - 1] ?? "", 10);
+  if (Number.isFinite(possibleTimestamp)) {
+    return possibleTimestamp;
+  }
+
+  return 0;
+};
+
+const pickRelevantPlanContract = (
+  contracts: RawPlanContract[] | null | undefined,
+): PlanContract | null => {
+  if (!contracts?.length) return null;
+
+  const orderedContracts = [...contracts].sort(
+    (a, b) => getContractTimestamp(b) - getContractTimestamp(a),
+  );
+
+  const activeContract = orderedContracts.find(
+    (contract) => contract.installments_paid < contract.installments_total,
+  );
+
+  return activeContract ?? orderedContracts[0] ?? null;
+};
+
 interface InvoiceFormState {
   facturareferencia: string;
   contnumero: string;
@@ -1771,9 +1824,18 @@ export function PaymentManagement({
             .from(contractTable)
             .select("*")
             .eq("member_id", newPayment.memberId)
-            .eq("plan_id", plan.id)
-            .single();
-          setPlanContract(error ? null : data ?? null);
+            .eq("plan_id", plan.id);
+
+          if (error) {
+            console.warn("Error fetching existing plan contract:", error);
+            setPlanContract(null);
+            return;
+          }
+
+          const matchedContract = pickRelevantPlanContract(
+            (data as RawPlanContract[] | null) ?? undefined,
+          );
+          setPlanContract(matchedContract);
         } else {
           setPlanContract(null);
         }
@@ -2643,26 +2705,53 @@ export function PaymentManagement({
                             nextInstallmentDue: computedNext,
                           });
                           if (newPayment.memberId && contractTable) {
-                            let { data, error } = await supabase
+                            let resolvedContracts: RawPlanContract[] | null = null;
+
+                            const { data, error } = await supabase
                               .from(contractTable)
                               .select("*")
                               .eq("member_id", newPayment.memberId)
-                              .eq("plan_id", value)
-                              .single();
-                            if (error) {
-                              const fallback = await supabase
-                                .from("plan_contract")
-                                .select("*")
-                                .eq("member_id", newPayment.memberId)
-                                .eq("plan_id", value)
-                                .single();
-                              data = fallback.data;
+                              .eq("plan_id", value);
+
+                            if (!error) {
+                              resolvedContracts =
+                                (data as RawPlanContract[] | null) ?? null;
+                            } else {
+                              console.warn(
+                                "Error fetching plan contract on selection:",
+                                error,
+                              );
+                              const fallbackTable: ContractTableName =
+                                contractTable === "plan_contract"
+                                  ? "plan_contracts"
+                                  : "plan_contract";
+                              const { data: fallbackData, error: fallbackError } =
+                                await supabase
+                                  .from(fallbackTable)
+                                  .select("*")
+                                  .eq("member_id", newPayment.memberId)
+                                  .eq("plan_id", value);
+
+                              if (!fallbackError) {
+                                resolvedContracts =
+                                  (fallbackData as RawPlanContract[] | null) ?? null;
+                              } else {
+                                console.warn(
+                                  "Fallback plan contract query also failed:",
+                                  fallbackError,
+                                );
+                              }
                             }
-                            setPlanContract(data ?? null);
-                            if (data) {
+
+                            const matchedContract = pickRelevantPlanContract(
+                              resolvedContracts ?? undefined,
+                            );
+                            setPlanContract(matchedContract);
+
+                            if (matchedContract) {
                               setNewPayment((prev) => ({
                                 ...prev,
-                                installments: data.installments_total,
+                                installments: matchedContract.installments_total,
                                 nextInstallmentDue:
                                   prev.nextInstallmentDue ||
                                   selectedMember?.next_installment_due ||
