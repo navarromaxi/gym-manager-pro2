@@ -65,9 +65,12 @@ export function InactiveManagement({
 
   const filteredInactiveMembers = useMemo(() => {
     return inactiveMembers.filter((member) => {
+      const name = member.name?.toLowerCase() ?? "";
+      const email = member.email?.toLowerCase() ?? "";
+      const normalizedSearch = searchTerm.toLowerCase();
+
       const matchesSearch =
-        member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.email.toLowerCase().includes(searchTerm.toLowerCase());
+        name.includes(normalizedSearch) || email.includes(normalizedSearch);
 
       const matchesColor =
         colorFilter === "all" || member.inactive_level === colorFilter;
