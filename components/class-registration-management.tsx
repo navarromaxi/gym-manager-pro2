@@ -51,6 +51,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+const currencyFormatter = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+  maximumFractionDigits: 0,
+});
+
+const formatCurrency = (value?: number | null) => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return null;
+  }
+
+  return currencyFormatter.format(value);
+};
+
 interface ClassRegistrationManagementProps {
   gymId: string;
   sessions: ClassSession[];
@@ -65,6 +79,7 @@ interface ClassSessionFormState {
   date: string;
   start_time: string;
   capacity: number;
+  price: number;
   notes: string;
   accept_receipts: boolean;
 }
@@ -74,6 +89,7 @@ const INITIAL_FORM_STATE: ClassSessionFormState = {
   date: "",
   start_time: "",
   capacity: 20,
+  price: 0,
   notes: "",
   accept_receipts: false,
 };
@@ -104,9 +120,9 @@ export function ClassRegistrationManagement({
     null
   );
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [deletingRegistrationId, setDeletingRegistrationId] = useState<string | null>(
-    null
-  );
+  const [deletingRegistrationId, setDeletingRegistrationId] = useState<
+    string | null
+  >(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editFormState, setEditFormState] =
@@ -155,7 +171,7 @@ export function ClassRegistrationManagement({
       supabase
         .from("class_sessions")
         .select(
-          "id, gym_id, title, date, start_time, capacity, notes, created_at, accept_receipts"
+          "id, gym_id, title, date, start_time, capacity, price, notes, created_at, accept_receipts"
         )
         .eq("gym_id", gymId)
         .order("date", { ascending: true })
@@ -189,6 +205,18 @@ export function ClassRegistrationManagement({
           return {
             ...prev,
             capacity: Math.max(1, Math.floor(numericValue)),
+          };
+        }
+
+        if (field === "price") {
+          const numericValue =
+            typeof value === "number" ? value : Number(value);
+          const sanitized = Number.isFinite(numericValue)
+            ? Math.max(0, numericValue)
+            : 0;
+          return {
+            ...prev,
+            price: sanitized,
           };
         }
 
@@ -230,6 +258,10 @@ export function ClassRegistrationManagement({
       return "Selecciona un horario de inicio.";
     }
 
+    if (!Number.isFinite(state.price) || state.price < 0) {
+      return "Ingresa un precio válido (0 o mayor).";
+    }
+
     return null;
   };
 
@@ -249,6 +281,7 @@ export function ClassRegistrationManagement({
       date: session.date,
       start_time: session.start_time,
       capacity: session.capacity,
+      price: typeof session.price === "number" ? session.price : 0,
       notes: session.notes ?? "",
       accept_receipts: session.accept_receipts ?? false,
     });
@@ -286,6 +319,7 @@ export function ClassRegistrationManagement({
           date: formState.date,
           startTime: formState.start_time,
           capacity: formState.capacity,
+          price: formState.price,
           notes: formState.notes.trim() || null,
           acceptReceipts: formState.accept_receipts,
         }),
@@ -361,6 +395,7 @@ export function ClassRegistrationManagement({
           date: editFormState.date,
           startTime: editFormState.start_time,
           capacity: editFormState.capacity,
+          price: editFormState.price,
           notes: editFormState.notes.trim() || null,
           acceptReceipts: editFormState.accept_receipts,
         }),
@@ -374,7 +409,8 @@ export function ClassRegistrationManagement({
       if (!response.ok) {
         const error = payload && "error" in payload ? payload.error : undefined;
         throw new Error(
-          error || "No se pudo actualizar la clase. Intenta nuevamente más tarde."
+          error ||
+            "No se pudo actualizar la clase. Intenta nuevamente más tarde."
         );
       }
 
@@ -526,7 +562,6 @@ export function ClassRegistrationManagement({
     }
   };
 
-
   const handleDeleteRegistration = async (registrationId: string) => {
     if (!gymId) return;
 
@@ -553,9 +588,10 @@ export function ClassRegistrationManagement({
         }),
       });
 
-      const payload = (await response.json().catch(() => null)) as
-        | { success?: boolean; error?: string }
-        | null;
+      const payload = (await response.json().catch(() => null)) as {
+        success?: boolean;
+        error?: string;
+      } | null;
 
       if (!response.ok || payload?.error) {
         const message =
@@ -602,7 +638,9 @@ export function ClassRegistrationManagement({
           ? new Date(registration.created_at).toLocaleString()
           : "";
         const receiptCell = registration.receipt_url
-          ? `<a href="${escapeHtml(registration.receipt_url)}" target="_blank" rel="noopener noreferrer">Ver comprobante</a>`
+          ? `<a href="${escapeHtml(
+              registration.receipt_url
+            )}" target="_blank" rel="noopener noreferrer">Ver comprobante</a>`
           : "-";
 
         return `<tr>
@@ -768,6 +806,20 @@ export function ClassRegistrationManagement({
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="class-price">Precio del ticket</Label>
+              <Input
+                id="class-price"
+                type="number"
+                min={0}
+                step="0.01"
+                value={formState.price}
+                onChange={(event) =>
+                  handleChange("price", Number(event.target.value))
+                }
+              />
+            </div>
+
             <div className="md:col-span-2 space-y-2">
               <Label htmlFor="class-notes">Notas (opcional)</Label>
               <Textarea
@@ -864,12 +916,13 @@ export function ClassRegistrationManagement({
                     <TableRow>
                       <TableHead>Nombre</TableHead>
                       <TableHead>Cupo</TableHead>
+                      <TableHead>Precio</TableHead>
                       <TableHead>Fecha</TableHead>
                       <TableHead>Hora</TableHead>
                       <TableHead>Inscriptos</TableHead>
                       <TableHead>Notas para los socios</TableHead>
                       <TableHead>Comprobantes</TableHead>
-                      <TableHead className="w-[260px]">Acciones</TableHead>
+                      <TableHead className="w-[320px]">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -900,6 +953,9 @@ export function ClassRegistrationManagement({
                             </div>
                           </TableCell>
                           <TableCell>
+                            {formatCurrency(session.price) ?? "-"}
+                          </TableCell>
+                          <TableCell>
                             {new Date(
                               `${session.date}T00:00:00`
                             ).toLocaleDateString()}
@@ -913,7 +969,10 @@ export function ClassRegistrationManagement({
                           </TableCell>
                           <TableCell>
                             {session.accept_receipts ? (
-                              <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">
+                              <Badge
+                                variant="secondary"
+                                className="bg-emerald-100 text-emerald-800"
+                              >
                                 Solicita comprobante
                               </Badge>
                             ) : (
@@ -978,16 +1037,13 @@ export function ClassRegistrationManagement({
         )}
       </div>
 
-      <Dialog
-        open={isEditDialogOpen}
-        onOpenChange={handleEditDialogChange}
-      >
+      <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogChange}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Editar clase</DialogTitle>
             <DialogDescription>
-              Actualiza el nombre, la fecha, el horario, el cupo o las notas del
-              evento.
+              Actualiza el nombre, la fecha, el horario, el cupo, el precio o
+              las notas del evento.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleUpdateSession} className="space-y-4">
@@ -1040,6 +1096,20 @@ export function ClassRegistrationManagement({
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="edit-class-price">Precio del ticket</Label>
+                <Input
+                  id="edit-class-price"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={editFormState.price}
+                  onChange={(event) =>
+                    handleEditChange("price", Number(event.target.value))
+                  }
+                />
+              </div>
+              
               <div className="md:col-span-2 space-y-2">
                 <Label htmlFor="edit-class-notes">Notas (opcional)</Label>
                 <Textarea
@@ -1069,8 +1139,8 @@ export function ClassRegistrationManagement({
                   </Label>
                   <p className="text-sm text-muted-foreground">
                     Cuando está activo, los socios podrán adjuntar una imagen o
-                    PDF del pago al inscribirse. El comprobante quedará disponible
-                    en la lista de inscriptos.
+                    PDF del pago al inscribirse. El comprobante quedará
+                    disponible en la lista de inscriptos.
                   </p>
                 </div>
               </div>
@@ -1180,11 +1250,7 @@ export function ClassRegistrationManagement({
                         </TableCell>
                         <TableCell>
                           {registration.receipt_url ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              asChild
-                            >
+                            <Button variant="outline" size="sm" asChild>
                               <a
                                 href={registration.receipt_url}
                                 target="_blank"

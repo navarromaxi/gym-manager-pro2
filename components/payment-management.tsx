@@ -1710,11 +1710,13 @@ export function PaymentManagement({
         : undefined;
       const planFromName =
         !planFromId && payment.plan ? planNameMap.get(payment.plan) : undefined;
+      const memberPlanPrice =
+        typeof member?.plan_price === "number" ? member.plan_price : null;
       const effectivePlanPrice =
+        previousState.planPrice ??
+        memberPlanPrice ??
         planFromId?.price ??
         planFromName?.price ??
-        previousState.planPrice ??
-        member?.plan_price ??
         null;
 
       if (payment.start_date) {

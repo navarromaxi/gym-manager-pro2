@@ -429,7 +429,7 @@ export default function GymManagementSystem() {
         supabase
           .from("class_sessions")
           .select(
-            "id, gym_id, title, date, start_time, capacity, notes, created_at, accept_receipts"
+            "id, gym_id, title, date, start_time, capacity, price, notes, created_at, accept_receipts"
           )
           .eq("gym_id", gymId)
           .order("date", { ascending: true })
@@ -548,7 +548,7 @@ export default function GymManagementSystem() {
       supabase
         .from("class_sessions")
         .select(
-          "id, gym_id, title, date, start_time, capacity, notes, created_at, accept_receipts"
+          "id, gym_id, title, date, start_time, capacity, price, notes, created_at, accept_receipts"
         )
         .eq("gym_id", gymData.id)
         .order("date", { ascending: true })

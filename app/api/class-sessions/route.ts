@@ -10,6 +10,11 @@ const createSessionSchema = z.object({
   date: z.string().min(1, "La fecha es obligatoria"),
   startTime: z.string().min(1, "El horario es obligatorio"),
   capacity: z.number().int().positive("La capacidad debe ser mayor a 0"),
+  price: z
+    .number()
+    .min(0, "El precio no puede ser negativo")
+    .nullable()
+    .optional(),
   notes: z.string().nullable().optional(),
   acceptReceipts: z.boolean().optional().default(false),
 });
@@ -28,6 +33,11 @@ const updateSessionSchema = z.object({
   date: z.string().min(1, "La fecha es obligatoria"),
   startTime: z.string().min(1, "El horario es obligatorio"),
   capacity: z.number().int().positive("La capacidad debe ser mayor a 0"),
+  price: z
+    .number()
+    .min(0, "El precio no puede ser negativo")
+    .nullable()
+    .optional(),
   notes: z.string().nullable().optional(),
   acceptReceipts: z.boolean().optional(),
 });
@@ -41,6 +51,12 @@ export async function POST(request: Request) {
       date: body?.date,
       startTime: body?.startTime,
       capacity: Number(body?.capacity ?? 0),
+      price:
+        typeof body?.price === "number"
+          ? body.price
+          : typeof body?.price === "string" && body.price.trim().length > 0
+          ? Number(body.price)
+          : null,
       notes:
         typeof body?.notes === "string" && body.notes.trim().length > 0
           ? body.notes.trim()
@@ -75,11 +91,12 @@ export async function POST(request: Request) {
         date: parsed.data.date,
         start_time: parsed.data.startTime,
         capacity: parsed.data.capacity,
+        price: parsed.data.price ?? null,
         notes: parsed.data.notes ?? null,
         accept_receipts: parsed.data.acceptReceipts ?? false,
       })
       .select(
-        "id, gym_id, title, date, start_time, capacity, notes, created_at, accept_receipts"
+        "id, gym_id, title, date, start_time, capacity, price, notes, created_at, accept_receipts"
       )
       .single();
 
@@ -117,6 +134,12 @@ export async function PATCH(request: Request) {
       date: body?.date,
       startTime: body?.startTime,
       capacity: Number(body?.capacity ?? 0),
+      price:
+        typeof body?.price === "number"
+          ? body.price
+          : typeof body?.price === "string" && body.price.trim().length > 0
+          ? Number(body.price)
+          : null,
       notes:
         typeof body?.notes === "string" && body.notes.trim().length > 0
           ? body.notes.trim()
@@ -177,13 +200,14 @@ export async function PATCH(request: Request) {
         date: parsed.data.date,
         start_time: parsed.data.startTime,
         capacity: parsed.data.capacity,
+        price: parsed.data.price ?? null,
         notes: parsed.data.notes ?? null,
         accept_receipts: parsed.data.acceptReceipts ?? false,
       })
       .eq("id", parsed.data.sessionId)
       .eq("gym_id", parsed.data.gymId)
       .select(
-        "id, gym_id, title, date, start_time, capacity, notes, created_at, accept_receipts"
+        "id, gym_id, title, date, start_time, capacity, price, notes, created_at, accept_receipts"
       )
       .single();
 

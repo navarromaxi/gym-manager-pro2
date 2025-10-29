@@ -254,6 +254,7 @@ export interface ClassSession {
   date: string
   start_time: string
   capacity: number
+  price?: number | null
   notes?: string | null
   created_at?: string | null
   accept_receipts: boolean

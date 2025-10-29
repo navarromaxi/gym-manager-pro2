@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useParams, useSearchParams } from "next/navigation";
-import { Calendar, Clock, Users } from "lucide-react";
+import { Calendar, Clock, Ticket, Users } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import type { ClassRegistration, ClassSession } from "@/lib/supabase";
@@ -26,6 +26,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+const currencyFormatter = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+  maximumFractionDigits: 0,
+});
+
+const formatCurrency = (value?: number | null) => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return null;
+  }
+
+  return currencyFormatter.format(value);
+};
 
 interface RegistrationFormState {
   fullName: string;
@@ -142,7 +156,7 @@ function PublicClassRegistrationPageContent() {
             supabase
               .from("class_sessions")
               .select(
-                "id, gym_id, title, date, start_time, capacity, notes, created_at, accept_receipts"
+                 "id, gym_id, title, date, start_time, capacity, price, notes, created_at, accept_receipts"
               )
               .eq("gym_id", gymId ?? "")
               .order("date", { ascending: true })
@@ -530,11 +544,15 @@ function PublicClassRegistrationPageContent() {
                             session.capacity - count,
                             0
                           );
-                          const label = `${new Date(
+            const label = `${new Date(
                             `${session.date}T00:00:00`
                           ).toLocaleDateString()} • ${
                             session.start_time
-                          } hs • ${available} libres`;
+                          } hs • ${available} libres${
+                            formatCurrency(session.price)
+                              ? ` • ${formatCurrency(session.price)}`
+                              : ""
+                          }`;
                           return (
                             <SelectItem key={session.id} value={session.id}>
                               {session.title}
@@ -565,6 +583,12 @@ function PublicClassRegistrationPageContent() {
                           <Users className="h-4 w-4" />
                           {selectedSession.capacity} cupos
                         </span>
+                        {formatCurrency(selectedSession.price) && (
+                          <span className="flex items-center gap-2">
+                            <Ticket className="h-4 w-4" />
+                            {formatCurrency(selectedSession.price)}
+                          </span>
+                        )}
                         <Badge
                            variant={
                             hasSelectedSessionStarted || spotsLeft <= 0
