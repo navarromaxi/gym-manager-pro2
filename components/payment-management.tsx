@@ -3099,9 +3099,47 @@ export function PaymentManagement({
                     id="date"
                     type="date"
                     value={newPayment.date}
-                    onChange={(e) =>
-                      setNewPayment({ ...newPayment, date: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setNewPayment((previous) => {
+                        if (previous.type !== "new_plan") {
+                          return {
+                            ...previous,
+                            date: value,
+                          };
+                        }
+
+                        const shouldSyncStartDate =
+                          !previous.startDate ||
+                          previous.startDate === previous.date;
+
+                        if (!shouldSyncStartDate) {
+                          return {
+                            ...previous,
+                            date: value,
+                          };
+                        }
+
+                        const syncedStartDate = value;
+                        const relatedPlan =
+                          plans.find((plan) => plan.id === previous.planId) ??
+                          null;
+                        const computedNext = calculatePlanEndDate(
+                          syncedStartDate,
+                          relatedPlan
+                        );
+
+                        return {
+                          ...previous,
+                          date: value,
+                          startDate: syncedStartDate,
+                          nextInstallmentDue:
+                            previous.installments === 1
+                              ? computedNext
+                              : previous.nextInstallmentDue || computedNext,
+                        };
+                      });
+                    }}
                   />
                 </div>
 

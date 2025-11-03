@@ -1045,12 +1045,40 @@ export function MemberManagement({
                     id="paymentDate"
                     type="date"
                     value={newMember.paymentDate}
-                    onChange={(e) =>
-                      setNewMember({
-                        ...newMember,
-                        paymentDate: e.target.value,
-                      })
-                    }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setNewMember((previous) => {
+                        const shouldSyncPlanStart =
+                          !previous.planStartDate ||
+                          previous.planStartDate === previous.paymentDate;
+
+                        if (!shouldSyncPlanStart) {
+                          return {
+                            ...previous,
+                            paymentDate: value,
+                          };
+                        }
+
+                        const syncedPlanStartDate = value;
+                        const relatedPlan =
+                          plans.find((plan) => plan.name === previous.plan) ??
+                          null;
+                        const computedNext = calculatePlanEndDate(
+                          syncedPlanStartDate,
+                          relatedPlan
+                        );
+
+                        return {
+                          ...previous,
+                          paymentDate: value,
+                          planStartDate: syncedPlanStartDate,
+                          nextInstallmentDue:
+                            previous.installments === 1
+                              ? computedNext
+                              : previous.nextInstallmentDue || computedNext,
+                        };
+                      });
+                    }}
                   />
                 </div>
                 <div className="grid gap-2">
