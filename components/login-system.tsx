@@ -269,10 +269,10 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
               <p>
                 ¿Necesitás ayuda con el acceso? Escribinos a
                 <a
-                  href="mailto:manager2comercial@gmail.com"
+                  href="mailto:managerpro2comercial@gmail.com"
                   className="ml-1 font-semibold text-emerald-300 underline-offset-2 hover:underline"
                 >
-                  manager2comercial@gmail.com
+                  managerpro2comercial@gmail.com
                 </a>
                 .
               </p>
