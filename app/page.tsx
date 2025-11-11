@@ -236,6 +236,8 @@ const getRealStatus = (m: Member): "active" | "expired" | "inactive" => {
 };
 
 const DEFAULT_GYM_NAME = "Sistema de Gestión Multi-Gimnasio";
+const BRAND_LOGO_URL =
+  "https://tvrwpwmuqxhqgjtmjoip.supabase.co/storage/v1/object/public/logos/Manager%20Pro%20Logo.png";
 
 const sanitizeGymName = (name: string) => {
   const cleaned = name
@@ -281,6 +283,7 @@ export default function GymManagementSystem() {
   const displayGymName = gymData?.name
     ? sanitizeGymName(gymData.name)
     : DEFAULT_GYM_NAME;
+  const displayLogo = gymData?.logo_url ?? BRAND_LOGO_URL;
 
   const handleLogin = (data: {
     name: string;
@@ -1099,16 +1102,17 @@ export default function GymManagementSystem() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
-              {gymData?.logo_url && (
+              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-white">
                 <img
-                  src={gymData.logo_url}
-                  alt={`Logo de ${gymData.name}`}
-                  className="h-12 w-12 rounded-full object-cover"
+                  src={displayLogo}
+                  alt={`Logo de ${gymData?.name ?? "ManagerPro 2.0"}`}
+                  className="h-10 w-10 object-contain"
+                  draggable={false}
                 />
-              )}
+              </div>
               <div>
                 <h1 className="text-[1.75rem] font-bold leading-tight text-gray-900">
-                  {/* GymManagerPro 2.0 */}
+                  ManagerPro 2.0
                 </h1>
                 <p className="text-base text-gray-500">{displayGymName}</p>
               </div>
