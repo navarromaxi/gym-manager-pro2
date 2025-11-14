@@ -274,7 +274,6 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
                 >
                   managerpro2comercial@gmail.com
                 </a>
-                .
               </p>
             </div>
           </div>

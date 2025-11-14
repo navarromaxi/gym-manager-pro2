@@ -31,15 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Search,
-  CalendarClock,
-  X,
-  AlertTriangle,
-} from "lucide-react";
+import { Plus, Edit, Trash2, Search, CalendarClock, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
 import { detectContractTable } from "@/lib/contract-table";
@@ -221,8 +213,6 @@ export function MemberManagement({
   const [visibleCount, setVisibleCount] = useState(MEMBERS_PER_BATCH);
   const [dismissedCustomPlanAlertIds, setDismissedCustomPlanAlertIds] =
     useState<string[]>([]);
-    const [dismissedLongPlanMemberIds, setDismissedLongPlanMemberIds] =
-    useState<string[]>([]);
 
   const planById = useMemo(() => {
     const map = new Map<string, Plan>();
@@ -399,6 +389,10 @@ export function MemberManagement({
         return followUpMemberIds.has(member.id);
       }
 
+      if (statusFilter === "long_plan_follow_up") {
+        return longTermFollowUpMemberIds.has(member.id);
+      }
+
       if (statusFilter === "balance_due") {
         return (member.balance_due || 0) > 0;
       }
@@ -417,7 +411,13 @@ export function MemberManagement({
     }
 
     return filtered;
-  }, [sortedMembers, debouncedSearch, statusFilter, getExpiringCustomPlans]);
+  }, [
+    sortedMembers,
+    debouncedSearch,
+    statusFilter,
+    getExpiringCustomPlans,
+    longTermFollowUpMemberIds,
+  ]);
 
   useEffect(() => {
     setVisibleCount(MEMBERS_PER_BATCH);
@@ -908,19 +908,10 @@ export function MemberManagement({
     return alerts.sort((a, b) => b.daysSinceStart - a.daysSinceStart);
   }, [payments, members, planById, planByName]);
 
-  const visibleLongTermPlanFollowUps = useMemo(
-    () =>
-      longTermPlanFollowUps.filter(
-        (alert) => !dismissedLongPlanMemberIds.includes(alert.memberId)
-      ),
-    [longTermPlanFollowUps, dismissedLongPlanMemberIds]
+  const longTermFollowUpMemberIds = useMemo(
+    () => new Set(longTermPlanFollowUps.map((alert) => alert.memberId)),
+    [longTermPlanFollowUps]
   );
-
-  const handleDismissLongPlanAlert = useCallback((memberId: string) => {
-    setDismissedLongPlanMemberIds((prev) =>
-      prev.includes(memberId) ? prev : [...prev, memberId]
-    );
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -1374,6 +1365,9 @@ export function MemberManagement({
                 </SelectItem>
                 <SelectItem value="balance_due">Saldo pendiente</SelectItem>
                 <SelectItem value="follow_up">Seguimiento pendiente</SelectItem>
+                <SelectItem value="long_plan_follow_up">
+                  Seguimiento cuota semestral (120 días)
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1393,6 +1387,25 @@ export function MemberManagement({
               ⚠️ El socio "{member.name}" se le vence una cuota pronto.
             </div>
           ))}
+
+          {longTermPlanFollowUps.length > 0 && (
+            <div className="mt-2 flex items-start justify-between gap-3 rounded border-l-4 border-sky-500 bg-sky-100 p-3 text-sm text-sky-700">
+              <span>
+                {`⚠️ Tienes ${longTermPlanFollowUps.length} socio${
+                  longTermPlanFollowUps.length === 1 ? "" : "s"
+                } con cuota semestral que ya cumpl${
+                  longTermPlanFollowUps.length === 1 ? "ió" : "ieron"
+                } 120 días y necesitan seguimiento.`}
+              </span>
+              <Button
+                variant="ghost"
+                className="text-sky-700 hover:underline"
+                onClick={() => setStatusFilter("long_plan_follow_up")}
+              >
+                Ver socios para seguimiento
+              </Button>
+            </div>
+          )}
 
           {membersWithPartialOverdue.length > 0 && (
             <div className="mt-2 text-sm text-rose-700 bg-rose-100 border-l-4 border-rose-500 p-3 rounded flex items-center justify-between">
@@ -1790,34 +1803,6 @@ export function MemberManagement({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-       {visibleLongTermPlanFollowUps.length > 0 && (
-        <div className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2">
-          {visibleLongTermPlanFollowUps.map((alert) => (
-            <div
-              key={alert.memberId}
-              className="flex items-start gap-3 rounded-md border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800 shadow-lg"
-            >
-              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-sky-600" />
-              <div className="flex-1">
-                <p className="font-semibold">
-                  Debes contactar a {alert.memberName}
-                </p>
-                <p className="text-xs text-sky-700">
-                  Su plan {alert.planName} ya cumplió 120 días. Alerta de seguimiento.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleDismissLongPlanAlert(alert.memberId)}
-                className="ml-2 text-sky-600 transition hover:text-sky-800"
-                aria-label={`Descartar alerta de seguimiento para ${alert.memberName}`}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
