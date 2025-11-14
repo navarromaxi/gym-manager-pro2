@@ -493,7 +493,7 @@ export function MemberManagement({
       }
 
       if (statusFilter === "balance_due") {
-        return (member.balance_due || 0) > 0;
+        return hasOverduePartialInstallment(member);
       }
 
       if (statusFilter === "custom_expiring") {
@@ -866,6 +866,16 @@ export function MemberManagement({
   const getMembersWithBalanceDue = () =>
     members.filter((member) => (member.balance_due || 0) > 0);
 
+  const hasOverduePartialInstallment = (member: Member) => {
+    if ((member.balance_due ?? 0) <= 0) return false;
+    if (!member.next_installment_due) return false;
+    const dueDate = toLocalDate(member.next_installment_due);
+    if (Number.isNaN(dueDate.getTime())) return false;
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    return dueDate.getTime() <= todayMidnight.getTime();
+  };
+
   //Función para marcar como contactado
   const handleMarkAsFollowedUp = async (memberId: string) => {
     try {
@@ -904,12 +914,9 @@ export function MemberManagement({
     );
     return diffDays <= 10 && diffDays >= 0;
   });
-  const membersWithPartialOverdue = membersWithBalanceDue.filter((member) => {
-    if (!member.next_installment_due) return false;
-    const dueDate = toLocalDate(member.next_installment_due);
-    if (Number.isNaN(dueDate.getTime())) return false;
-    return dueDate.getTime() < todayMidnight.getTime();
-  });
+  const membersWithPartialOverdue = members.filter(
+    hasOverduePartialInstallment
+  );
   const expiringCustomPlansForAlert = getExpiringCustomPlans();
   const visibleExpiringCustomPlansForAlert = expiringCustomPlansForAlert.filter(
     (plan) => !dismissedCustomPlanAlertIds.includes(plan.id)
@@ -1373,7 +1380,9 @@ export function MemberManagement({
                 <SelectItem value="custom_expiring">
                   Personalizados por vencer (10 días)
                 </SelectItem>
-                <SelectItem value="balance_due">Saldo pendiente</SelectItem>
+                <SelectItem value="balance_due">
+                  Cuota parcial vencida
+                </SelectItem>
                 <SelectItem value="follow_up">Seguimiento pendiente</SelectItem>
                 <SelectItem value="long_plan_follow_up">
                   Seguimiento cuota semestral (120 días)
