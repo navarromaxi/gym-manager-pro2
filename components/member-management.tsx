@@ -866,7 +866,7 @@ export function MemberManagement({
   const getMembersWithBalanceDue = () =>
     members.filter((member) => (member.balance_due || 0) > 0);
 
-  const hasOverduePartialInstallment = (member: Member) => {
+  function hasOverduePartialInstallment(member: Member) {
     if ((member.balance_due ?? 0) <= 0) return false;
     if (!member.next_installment_due) return false;
     const dueDate = toLocalDate(member.next_installment_due);
@@ -874,7 +874,7 @@ export function MemberManagement({
     const todayMidnight = new Date();
     todayMidnight.setHours(0, 0, 0, 0);
     return dueDate.getTime() <= todayMidnight.getTime();
-  };
+  }
 
   //Función para marcar como contactado
   const handleMarkAsFollowedUp = async (memberId: string) => {
