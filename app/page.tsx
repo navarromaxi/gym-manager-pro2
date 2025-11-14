@@ -16,7 +16,6 @@ import {
   X,
 } from "lucide-react";
 
-import type { MemberManagementProps } from "@/components/member-management";
 import dynamic from "next/dynamic";
 
 const LoginSystem = dynamic(
