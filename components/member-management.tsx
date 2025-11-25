@@ -1418,7 +1418,7 @@ export function MemberManagement({
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle>Filtros</CardTitle>;
+          <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex gap-4">
