@@ -79,6 +79,15 @@ const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
 
 const MEMBERS_PER_BATCH = 10;
 
+type SortOption =
+  | "recent_activity_desc"
+  | "plan_end_asc"
+  | "plan_end_desc"
+  | "installment_due_asc"
+  | "installment_due_desc"
+  | "days_remaining_asc"
+  | "days_remaining_desc";
+
 const formatDateForAlert = (isoDate: string) => {
   if (!isoDate) return "";
   const date = toLocalDate(isoDate);
@@ -171,6 +180,9 @@ export function MemberManagement({
   }, [searchTerm]);
 
   const [statusFilter, setStatusFilter] = useState(initialFilter);
+  const [sortOption, setSortOption] = useState<SortOption>(
+    "recent_activity_desc"
+  );
   const [newMember, setNewMember] = useState({
     name: "",
     email: "",
@@ -315,19 +327,75 @@ export function MemberManagement({
   }, [customPlans, isLatestCustomPlan]);
 
   const sortedMembers = useMemo(() => {
-    const parseDate = (value?: string | null) => {
-      if (!value) return 0;
-      const direct = Date.parse(value);
-      if (!Number.isNaN(direct)) return direct;
-      return Date.parse(`${value}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const getDateValue = (value?: string | null) => {
+      if (!value) return null;
+      const parsed = toLocalDate(value);
+      const time = parsed.getTime();
+      return Number.isNaN(time) ? null : time;
+    };
+
+    const compareOptional = (
+      aValue: number | null,
+      bValue: number | null,
+      ascending: boolean
+    ) => {
+      if (aValue === null && bValue === null) return 0;
+      if (aValue === null) return 1;
+      if (bValue === null) return -1;
+      return ascending ? aValue - bValue : bValue - aValue;
+    };
+
+    const getDaysRemaining = (member: Member) => {
+      const time = getDateValue(member.next_payment);
+      if (time === null) return null;
+      return Math.ceil((time - today.getTime()) / 86400000);
     };
 
     return [...members].sort((a, b) => {
-      const aTime = Math.max(parseDate(a.last_payment), parseDate(a.join_date));
-      const bTime = Math.max(parseDate(b.last_payment), parseDate(b.join_date));
-      return bTime - aTime;
+      if (sortOption === "plan_end_asc" || sortOption === "plan_end_desc") {
+        return compareOptional(
+          getDateValue(a.next_payment),
+          getDateValue(b.next_payment),
+          sortOption === "plan_end_asc"
+        );
+      }
+
+      if (
+        sortOption === "installment_due_asc" ||
+        sortOption === "installment_due_desc"
+      ) {
+        return compareOptional(
+          getDateValue(a.next_installment_due ?? a.next_payment),
+          getDateValue(b.next_installment_due ?? b.next_payment),
+          sortOption === "installment_due_asc"
+        );
+      }
+
+      if (
+        sortOption === "days_remaining_asc" ||
+        sortOption === "days_remaining_desc"
+      ) {
+        return compareOptional(
+          getDaysRemaining(a),
+          getDaysRemaining(b),
+          sortOption === "days_remaining_asc"
+        );
+      }
+
+      const aTime = Math.max(
+        getDateValue(a.last_payment) ?? -Infinity,
+        getDateValue(a.join_date) ?? -Infinity
+      );
+      const bTime = Math.max(
+        getDateValue(b.last_payment) ?? -Infinity,
+        getDateValue(b.join_date) ?? -Infinity
+      );
+      return compareOptional(aTime, bTime, false);
     });
-  }, [members]);
+  }, [members, sortOption]);
 
   const getMembersToFollowUp = useCallback(() => {
     const today = new Date();
@@ -470,7 +538,8 @@ export function MemberManagement({
       const matchesSearch =
         !debouncedSearch ||
         name.includes(debouncedSearch) ||
-        email.includes(debouncedSearch);
+        email.includes(debouncedSearch) ||
+        (member.phone ?? "").toLowerCase().includes(debouncedSearch);
 
       if (!matchesSearch) return false;
 
@@ -516,11 +585,12 @@ export function MemberManagement({
     statusFilter,
     getExpiringCustomPlans,
     longTermFollowUpMemberIds,
+    followUpMemberIds,
   ]);
 
   useEffect(() => {
     setVisibleCount(MEMBERS_PER_BATCH);
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, sortOption, statusFilter]);
 
   const totalFiltered = filteredMembers.length;
   const currentVisibleCount = Math.min(visibleCount, totalFiltered);
@@ -1356,13 +1426,44 @@ export function MemberManagement({
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por nombre o email..."
+                  placeholder="Buscar por nombre, email o telefono..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8"
                 />
               </div>
             </div>
+            <Select
+              value={sortOption}
+              onValueChange={(value) => setSortOption(value as SortOption)}
+            >
+              <SelectTrigger className="w-[230px]">
+                <SelectValue placeholder="Ordenar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recent_activity_desc">
+                  Orden actual (mas recientes primero)
+                </SelectItem>
+                <SelectItem value="plan_end_asc">
+                  Fin del plan ascendente
+                </SelectItem>
+                <SelectItem value="plan_end_desc">
+                  Fin del plan descendente
+                </SelectItem>
+                <SelectItem value="installment_due_asc">
+                  Proxima cuota ascendente
+                </SelectItem>
+                <SelectItem value="installment_due_desc">
+                  Proxima cuota descendente
+                </SelectItem>
+                <SelectItem value="days_remaining_asc">
+                  Dias restantes ascendente
+                </SelectItem>
+                <SelectItem value="days_remaining_desc">
+                  Dias restantes descendente
+                </SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Estado" />
