@@ -147,7 +147,7 @@ const pickRelevantPlanContract = (
     (contract) => contract.installments_paid < contract.installments_total,
   );
 
-  return activeContract ?? orderedContracts[0] ?? null;
+  return activeContract ?? null;
 };
 
 interface InvoiceFormState {
@@ -2137,46 +2137,57 @@ export function PaymentManagement({
           return;
         }
 
+        const shouldTrackContract =
+          newPayment.installments > 1 && Boolean(contractTable);
         let currentContract = planContract;
-        const contractId =
-          planContract?.id || `${newPayment.memberId}_contract_${Date.now()}`;
 
-        const isFirstInstallment = !currentContract;
+        if (shouldTrackContract) {
+          const contractId =
+            planContract?.id || `${newPayment.memberId}_contract_${Date.now()}`;
 
-        if (isFirstInstallment && contractTable) {
-          const newContract: PlanContract = {
-            id: contractId,
-            gym_id: gymId,
-            member_id: newPayment.memberId,
-            plan_id: selectedPlan.id,
-            installments_total: newPayment.installments,
-            installments_paid: 1,
-          };
-          const { error: contractError } = await supabase
-            .from(contractTable)
-            .insert([newContract]);
-          if (contractError) {
-            console.warn("Error registrando contrato de plan:", contractError);
-          } else {
-            currentContract = newContract;
+          if (!currentContract && contractTable) {
+            const newContract: PlanContract = {
+              id: contractId,
+              gym_id: gymId,
+              member_id: newPayment.memberId,
+              plan_id: selectedPlan.id,
+              installments_total: newPayment.installments,
+              installments_paid: 1,
+            };
+            const { error: contractError } = await supabase
+              .from(contractTable)
+              .insert([newContract]);
+            if (contractError) {
+              console.warn("Error registrando contrato de plan:", contractError);
+            } else {
+              currentContract = newContract;
+              setPlanContract(currentContract);
+            }
+          } else if (currentContract && contractTable) {
+            const { error: contractError } = await supabase
+              .from(contractTable)
+              .update({
+                installments_paid: currentContract.installments_paid + 1,
+              })
+              .eq("id", currentContract.id);
+            if (contractError) {
+              console.warn(
+                "Error actualizando contrato de plan:",
+                contractError
+              );
+            }
+            currentContract = {
+              ...currentContract,
+              installments_paid: currentContract.installments_paid + 1,
+            };
             setPlanContract(currentContract);
           }
-        } else if (currentContract && contractTable) {
-          const { error: contractError } = await supabase
-            .from(contractTable)
-            .update({
-              installments_paid: currentContract.installments_paid + 1,
-            })
-            .eq("id", currentContract.id);
-          if (contractError) {
-            console.warn("Error actualizando contrato de plan:", contractError);
-          }
-          currentContract = {
-            ...currentContract,
-            installments_paid: currentContract.installments_paid + 1,
-          };
-          setPlanContract(currentContract);
+        } else {
+          currentContract = null;
+          setPlanContract(null);
         }
+
+        const isFirstInstallment = !currentContract;
 
         const planAmountValue =
           newPayment.planAmount ?? selectedPlan.price ?? 0;
