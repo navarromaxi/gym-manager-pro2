@@ -2768,7 +2768,11 @@ export function PaymentManagement({
                               nextInstallmentDue: computedNext,
                             };
                           });
-                          if (newPayment.memberId && contractTable) {
+                          if (
+                            newPayment.type === "existing_plan" &&
+                            newPayment.memberId &&
+                            contractTable
+                          ) {
                             let resolvedContracts: RawPlanContract[] | null = null;
 
                             const { data, error } = await supabase
