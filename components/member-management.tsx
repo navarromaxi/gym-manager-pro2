@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -229,6 +239,9 @@ export function MemberManagement({
     useState<string[]>([]);
   const [dismissedLongPlanMemberIds, setDismissedLongPlanMemberIds] =
     useState<string[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingDeleteMemberId, setPendingDeleteMemberId] =
+    useState<string | null>(null);
 
   const planById = useMemo(() => {
     const map = new Map<string, Plan>();
@@ -860,8 +873,6 @@ export function MemberManagement({
   };
 
   const handleDeleteMember = async (id: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este miembro?")) return;
-
     try {
       // Eliminar pagos relacionados
       const { error: paymentsError } = await supabase
@@ -886,6 +897,16 @@ export function MemberManagement({
       console.error("Error eliminando miembro:", error);
       alert("Error al eliminar el miembro. Inténtalo de nuevo.");
     }
+  };
+  const confirmDeleteMember = async () => {
+    if (!pendingDeleteMemberId) return;
+    const memberId = pendingDeleteMemberId;
+    setPendingDeleteMemberId(null);
+    setDeleteDialogOpen(false);
+
+    if (!confirm("Estas seguro de que quieres eliminar este miembro?")) return;
+
+    await handleDeleteMember(memberId);
   };
 
   const getStatusBadge = (
@@ -1659,6 +1680,30 @@ export function MemberManagement({
         )}
 
         <CardContent>
+          <AlertDialog
+            open={deleteDialogOpen}
+            onOpenChange={(open) => {
+              setDeleteDialogOpen(open);
+              if (!open) {
+                setPendingDeleteMemberId(null);
+              }
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar eliminacion</AlertDialogTitle>
+                <AlertDialogDescription className="text-red-600">
+                  Usted va a eliminar un socio y toda su informacion. Esta seguro que quiere hacerlo?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDeleteMember}>
+                  Aceptar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Table>
             <TableHeader>
               <TableRow>
@@ -1775,7 +1820,10 @@ export function MemberManagement({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDeleteMember(member.id)}
+                          onClick={() => {
+                            setPendingDeleteMemberId(member.id);
+                            setDeleteDialogOpen(true);
+                          }}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -1926,3 +1974,8 @@ export function MemberManagement({
     </div>
   );
 }
+
+
+
+
+

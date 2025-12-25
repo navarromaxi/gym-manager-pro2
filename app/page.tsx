@@ -58,7 +58,7 @@ const ExpenseManagement = dynamic<any>(
 
 const ReportsSection = dynamic<any>(
   () => import("@/components/reports-section").then((m) => m.ReportsSection),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="p-4 text-sm">Cargando reportes…</div> }
 );
 
 const InvoiceManagement = dynamic(
@@ -264,6 +264,8 @@ export default function GymManagementSystem() {
   const [classRegistrations, setClassRegistrations] = useState<
     ClassRegistration[]
   >([]);
+  const [hasLoadedInvoices, setHasLoadedInvoices] = useState(false);
+  const [hasLoadedClassData, setHasLoadedClassData] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [gymData, setGymData] = useState<{
@@ -337,6 +339,8 @@ export default function GymManagementSystem() {
     setClassSessions([]);
     setClassRegistrations([]);
     setInvoices([]);
+    setHasLoadedInvoices(false);
+    setHasLoadedClassData(false);
   };
 
   // CARGAR DATOS DESDE SUPABASE
@@ -353,15 +357,12 @@ export default function GymManagementSystem() {
       const [
         { data: membersData, error: membersError },
         { data: paymentsData, error: paymentsError },
-        { data: invoicesData, error: invoicesError },
         { data: expensesData, error: expensesError },
         { data: prospectsData, error: prospectsError, count: prospectsCount },
         { data: plansData, error: plansError },
         { data: activitiesData, error: activitiesError },
         { data: customPlansData, error: customPlansError },
         { data: oneTimePaymentsData, error: oneTimePaymentsError },
-        { data: classSessionsData, error: classSessionsError },
-        { data: classRegistrationsData, error: classRegistrationsError },
       ] = await Promise.all([
         supabase
           .from("members")
@@ -426,21 +427,6 @@ export default function GymManagementSystem() {
           .select(
             "id, gym_id, full_name, phone, source, amount, description, visit_date, estimated_payment_date, payment_method, created_at"
           )
-          .eq("gym_id", gymId)
-          .order("visit_date", { ascending: false }),
-        supabase
-          .from("class_sessions")
-          .select(
-            "id, gym_id, title, date, start_time, capacity, price, notes, created_at, accept_receipts"
-          )
-          .eq("gym_id", gymId)
-          .order("date", { ascending: true })
-          .order("start_time", { ascending: true }),
-        supabase
-          .from("class_registrations")
-          .select(
-            "id, session_id, gym_id, full_name, email, phone, created_at, receipt_url, receipt_storage_path"
-          )
           .eq("gym_id", gymId),
       ]);
 
@@ -454,10 +440,6 @@ export default function GymManagementSystem() {
 
       if (expensesError) {
         console.error("Error cargando gastos:", expensesError);
-      }
-
-      if (invoicesError) {
-        console.error("Error cargando facturas:", invoicesError);
       }
 
       if (prospectsError) {
@@ -483,28 +465,16 @@ export default function GymManagementSystem() {
         console.error("Error cargando pagos únicos:", oneTimePaymentsError);
       }
 
-      if (classSessionsError) {
-        console.error("Error cargando clases registradas:", classSessionsError);
-      }
-
-      if (classRegistrationsError) {
-        console.error(
-          "Error cargando inscripciones a clases:",
-          classRegistrationsError
-        );
-      }
-
-      setMembers(membersData || []);
+      setMembers((membersData ?? []) as Member[]);
       const normalizedPayments = normalizeCustomPlanPayments(
         (paymentsData ?? []) as Payment[]
       );
-       const mergedPayments = mergePaymentsWithDueOneTime(
+      const mergedPayments = mergePaymentsWithDueOneTime(
         normalizedPayments,
-        oneTimePaymentsData || []
+        (oneTimePaymentsData ?? []) as OneTimePayment[]
       );
       setPayments(mergedPayments);
-      setInvoices((invoicesData ?? []) as Invoice[]);
-      setExpenses(expensesData || []);
+      setExpenses((expensesData ?? []) as Expense[]);
       const normalizedProspects = (prospectsData ?? []).map(
         (prospect: any) => ({
           ...prospect,
@@ -518,13 +488,10 @@ export default function GymManagementSystem() {
           ? prospectsCount
           : normalizedProspects.length
       );
-      setPlans(plansData || []);
-      setActivities(activitiesData || []);
-      setCustomPlans(customPlansData || []);
-      setOneTimePayments(oneTimePaymentsData || []);
-      setClassSessions(classSessionsData || []);
-      setClassRegistrations(classRegistrationsData || []);
-
+      setPlans((plansData ?? []) as Plan[]);
+      setActivities((activitiesData ?? []) as Activity[]);
+      setCustomPlans((customPlansData ?? []) as CustomPlan[]);
+      setOneTimePayments((oneTimePaymentsData ?? []) as OneTimePayment[]);
       console.log("Datos cargados:", {
         members: membersData?.length || 0,
         payments: paymentsData?.length || 0,
@@ -532,15 +499,31 @@ export default function GymManagementSystem() {
         activities: activitiesData?.length || 0,
         customPlans: customPlansData?.length || 0,
         oneTimePayments: oneTimePaymentsData?.length || 0,
-        invoices: invoicesData?.length || 0,
-        classSessions: classSessionsData?.length || 0,
-        classRegistrations: classRegistrationsData?.length || 0,
       });
     } catch (error) {
       console.error("Error cargando datos:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadInvoices = async (gymId: string) => {
+    const { data, error } = await supabase
+      .from("invoices")
+      .select(
+        "id, gym_id, payment_id, member_id, member_name, total, currency, status, invoice_number, invoice_series, external_invoice_id, environment, typecfe, issued_at, due_date, request_payload, response_payload, created_at, updated_at"
+      )
+      .eq("gym_id", gymId)
+      .order("issued_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false, nullsFirst: false });
+
+    if (error) {
+      console.error("Error cargando facturas:", error);
+      return;
+    }
+
+    setInvoices((data ?? []) as Invoice[]);
+    setHasLoadedInvoices(true);
   };
 
   const reloadClassData = async () => {
@@ -570,6 +553,7 @@ export default function GymManagementSystem() {
     setClassRegistrations(
       (registrationsResponse.data ?? []) as ClassRegistration[]
     );
+    setHasLoadedClassData(true);
   };
 
 
@@ -645,6 +629,20 @@ export default function GymManagementSystem() {
       loadData(gymData.id);
     }
   }, [gymData?.id]);
+
+  useEffect(() => {
+    if (!gymData?.id) return;
+
+    if (activeTab === "invoices" && !hasLoadedInvoices) {
+      loadInvoices(gymData.id);
+    }
+
+    if (activeTab === "class_registrations" && !hasLoadedClassData) {
+      reloadClassData().catch((error) =>
+        console.error("Error cargando clases/inscripciones:", error)
+      );
+    }
+  }, [activeTab, gymData?.id, hasLoadedInvoices, hasLoadedClassData]);
 
   useEffect(() => {
     setPayments((currentPayments) =>
