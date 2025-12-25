@@ -492,10 +492,10 @@ export function PlanManagement({
                     {plan.description}
                   </TableCell>
                   <TableCell className="font-bold text-green-600">
-                    ${plan.price.toLocaleString()}
+                    ${Number(plan.price ?? 0).toLocaleString()}
                   </TableCell>
                   <TableCell>
-                    {getDurationText(plan.duration, plan.duration_type)} // ✅
+                    {getDurationText(Number(plan.duration ?? 0), plan.duration_type)} // ✅
                     nombre correcto
                   </TableCell>
                   <TableCell>
