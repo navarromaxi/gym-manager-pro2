@@ -830,7 +830,7 @@ export function PaymentManagement({
     startDate: "",
   });
   const [searchTerm, setSearchTerm] = useState("");
-  const [periodFilter, setPeriodFilter] = useState("previous_month");
+  const [periodFilter, setPeriodFilter] = useState("all");
   const [memberSearchTerm, setMemberSearchTerm] = useState("");
   const [newPayment, setNewPayment] = useState({
     memberId: "",
