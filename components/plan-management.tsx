@@ -132,11 +132,12 @@ export function PlanManagement({
   }, [gymId]);
 
   // 🔍 FILTRADO
-  const filteredPlans = plans.filter(
-    (plan) =>
-      plan.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      plan.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const searchLower = searchTerm.toLowerCase();
+  const filteredPlans = plans.filter((plan) => {
+    const name = (plan.name ?? "").toLowerCase();
+    const description = (plan.description ?? "").toLowerCase();
+    return name.includes(searchLower) || description.includes(searchLower);
+  });
 
   // ✅ CARGAR PLANES DESDE SUPABASE
   useEffect(() => {
@@ -489,7 +490,7 @@ export function PlanManagement({
                 <TableRow key={plan.id}>
                   <TableCell className="font-medium">{plan.name}</TableCell>
                   <TableCell className="max-w-xs truncate">
-                    {plan.description}
+                    {plan.description ?? ""}
                   </TableCell>
                   <TableCell className="font-bold text-green-600">
                     ${Number(plan.price ?? 0).toLocaleString()}
@@ -500,7 +501,7 @@ export function PlanManagement({
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {plan.activities.slice(0, 2).map((activity) => (
+                      {(plan.activities ?? []).slice(0, 2).map((activity) => (
                         <Badge
                           key={activity}
                           variant="outline"
@@ -509,9 +510,9 @@ export function PlanManagement({
                           {activity}
                         </Badge>
                       ))}
-                      {plan.activities.length > 2 && (
+                      {(plan.activities ?? []).length > 2 && (
                         <Badge variant="outline" className="text-xs">
-                          +{plan.activities.length - 2}
+                          +{(plan.activities ?? []).length - 2}
                         </Badge>
                       )}
                     </div>

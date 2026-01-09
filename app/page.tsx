@@ -225,6 +225,19 @@ const mergePaymentsWithDueOneTime = (
   return normalizeCustomPlanPayments([...basePayments, ...syntheticPayments]);
 };
 
+const normalizePlan = (plan: any): Plan => ({
+  ...plan,
+  price:
+    typeof plan?.price === "string" ? parseFloat(plan.price) : plan?.price ?? 0,
+  duration:
+    typeof plan?.duration === "string"
+      ? Number.parseInt(plan.duration, 10)
+      : plan?.duration ?? 0,
+  activities: Array.isArray(plan?.activities) ? plan.activities : [],
+  description: plan?.description ?? "",
+  is_active: plan?.is_active ?? true,
+});
+
 const getRealStatus = (m: Member): "active" | "expired" | "inactive" => {
   const today = new Date();
   const next = toLocalDate(m.next_payment);
@@ -379,14 +392,6 @@ export default function GymManagementSystem() {
           )
           .eq("gym_id", gymId)
           .order("date", { ascending: false }),
-          supabase
-          .from("invoices")
-          .select(
-            "id, gym_id, payment_id, member_id, member_name, total, currency, status, invoice_number, invoice_series, external_invoice_id, environment, typecfe, issued_at, due_date, request_payload, response_payload, created_at, updated_at"
-          )
-          .eq("gym_id", gymId)
-          .order("issued_at", { ascending: false, nullsFirst: false })
-          .order("created_at", { ascending: false, nullsFirst: false }),
         supabase
           .from("expenses")
           .select(
@@ -488,7 +493,7 @@ export default function GymManagementSystem() {
           ? prospectsCount
           : normalizedProspects.length
       );
-      setPlans((plansData ?? []) as Plan[]);
+      setPlans((plansData ?? []).map(normalizePlan));
       setActivities((activitiesData ?? []) as Activity[]);
       setCustomPlans((customPlansData ?? []) as CustomPlan[]);
       setOneTimePayments((oneTimePaymentsData ?? []) as OneTimePayment[]);
