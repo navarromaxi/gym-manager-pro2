@@ -1204,13 +1204,13 @@ export function MemberManagement({
                       <SelectValue placeholder="Selecciona un plan" />
                     </SelectTrigger>
                     <SelectContent>
-                      {plans
-                        .filter((plan) => plan.is_active)
-                        .map((plan) => (
-                          <SelectItem key={plan.id} value={plan.name}>
-                            {plan.name} - ${plan.price}
-                          </SelectItem>
-                        ))}
+                    {plans
+                      .filter((plan) => plan.is_active !== false)
+                      .map((plan) => (
+                        <SelectItem key={plan.id} value={plan.name}>
+                          {plan.name} - ${plan.price}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

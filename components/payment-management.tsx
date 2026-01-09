@@ -2839,7 +2839,7 @@ export function PaymentManagement({
                         </SelectTrigger>
                         <SelectContent>
                           {plans
-                            .filter((plan) => plan.is_active)
+                            .filter((plan) => plan.is_active !== false)
                             .map((plan) => (
                               <SelectItem key={plan.id} value={plan.id}>
                                 {plan.name} - ${plan.price.toLocaleString()}

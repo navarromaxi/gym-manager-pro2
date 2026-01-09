@@ -729,7 +729,7 @@ export function MemberManagement({
                   </SelectTrigger>
                   <SelectContent>
                     {plans
-                      .filter((plan) => plan.is_active)
+                      .filter((plan) => plan.is_active !== false)
                       .map((plan) => (
                         <SelectItem key={plan.id} value={plan.name}>
                           {plan.name} - ${plan.price}
