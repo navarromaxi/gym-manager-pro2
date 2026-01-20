@@ -97,6 +97,7 @@ export interface Member {
   name: string
   email: string
   phone: string
+  cedula?: string | null
   referral_source?: string | null
   join_date: string
   plan: string

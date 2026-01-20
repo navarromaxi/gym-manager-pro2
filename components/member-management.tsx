@@ -1,4 +1,4 @@
-﻿"use client";
+﻿﻿"use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -198,6 +198,7 @@ export function MemberManagement({
     email: "",
     referralSource: "",
     phone: "",
+    cedula: "",
     plan: "",
     planPrice: 0,
     planStartDate: new Date().toISOString().split("T")[0],
@@ -626,14 +627,18 @@ export function MemberManagement({
         alert("Debes seleccionar un plan");
         return;
       }
-      if (newMember.planPrice <= 0) {
+      if (newMember.planPrice < 0) {
         alert("Debes ingresar un precio válido");
         return;
       }
       const installments = newMember.installments || 1;
       const paymentAmount =
-        installments === 1 ? newMember.planPrice : newMember.paymentAmount;
-      if (paymentAmount <= 0) {
+        newMember.planPrice === 0
+          ? 0
+          : installments === 1
+          ? newMember.planPrice
+          : newMember.paymentAmount;
+      if (newMember.planPrice > 0 && paymentAmount <= 0) {
         alert("Debes ingresar un monto válido");
         return;
       }
@@ -689,6 +694,7 @@ export function MemberManagement({
         name: newMember.name,
         email: newMember.email,
         phone: newMember.phone,
+        cedula: newMember.cedula?.trim() || null,
         referral_source: newMember.referralSource || null,
         plan: newMember.plan,
         plan_price: newMember.planPrice,
@@ -711,19 +717,17 @@ export function MemberManagement({
 
       if (memberError) throw memberError;
 
-      // Crear contrato de plan
-      const contractId = `${memberId}_contract_${Date.now()}`;
-
-      // Intentar insertar en la tabla plural y si no existe usar la singular
-      const contract = {
-        id: contractId,
-        gym_id: gymId,
-        member_id: memberId,
-        plan_id: selectedPlan?.id || "",
-        installments_total: installments,
-        installments_paid: 1,
-      };
-      if (contractTable) {
+      // Crear contrato de plan solo cuando hay cuotas
+      if (contractTable && installments > 1 && selectedPlan?.id) {
+        const contractId = `${memberId}_contract_${Date.now()}`;
+        const contract = {
+          id: contractId,
+          gym_id: gymId,
+          member_id: memberId,
+          plan_id: selectedPlan.id,
+          installments_total: installments,
+          installments_paid: 1,
+        };
         const { error: contractError } = await supabase
           .from(contractTable)
           .insert([contract]);
@@ -771,6 +775,7 @@ export function MemberManagement({
         email: "",
         referralSource: "",
         phone: "",
+        cedula: "",
         plan: "",
         planPrice: 0,
         planStartDate: new Date().toISOString().split("T")[0],
@@ -815,6 +820,7 @@ export function MemberManagement({
           name: editingMember.name,
           email: editingMember.email,
           phone: editingMember.phone,
+          cedula: editingMember.cedula ?? null,
           //description: editingMember.description || null,
           next_payment: editingMember.next_payment,
           next_installment_due:
@@ -1107,6 +1113,17 @@ export function MemberManagement({
                       setNewMember({ ...newMember, phone: e.target.value })
                     }
                     placeholder="099123456"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="cedula">Cedula</Label>
+                  <Input
+                    id="cedula"
+                    value={newMember.cedula}
+                    onChange={(e) =>
+                      setNewMember({ ...newMember, cedula: e.target.value })
+                    }
+                    placeholder="Ej: 12345678"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -1868,7 +1885,7 @@ export function MemberManagement({
                   <Label htmlFor="edit-name">Nombre completo</Label>
                   <Input
                     id="edit-name"
-                    value={editingMember.name}
+                    value={editingMember.name ?? ""}
                     onChange={(e) =>
                       setEditingMember({
                         ...editingMember,
@@ -1882,7 +1899,7 @@ export function MemberManagement({
                   <Input
                     id="edit-email"
                     type="email"
-                    value={editingMember.email}
+                    value={editingMember.email ?? ""}
                     onChange={(e) =>
                       setEditingMember({
                         ...editingMember,
@@ -1895,7 +1912,7 @@ export function MemberManagement({
                   <Label htmlFor="edit-phone">Teléfono</Label>
                   <Input
                     id="edit-phone"
-                    value={editingMember.phone}
+                    value={editingMember.phone ?? ""}
                     onChange={(e) =>
                       setEditingMember({
                         ...editingMember,
@@ -1905,11 +1922,24 @@ export function MemberManagement({
                   />
                 </div>
                 <div className="grid gap-2">
+                  <Label htmlFor="edit-cedula">Cedula</Label>
+                  <Input
+                    id="edit-cedula"
+                    value={editingMember.cedula ?? ""}
+                    onChange={(e) =>
+                      setEditingMember({
+                        ...editingMember,
+                        cedula: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
                   <Label htmlFor="edit-next-payment">Fin del plan</Label>
                   <Input
                     id="edit-next-payment"
                     type="date"
-                    value={editingMember.next_payment}
+                    value={editingMember.next_payment ?? ""}
                     onChange={(e) =>
                       setEditingMember({
                         ...editingMember,
@@ -1974,8 +2004,3 @@ export function MemberManagement({
     </div>
   );
 }
-
-
-
-
-

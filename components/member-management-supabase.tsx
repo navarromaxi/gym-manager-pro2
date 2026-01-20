@@ -78,6 +78,7 @@ export function MemberManagement({
     name: "",
     email: "",
     phone: "",
+    cedula: "",
     plan: "",
     planPrice: 0,
     planStartDate: new Date().toISOString().split("T")[0],
@@ -350,6 +351,7 @@ export function MemberManagement({
         name: newMember.name,
         email: newMember.email,
         phone: newMember.phone,
+        cedula: newMember.cedula?.trim() || null,
         plan: newMember.plan,
         plan_price: newMember.planPrice,
         join_date: newMember.paymentDate,
@@ -418,6 +420,7 @@ export function MemberManagement({
         name: "",
         email: "",
         phone: "",
+        cedula: "",
         plan: "",
         planPrice: 0,
         planStartDate: new Date().toISOString().split("T")[0],
@@ -459,6 +462,7 @@ export function MemberManagement({
           name: editingMember.name,
           email: editingMember.email,
           phone: editingMember.phone,
+          cedula: editingMember.cedula ?? null,
           next_payment: editingMember.next_payment,
           description: editingMember.description ?? null,
           status: newStatus,
@@ -680,6 +684,17 @@ export function MemberManagement({
                     setNewMember({ ...newMember, phone: e.target.value })
                   }
                   placeholder="099123456"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="cedula">CAdula</Label>
+                <Input
+                  id="cedula"
+                  value={newMember.cedula}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, cedula: e.target.value })
+                  }
+                  placeholder="Ej: 12345678"
                 />
               </div>
               <div className="grid gap-2">
@@ -1148,7 +1163,7 @@ export function MemberManagement({
                   <Input
                     id="edit-email"
                     type="email"
-                    value={editingMember.email}
+                    value={editingMember.email ?? ""}
                     onChange={(e) =>
                       setEditingMember({
                         ...editingMember,
@@ -1161,7 +1176,7 @@ export function MemberManagement({
                   <Label htmlFor="edit-phone">Teléfono</Label>
                   <Input
                     id="edit-phone"
-                    value={editingMember.phone}
+                    value={editingMember.phone ?? ""}
                     onChange={(e) =>
                       setEditingMember({
                         ...editingMember,
@@ -1171,11 +1186,24 @@ export function MemberManagement({
                   />
                 </div>
                 <div className="grid gap-2">
+                  <Label htmlFor="edit-cedula">CAdula</Label>
+                  <Input
+                    id="edit-cedula"
+                    value={editingMember.cedula ?? ""}
+                    onChange={(e) =>
+                      setEditingMember({
+                        ...editingMember,
+                        cedula: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
                   <Label htmlFor="edit-next-payment">Fin del plan</Label>
                   <Input
                     id="edit-next-payment"
                     type="date"
-                    value={editingMember.next_payment}
+                    value={editingMember.next_payment ?? ""}
                     onChange={(e) =>
                       setEditingMember({
                         ...editingMember,

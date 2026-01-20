@@ -380,7 +380,7 @@ export default function GymManagementSystem() {
         supabase
           .from("members")
           .select(
-            "id, gym_id, name, email, phone, referral_source, join_date, plan, plan_price, last_payment, next_payment, next_installment_due, status, inactive_level, inactive_comment, followed_up, balance_due"
+            "id, gym_id, name, email, phone, cedula, referral_source, join_date, plan, plan_price, last_payment, next_payment, next_installment_due, status, inactive_level, inactive_comment, followed_up, balance_due"
           )
           .eq("gym_id", gymId)
           .order("balance_due", { ascending: false })
