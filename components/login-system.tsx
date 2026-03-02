@@ -28,6 +28,36 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const getAuthErrorMessage = (error: { message?: string; code?: string } | null) => {
+    if (!error) return "No se pudo iniciar sesiÛn.";
+
+    const normalizedMessage = error.message?.toLowerCase() ?? "";
+    const normalizedCode = error.code?.toLowerCase() ?? "";
+
+    if (
+      normalizedCode.includes("invalid_credentials") ||
+      normalizedMessage.includes("invalid login credentials")
+    ) {
+      return "Usuario o contraseÒa incorrectos.";
+    }
+
+    if (
+      normalizedCode.includes("email_provider_disabled") ||
+      normalizedMessage.includes("email logins are disabled")
+    ) {
+      return "El acceso por email y contraseÒa est· deshabilitado en Supabase.";
+    }
+
+    if (
+      normalizedCode.includes("email_not_confirmed") ||
+      normalizedMessage.includes("email not confirmed")
+    ) {
+      return "El usuario existe, pero su email todavÌa no fue confirmado.";
+    }
+
+    return error.message ?? "No se pudo iniciar sesiÛn.";
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -40,7 +70,7 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
         password,
       });
       if (error || !data?.user) {
-        throw new Error("Usuario o contrase√±a incorrectos.");
+        throw new Error(getAuthErrorMessage(error));
       }
       const user = data.user;
 
@@ -282,3 +312,4 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
     </div>
   );
 }
+
