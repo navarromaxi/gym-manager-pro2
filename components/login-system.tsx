@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import type React from "react";
 import {
@@ -11,7 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Building2, Clock, Lock, ShieldCheck, TrendingUp, User } from "lucide-react";
+import {
+  Building2,
+  Clock,
+  Lock,
+  ShieldCheck,
+  TrendingUp,
+  User,
+} from "lucide-react";
 
 interface LoginSystemProps {
   onLogin: (gymData: {
@@ -29,7 +36,7 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const getAuthErrorMessage = (error: { message?: string; code?: string } | null) => {
-    if (!error) return "No se pudo iniciar sesión.";
+    if (!error) return "No se pudo iniciar sesion.";
 
     const normalizedMessage = error.message?.toLowerCase() ?? "";
     const normalizedCode = error.code?.toLowerCase() ?? "";
@@ -38,24 +45,24 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
       normalizedCode.includes("invalid_credentials") ||
       normalizedMessage.includes("invalid login credentials")
     ) {
-      return "Usuario o contraseña incorrectos.";
+      return "Usuario o contrasena incorrectos.";
     }
 
     if (
       normalizedCode.includes("email_provider_disabled") ||
       normalizedMessage.includes("email logins are disabled")
     ) {
-      return "El acceso por email y contraseña está deshabilitado en Supabase.";
+      return "El acceso por email y contrasena esta deshabilitado en Supabase.";
     }
 
     if (
       normalizedCode.includes("email_not_confirmed") ||
       normalizedMessage.includes("email not confirmed")
     ) {
-      return "El usuario existe, pero su email todavía no fue confirmado.";
+      return "El usuario existe, pero su email todavia no fue confirmado.";
     }
 
-    return error.message ?? "No se pudo iniciar sesión.";
+    return error.message ?? "No se pudo iniciar sesion.";
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -64,14 +71,16 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
     setError("");
 
     try {
-      // 1) AutenticaciÃ³n con Supabase Auth
+      // 1) Autenticacion con Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+
       if (error || !data?.user) {
         throw new Error(getAuthErrorMessage(error));
       }
+
       const user = data.user;
 
       // 2) Traer el gimnasio vinculado al usuario logueado
@@ -84,12 +93,12 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
         .single();
 
       if (gymErr || !gym) {
-        throw new Error("No se encontrÃ³ el gimnasio vinculado a este usuario.");
+        throw new Error("No se encontro el gimnasio vinculado a este usuario.");
       }
 
-      // 3) Validar suscripciÃ³n (tu lÃ³gica actual)
+      // 3) Validar suscripcion
       if (gym.subscription !== "active" && gym.subscription !== "trial") {
-        throw new Error("Tu suscripciÃ³n ha expirado.");
+        throw new Error("Tu suscripcion ha expirado.");
       }
 
       const invoiceConfig: GymInvoiceConfig = mapGymInvoiceConfig(gym as any);
@@ -102,29 +111,30 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
       if (updateError) {
         const { error: sessionError } = await supabase.auth.refreshSession();
         if (sessionError) {
-          throw new Error("No se pudo refrescar la sesiÃ³n.");
+          throw new Error("No se pudo refrescar la sesion.");
         }
+
         ({ error: updateError } = await supabase.auth.updateUser({
           data: { gym_id: gym.id },
         }));
+
         if (updateError) {
-          throw new Error(
-            "No se pudo asociar el gimnasio al usuario."
-          );
+          throw new Error("No se pudo asociar el gimnasio al usuario.");
         }
       }
 
-      // 5) Refrescar sesiÃ³n para obtener un JWT con gym_id
+      // 5) Refrescar sesion para obtener un JWT con gym_id
       const { data: refreshData, error: refreshError } =
         await supabase.auth.refreshSession();
+
       if (refreshError) {
-        throw new Error("No se pudo actualizar la sesiÃ³n.");
-      }if (refreshData.session) {
+        throw new Error("No se pudo actualizar la sesion.");
+      }
+
+      if (refreshData.session) {
         await supabase.auth.setSession(refreshData.session);
       }
 
-      // 6) Continuar: usar el id de gym (text) para filtrar en toda la app
-      
       onLogin({
         name: gym.name,
         id: gym.id,
@@ -132,7 +142,7 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
         invoiceConfig,
       });
     } catch (err: any) {
-      setError(err.message ?? "Error al iniciar sesiÃ³n.");
+      setError(err.message ?? "Error al iniciar sesion.");
     } finally {
       setIsLoading(false);
     }
@@ -169,13 +179,15 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
                   Plataforma integral para gimnasios visionarios
                 </p>
                 <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl">
-                  CentralizÃ¡ todas tus sedes en un Ãºnico panel inteligente.
+                  Centraliza todas tus sedes en un unico panel inteligente.
                 </h1>
               </div>
             </div>
 
             <p className="max-w-lg text-sm text-slate-300 sm:text-base">
-              DiseÃ±amos una experiencia de acceso exclusiva para cada franquicia. CoordinÃ¡ cobros, socios, campaÃ±as y facturaciÃ³n en segundos con un tablero pensado para equipos en constante movimiento.
+              Disenamos una experiencia de acceso exclusiva para cada franquicia.
+              Coordina cobros, socios, campanas y facturacion en segundos con un
+              tablero pensado para equipos en constante movimiento.
             </p>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -185,7 +197,8 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
                 </div>
                 <h3 className="text-lg font-semibold text-white">Acceso seguro</h3>
                 <p className="mt-2 text-sm text-slate-300">
-                  AutenticaciÃ³n multi-gym con auditorÃ­as y renovaciones automÃ¡ticas de sesiÃ³n.
+                  Autenticacion multi-gym con auditorias y renovaciones automaticas
+                  de sesion.
                 </p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
@@ -194,16 +207,17 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
                 </div>
                 <h3 className="text-lg font-semibold text-white">Datos en vivo</h3>
                 <p className="mt-2 text-sm text-slate-300">
-                  EstadÃ­sticas consolidadas de membresÃ­as, facturaciÃ³n y retenciÃ³n en tiempo real.
+                  Estadisticas consolidadas de membresias, facturacion y retencion
+                  en tiempo real.
                 </p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
                 <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500/15 text-cyan-300">
                   <Clock className="h-5 w-5" />
                 </div>
-                <h3 className="text-lg font-semibold text-white">OperaciÃ³n Ã¡gil</h3>
+                <h3 className="text-lg font-semibold text-white">Operacion agil</h3>
                 <p className="mt-2 text-sm text-slate-300">
-                  AutomatizÃ¡ recordatorios, vencimientos y cobranzas en toda tu red.
+                  Automatiza recordatorios, vencimientos y cobranzas en toda tu red.
                 </p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
@@ -212,15 +226,16 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
                 </div>
                 <h3 className="text-lg font-semibold text-white">Multi-sede ilimitado</h3>
                 <p className="mt-2 text-sm text-slate-300">
-                  ConfigurÃ¡ ilimitados gimnasios y mantenÃ© un branding cohesivo en cada punto de contacto.
+                  Configura ilimitados gimnasios y mantene un branding cohesivo en
+                  cada punto de contacto.
                 </p>
               </div>
             </div>
           </div>
 
           <div className="mt-14 hidden gap-6 text-xs text-slate-400 sm:flex">
-            <span>Â© {new Date().getFullYear()} ManagerPro 2.0</span>
-            <span>Impulsando cadenas fitness en LatinoamÃ©rica</span>
+            <span>(c) {new Date().getFullYear()} ManagerPro 2.0</span>
+            <span>Impulsando cadenas fitness en Latinoamerica</span>
           </div>
         </section>
 
@@ -230,9 +245,12 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-emerald-200">
                 <span>Portal privado</span>
               </div>
-              <h2 className="text-3xl font-semibold text-white">IniciÃ¡ sesiÃ³n en tu ecosistema</h2>
+              <h2 className="text-3xl font-semibold text-white">
+                Inicia sesion en tu ecosistema
+              </h2>
               <p className="text-sm text-slate-300">
-                Conectate con tu panel personalizado y coordinÃ¡ a tus equipos, socios y campaÃ±as en un mismo lugar.
+                Conectate con tu panel personalizado y coordina a tus equipos,
+                socios y campanas en un mismo lugar.
               </p>
             </div>
 
@@ -254,16 +272,17 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
                   />
                 </div>
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-slate-200">
-                  ContraseÃ±a
+                  Contrasena
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                   <Input
                     id="password"
                     type="password"
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                    placeholder="********"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10 border-white/10 bg-white/10 text-white placeholder:text-slate-400 focus-visible:ring-emerald-400"
@@ -294,10 +313,12 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
             <div className="mt-8 space-y-3 rounded-2xl border border-white/10 bg-slate-900/60 p-5 text-xs text-slate-300">
               <div className="flex items-center gap-3">
                 <ShieldCheck className="h-4 w-4 text-emerald-300" />
-                <p className="font-medium text-slate-200">Sesiones protegidas y trazables.</p>
+                <p className="font-medium text-slate-200">
+                  Sesiones protegidas y trazables.
+                </p>
               </div>
               <p>
-                Â¿NecesitÃ¡s ayuda con el acceso? Escribinos a
+                Necesitas ayuda con el acceso? Escribinos a
                 <a
                   href="mailto:managerpro2comercial@gmail.com"
                   className="ml-1 font-semibold text-emerald-300 underline-offset-2 hover:underline"
@@ -312,5 +333,3 @@ export function LoginSystem({ onLogin }: LoginSystemProps) {
     </div>
   );
 }
-
-
