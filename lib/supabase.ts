@@ -272,3 +272,18 @@ export interface ClassRegistration {
   receipt_url?: string | null
   receipt_storage_path?: string | null
 }
+
+export interface MemberAccessLog {
+  id: string
+  gym_id: string
+  member_id?: string | null
+  member_name?: string | null
+  cedula_entered: string
+  normalized_cedula: string
+  result: "active" | "expiring" | "expired" | "not_found"
+  status_color: "green" | "yellow" | "red"
+  message: string
+  days_remaining?: number | null
+  days_expired?: number | null
+  created_at?: string | null
+}

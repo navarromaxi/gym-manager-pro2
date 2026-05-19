@@ -123,6 +123,14 @@ const InactiveManagement = dynamic(
   { ssr: false }
 );
 
+const IncomeManagement = dynamic(
+  () =>
+    import("@/components/income-management").then(
+      (m) => m.IncomeManagement
+    ),
+  { ssr: false, loading: () => <div className="p-4 text-sm">Cargando ingresos...</div> }
+);
+
 //Sigue aca
 import { supabase } from "@/lib/supabase";
 import { mapProspectStatusFromDb } from "@/lib/prospect-status";
@@ -1144,6 +1152,7 @@ export default function GymManagementSystem() {
               { id: "routines", label: "Rutinas" },
               { id: "expenses", label: "Gastos" },
               { id: "reports", label: "Reportes" },
+              { id: "income_access", label: "Ingresos" },
               { id: "invoices", label: "Facturas" },
             ].map((tab) => (
               <button
@@ -1232,6 +1241,12 @@ export default function GymManagementSystem() {
             prospects={prospects}
             customPlans={customPlans}
             oneTimePayments={oneTimePayments}
+            gymName={gymData?.name || ""}
+          />
+        )}
+        {activeTab === "income_access" && (
+          <IncomeManagement
+            gymId={gymData?.id || ""}
             gymName={gymData?.name || ""}
           />
         )}

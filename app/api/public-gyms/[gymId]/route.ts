@@ -9,10 +9,11 @@ const paramsSchema = z.object({
 
 export async function GET(
   _request: Request,
-  context: { params: { gymId?: string } }
+  context: { params: Promise<{ gymId?: string }> }
 ) {
+  const params = await context.params;
   const parsedParams = paramsSchema.safeParse({
-    gymId: context.params?.gymId,
+    gymId: params?.gymId,
   });
 
   if (!parsedParams.success) {
