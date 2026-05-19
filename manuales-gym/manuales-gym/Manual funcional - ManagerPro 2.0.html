@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<!-- saved from url=(0106)file:///C:/Users/maxi_/Downloads/gym-management-system/public/manuales-gym/manual-funcional-gimnasios.html -->
+<html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual funcional - ManagerPro 2.0</title>
+    <style>
+      :root {
+        --ink: #1a2430;
+        --muted: #61707d;
+        --brand: #14532d;
+        --brand-soft: #eef8f1;
+        --line: #dde5ea;
+        --paper: #ffffff;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: #edf2f4;
+        color: var(--ink);
+        font-family: "Segoe UI", Arial, sans-serif;
+      }
+
+      .doc {
+        width: min(100%, 920px);
+        margin: 24px auto;
+        background: var(--paper);
+        box-shadow: 0 18px 50px rgba(26, 36, 48, 0.1);
+      }
+
+      .hero {
+        padding: 46px 54px 34px;
+        border-bottom: 1px solid var(--line);
+        background:
+          linear-gradient(180deg, rgba(20, 83, 45, 0.08), rgba(20, 83, 45, 0)),
+          #fff;
+      }
+
+      .hero p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .hero .tag {
+        margin-bottom: 10px;
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--brand);
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 2.4rem;
+        line-height: 1.05;
+      }
+
+      .intro {
+        margin-top: 16px;
+        max-width: 720px;
+        line-height: 1.8;
+        font-size: 1.02rem;
+      }
+
+      .content {
+        padding: 28px 54px 56px;
+      }
+
+      section {
+        padding: 18px 0 10px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      section:last-child {
+        border-bottom: 0;
+      }
+
+      h2 {
+        margin: 0 0 10px;
+        font-size: 1.32rem;
+        color: var(--brand);
+      }
+
+      p {
+        margin: 0 0 12px;
+        line-height: 1.75;
+      }
+
+      .box {
+        margin-top: 12px;
+        background: var(--brand-soft);
+        border-radius: 16px;
+        padding: 16px 18px;
+      }
+
+      ul {
+        margin: 10px 0 0 18px;
+        padding: 0;
+      }
+
+      li {
+        margin: 0 0 8px;
+        line-height: 1.7;
+      }
+
+      .cols {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .tile {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 16px 18px;
+      }
+
+      .tile strong {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--brand);
+      }
+
+      .closing {
+        margin-top: 24px;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      @page {
+        size: A4;
+        margin: 14mm;
+      }
+
+      @media print {
+        body {
+          background: white;
+        }
+
+        .doc {
+          width: auto;
+          margin: 0;
+          box-shadow: none;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .hero,
+        .content {
+          padding-left: 24px;
+          padding-right: 24px;
+        }
+
+        .cols {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <article class="doc">
+      <header class="hero">
+        <p class="tag">Manual funcional</p>
+        <h1>Manual de uso general para gimnasios</h1>
+        <p class="intro">
+          ManagerPro 2.0 es una plataforma de gestion comercial y
+          administrativa orientada a gimnasios y centros fitness. Su objetivo
+          es centralizar la informacion del socio, ordenar la operacion diaria y
+          conectar dashboard, socios, pagos, interesados, clases, rutinas,
+          gastos, reportes y facturacion en un solo sistema.
+        </p>
+      </header>
+
+      <div class="content">
+        <section>
+          <h2>Resumen general del sistema</h2>
+          <p>
+            El sistema acompana el trabajo real de recepcion, administracion y
+            seguimiento comercial. Cada modulo cumple una funcion concreta, pero
+            todos comparten la misma base de informacion para dar continuidad a
+            la gestion del gimnasio.
+          </p>
+          <div class="cols">
+            <div class="tile">
+              <strong>Enfoque comercial</strong>
+              La captacion y el seguimiento de interesados se vinculan con la
+              conversion a socio, el alta del plan y el primer pago.
+            </div>
+            <div class="tile">
+              <strong>Enfoque administrativo</strong>
+              Socios, pagos, clases, gastos, reportes y facturas se administran
+              desde el mismo entorno.
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Acceso e inicio</h2>
+          <p>
+            El sistema cuenta con acceso privado por usuario y gimnasio. Cada
+            cuenta ingresa con email y contrasena y visualiza la informacion
+            asociada a su gimnasio.
+          </p>
+          <div class="box">
+            <strong>Que destacar</strong>
+            <ul>
+              <li>Acceso seguro con autenticacion</li>
+              <li>Imagen de marca del gimnasio dentro del panel</li>
+              <li>Entorno centralizado para operacion diaria</li>
+            </ul>
+          </div>
+        </section>
+
+        <section>
+          <h2>Dashboard</h2>
+          <ul>
+            <li>Ver socios activos</li>
+            <li>Detectar vencimientos proximos</li>
+            <li>Controlar ingresos, gastos y ganancia mensual</li>
+            <li>Revisar alertas de seguimiento comercial</li>
+            <li>Acceder rapido a los modulos principales</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Socios</h2>
+          <p>El modulo de socios concentra la base principal de clientes activos, vencidos e inactivos.</p>
+          <ul>
+            <li>Datos personales y de contacto</li>
+            <li>Plan asignado</li>
+            <li>Fecha de ultimo pago</li>
+            <li>Proximo vencimiento</li>
+            <li>Saldo pendiente</li>
+            <li>Estado del socio</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Pagos</h2>
+          <p>Centraliza la gestion administrativa de cobros y seguimiento financiero.</p>
+          <ul>
+            <li>Registro de pagos de socios</li>
+            <li>Historial completo de cobros</li>
+            <li>Metodos de pago</li>
+            <li>Tarjetas, debito, credito y cuotas</li>
+            <li>Control mensual de ingresos</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Interesados</h2>
+          <p>Ordena la gestion comercial previa a la venta.</p>
+          <ul>
+            <li>Registrar nuevos prospectos</li>
+            <li>Definir interes, prioridad y notas</li>
+            <li>Programar proximos contactos</li>
+            <li>Recordar seguimientos pendientes</li>
+            <li>Convertir un interesado en socio desde el mismo sistema</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Inactivos</h2>
+          <ul>
+            <li>Clasificacion por nivel de recuperacion</li>
+            <li>Comentarios internos por caso</li>
+            <li>Filtros para detectar recuperables, en evaluacion o perdidos</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Planes y plan complementario</h2>
+          <div class="cols">
+            <div class="tile">
+              <strong>Planes</strong>
+              Membresias base con nombre, precio, duracion, actividades
+              incluidas y estado activo o inactivo.
+            </div>
+            <div class="tile">
+              <strong>Plan complementario</strong>
+              Planes personalizados, cobros por cuotas, renovaciones y ajustes
+              comerciales individuales.
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Pago unico</h2>
+          <p>Permite registrar visitas, servicios o cobros puntuales fuera del esquema de membresia.</p>
+          <ul>
+            <li>Nombre del visitante o cliente</li>
+            <li>Fecha de visita</li>
+            <li>Monto</li>
+            <li>Medio de pago</li>
+            <li>Fecha estimada de cobro si aplica</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Clases, eventos e inscripcion publica</h2>
+          <ul>
+            <li>Crear clases o eventos</li>
+            <li>Definir fecha, hora, capacidad y precio</li>
+            <li>Revisar inscriptos</li>
+            <li>Solicitar comprobantes de pago</li>
+            <li>Compartir un link publico para reservar</li>
+            <li>Actualizar automaticamente los cupos</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Actividades y rutinas</h2>
+          <div class="cols">
+            <div class="tile">
+              <strong>Actividades</strong>
+              Nombre, descripcion, instructor, cupo, duracion y horarios.
+            </div>
+            <div class="tile">
+              <strong>Rutinas</strong>
+              Creacion, filtrado, edicion y soporte para acompanamiento del socio.
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Gastos, reportes y facturas</h2>
+          <ul>
+            <li>Registro de gastos variables y fijos</li>
+            <li>Lectura de ingresos, gastos y ganancia neta</li>
+            <li>Metodos de pago y distribucion por planes</li>
+            <li>Consulta y descarga de facturas emitidas</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Que destacar ante un cliente</h2>
+          <p>
+            ManagerPro 2.0 conecta captacion, socios, clases, pagos y control
+            administrativo en una sola plataforma. Su valor esta en ordenar
+            procesos, dar visibilidad a la operacion y profesionalizar tanto la
+            gestion comercial como la financiera del gimnasio.
+          </p>
+        </section>
+
+        <p class="closing">
+          Documento funcional base para presentar y explicar ManagerPro 2.0 en
+          gimnasios y centros fitness.
+        </p>
+      </div>
+    </article>
+  
+
+</body></html>

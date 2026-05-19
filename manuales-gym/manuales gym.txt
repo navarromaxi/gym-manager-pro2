@@ -1,0 +1,4 @@
+Índice: public/manuales-gym/index.html
+Propuesta formal: public/manuales-gym/propuesta-formal-gimnasios.html
+Manual funcional: public/manuales-gym/manual-funcional-gimnasios.html
+Brochure comercial: public/manuales-gym/brochure-comercial-gimnasios.html

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Propuesta formal - ManagerPro 2.0</title>
+    <style>
+      :root {
+        --ink: #18232f;
+        --muted: #5f6b76;
+        --brand: #0f766e;
+        --brand-dark: #0b4f4a;
+        --line: #d9e2e8;
+        --soft: #eff8f7;
+        --page: #ffffff;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        color: var(--ink);
+        background: #e9eff2;
+      }
+
+      .page {
+        width: min(100%, 900px);
+        margin: 24px auto;
+        background: var(--page);
+        box-shadow: 0 18px 50px rgba(24, 35, 47, 0.12);
+      }
+
+      .cover {
+        padding: 64px 56px 40px;
+        background:
+          linear-gradient(135deg, rgba(15, 118, 110, 0.94), rgba(11, 79, 74, 0.96)),
+          linear-gradient(180deg, #0f766e, #0b4f4a);
+        color: white;
+      }
+
+      .cover .eyebrow {
+        margin: 0 0 18px;
+        font: 600 12px/1.2 "Segoe UI", Arial, sans-serif;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        opacity: 0.8;
+      }
+
+      .cover h1 {
+        margin: 0;
+        font-size: 3rem;
+        line-height: 0.95;
+      }
+
+      .cover h2 {
+        margin: 16px 0 0;
+        font: 400 1.45rem/1.4 "Segoe UI", Arial, sans-serif;
+        max-width: 560px;
+        color: rgba(255, 255, 255, 0.88);
+      }
+
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-top: 36px;
+      }
+
+      .meta-box {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 18px;
+        padding: 16px;
+      }
+
+      .meta-box strong {
+        display: block;
+        margin-bottom: 6px;
+        font: 600 0.75rem/1.2 "Segoe UI", Arial, sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .content {
+        padding: 44px 56px 60px;
+      }
+
+      h3 {
+        margin: 34px 0 12px;
+        font-size: 1.35rem;
+        color: var(--brand-dark);
+      }
+
+      p {
+        margin: 0 0 14px;
+        font-size: 1.04rem;
+        line-height: 1.8;
+      }
+
+      .highlight {
+        background: var(--soft);
+        border-left: 4px solid var(--brand);
+        padding: 18px 20px;
+        border-radius: 14px;
+        margin: 18px 0 8px;
+      }
+
+      .section-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 16px;
+      }
+
+      .item {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 16px 18px;
+      }
+
+      .item strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--brand-dark);
+        font-family: "Segoe UI", Arial, sans-serif;
+      }
+
+      ul {
+        margin: 8px 0 0 18px;
+        padding: 0;
+      }
+
+      li {
+        margin: 0 0 8px;
+        line-height: 1.7;
+      }
+
+      .footer-note {
+        margin-top: 32px;
+        padding-top: 20px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      @page {
+        size: A4;
+        margin: 14mm;
+      }
+
+      @media print {
+        body {
+          background: white;
+        }
+
+        .page {
+          margin: 0;
+          width: auto;
+          box-shadow: none;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .cover,
+        .content {
+          padding: 32px 24px;
+        }
+
+        .meta,
+        .section-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .cover h1 {
+          font-size: 2.4rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <article class="page">
+      <section class="cover">
+        <p class="eyebrow">Propuesta formal</p>
+        <h1>ManagerPro 2.0</h1>
+        <h2>Propuesta de implementacion para gimnasios y centros fitness</h2>
+
+        <div class="meta">
+          <div class="meta-box">
+            <strong>Proveedor</strong>
+            <span>AppSistemasPymes</span>
+          </div>
+          <div class="meta-box">
+            <strong>Solucion</strong>
+            <span>Plataforma de gestion para gimnasios</span>
+          </div>
+          <div class="meta-box">
+            <strong>Documento base</strong>
+            <span>Adaptable segun cliente y etapa comercial</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="content">
+        <h3>Objetivo de la propuesta</h3>
+        <p>
+          El objetivo es ofrecer al gimnasio una herramienta que permita ordenar
+          la operacion diaria, profesionalizar el seguimiento de socios e
+          interesados, mejorar el control de pagos y dar visibilidad real sobre
+          ingresos, vencimientos, clases, gastos y reportes.
+        </p>
+        <div class="highlight">
+          <p>
+            <strong>Necesidad operativa.</strong> Reducir la dependencia de
+            planillas, mensajes sueltos y registros dispersos, unificando la
+            informacion comercial y administrativa en una sola base de trabajo.
+          </p>
+          <p>
+            <strong>Resultado esperado.</strong> Un gimnasio mas organizado,
+            medible y preparado para crecer con una operacion digital mas clara.
+          </p>
+        </div>
+
+        <h3>Alcance funcional</h3>
+        <p>
+          La propuesta contempla una solucion especializada para gimnasios,
+          priorizando herramientas alineadas al flujo real de captacion,
+          membresias, clases y cobranzas.
+        </p>
+        <div class="section-grid">
+          <div class="item"><strong>Socios</strong>Altas, edicion, planes, vencimientos, saldos y seguimiento.</div>
+          <div class="item"><strong>Pagos</strong>Cobros, historial, metodos, tarjetas, cuotas y control mensual.</div>
+          <div class="item"><strong>Interesados</strong>Seguimiento comercial, prioridades, proximos contactos y conversion a socio.</div>
+          <div class="item"><strong>Planes</strong>Membresias base y planes complementarios para casos especiales.</div>
+          <div class="item"><strong>Clases y eventos</strong>Cupos, inscripciones y carga de comprobantes.</div>
+          <div class="item"><strong>Actividades y rutinas</strong>Disciplinas, horarios, instructores y contenido reutilizable.</div>
+          <div class="item"><strong>Gastos y reportes</strong>Lectura operativa y financiera del negocio.</div>
+          <div class="item"><strong>Facturas</strong>Consulta y descarga de comprobantes emitidos.</div>
+        </div>
+
+        <h3>Componentes diferenciales</h3>
+        <div class="section-grid">
+          <div class="item">
+            <strong>Enfoque especifico en gimnasios</strong>
+            <ul>
+              <li>Gestion de socios, vencimientos y cobranzas en un mismo entorno</li>
+              <li>Seguimiento comercial con conversion directa a socio</li>
+              <li>Control de clases, cupos e inscripciones publicas</li>
+              <li>Rutinas y actividades integradas con la operacion diaria</li>
+            </ul>
+          </div>
+          <div class="item">
+            <strong>Enfoque de gestion y crecimiento</strong>
+            <ul>
+              <li>Dashboard con alertas de vencimientos y actividad comercial</li>
+              <li>Reportes de ingresos, gastos, utilidad y metodos de pago</li>
+              <li>Estructura apta para gimnasios con una o varias sedes</li>
+              <li>Imagen profesional de marca para operar y presentar el negocio</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>Beneficios esperados</h3>
+        <div class="section-grid">
+          <div class="item">
+            <strong>Para la direccion</strong>
+            <ul>
+              <li>Mayor control sobre ingresos, gastos y saldos pendientes</li>
+              <li>Mejor visibilidad sobre retencion, vencimientos y rendimiento comercial</li>
+              <li>Base mas profesional para escalar el gimnasio o la cadena</li>
+            </ul>
+          </div>
+          <div class="item">
+            <strong>Para el equipo</strong>
+            <ul>
+              <li>Menos tiempo administrativo y menos informacion repetida</li>
+              <li>Acceso rapido al historial del socio, pagos e interacciones</li>
+              <li>Mejor coordinacion entre recepcion, ventas y administracion</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>Modalidad sugerida</h3>
+        <ul>
+          <li><strong>Etapa 1.</strong> Configuracion inicial, alta de planes, socios, pagos y dashboard operativo.</li>
+          <li><strong>Etapa 2.</strong> Orden comercial con interesados, seguimiento, conversiones e inactivos.</li>
+          <li><strong>Etapa 3.</strong> Activacion de clases, inscripciones publicas, rutinas, facturas y reportes consolidados.</li>
+        </ul>
+
+        <h3>Acompanamiento y puesta en marcha</h3>
+        <p>
+          AppSistemasPymes no solo entrega una herramienta: acompana al
+          gimnasio en la configuracion, la implementacion y la adaptacion del
+          sistema a su forma real de trabajo.
+        </p>
+        <ul>
+          <li>Configuracion inicial junto al cliente para acelerar la puesta en marcha</li>
+          <li>Ayuda para ordenar planes, actividades, socios y circuitos de cobro</li>
+          <li>Acompanamiento directo ante dudas, ajustes y nuevas necesidades operativas</li>
+        </ul>
+
+        <p class="footer-note">
+          Documento formal base para presentaciones comerciales de
+          AppSistemasPymes / ManagerPro 2.0 a gimnasios y centros fitness.
+          Puede adaptarse con nombre del cliente, alcance final, cronograma,
+          valores y condiciones comerciales.
+        </p>
+      </section>
+    </article>
+  </body>
+</html>

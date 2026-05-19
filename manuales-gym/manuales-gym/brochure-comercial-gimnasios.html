@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brochure comercial - ManagerPro 2.0</title>
+    <style>
+      :root {
+        --ink: #15202a;
+        --muted: #60707c;
+        --brand: #1d4ed8;
+        --brand-dark: #1e3a8a;
+        --accent: #dbeafe;
+        --line: #dbe3ea;
+        --paper: #ffffff;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: #edf3f8;
+        color: var(--ink);
+      }
+
+      .sheet {
+        width: min(100%, 920px);
+        margin: 24px auto;
+        background: var(--paper);
+        box-shadow: 0 22px 56px rgba(21, 32, 42, 0.1);
+      }
+
+      .top {
+        padding: 52px 54px 42px;
+        background:
+          radial-gradient(circle at top right, rgba(59, 130, 246, 0.28), transparent 28%),
+          linear-gradient(135deg, #0f172a, #1e3a8a);
+        color: white;
+      }
+
+      .top .tag {
+        margin: 0 0 14px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.78);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 2.7rem;
+        line-height: 1.02;
+        max-width: 720px;
+      }
+
+      .subtitle {
+        margin-top: 16px;
+        max-width: 720px;
+        font-size: 1.05rem;
+        line-height: 1.75;
+        color: rgba(255, 255, 255, 0.86);
+      }
+
+      .pillars {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 28px;
+      }
+
+      .pillar {
+        padding: 16px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+      }
+
+      .pillar strong {
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      .content {
+        padding: 34px 54px 56px;
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        color: var(--brand-dark);
+        font-size: 1.35rem;
+      }
+
+      p {
+        margin: 0 0 14px;
+        line-height: 1.78;
+      }
+
+      .three {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        margin: 16px 0 30px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px;
+      }
+
+      .card .num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--brand-dark);
+        font-weight: 700;
+        margin-bottom: 12px;
+      }
+
+      .modules,
+      .plans {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .module,
+      .plan {
+        border-radius: 18px;
+        padding: 18px;
+        border: 1px solid var(--line);
+      }
+
+      .module strong,
+      .plan strong {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--brand-dark);
+      }
+
+      ul {
+        margin: 10px 0 0 18px;
+        padding: 0;
+      }
+
+      li {
+        margin: 0 0 8px;
+        line-height: 1.7;
+      }
+
+      .impact {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 22px;
+        margin: 28px 0;
+      }
+
+      .fine {
+        margin-top: 28px;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      @page {
+        size: A4;
+        margin: 14mm;
+      }
+
+      @media print {
+        body {
+          background: white;
+        }
+
+        .sheet {
+          width: auto;
+          margin: 0;
+          box-shadow: none;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .top,
+        .content {
+          padding-left: 24px;
+          padding-right: 24px;
+        }
+
+        .pillars,
+        .three,
+        .modules,
+        .plans {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <article class="sheet">
+      <header class="top">
+        <p class="tag">Brochure comercial gimnasios</p>
+        <h1>ManagerPro 2.0 para gimnasios que quieren ordenar, vender y crecer mejor.</h1>
+        <p class="subtitle">
+          Una plataforma pensada para profesionalizar el seguimiento de socios e
+          interesados y mejorar la operacion diaria de recepcion, cobranzas,
+          clases y administracion.
+        </p>
+
+        <div class="pillars">
+          <div class="pillar">
+            <strong>Gestion de socios clara</strong>
+            Socios, vencimientos, saldos pendientes y estados de membresia integrados.
+          </div>
+          <div class="pillar">
+            <strong>Operacion conectada</strong>
+            Pagos, gastos, facturas, reportes y clases desde el mismo sistema.
+          </div>
+          <div class="pillar">
+            <strong>Estructura para crecer</strong>
+            Mas orden, mejor seguimiento comercial y procesos medibles.
+          </div>
+        </div>
+      </header>
+
+      <section class="content">
+        <h2>Que resuelve</h2>
+        <p>
+          Centraliza la operacion del gimnasio y reemplaza la dependencia de
+          planillas, mensajes sueltos y registros dispersos por una base de
+          trabajo mas clara, profesional y facil de seguir.
+        </p>
+
+        <div class="three">
+          <div class="card">
+            <div class="num">1</div>
+            <strong>Seguimiento de socios</strong>
+            Historial, plan, vencimiento, deuda y estado siempre visibles para el equipo.
+          </div>
+          <div class="card">
+            <div class="num">2</div>
+            <strong>Operacion diaria ordenada</strong>
+            Pagos, clases, rutinas, gastos y facturas conectados en un solo entorno.
+          </div>
+          <div class="card">
+            <div class="num">3</div>
+            <strong>Control del negocio</strong>
+            Mayor visibilidad sobre ingresos, gastos, vencimientos, conversiones y desempeno general.
+          </div>
+        </div>
+
+        <h2>Modulos principales</h2>
+        <div class="modules">
+          <div class="module"><strong>Socios</strong>Datos personales, contacto, plan, estado, vencimiento y saldo pendiente.</div>
+          <div class="module"><strong>Pagos y cobranzas</strong>Registro de cobros, historial, metodos de pago, cuotas y lectura mensual.</div>
+          <div class="module"><strong>Interesados</strong>Seguimiento comercial de consultas, prioridades, notas y proximos contactos.</div>
+          <div class="module"><strong>Planes y planes complementarios</strong>Membresias base y esquemas personalizados para casos especiales.</div>
+          <div class="module"><strong>Pago unico</strong>Cobros puntuales para visitas, clases sueltas o servicios no recurrentes.</div>
+          <div class="module"><strong>Clases y eventos</strong>Programacion, cupos, precio, inscripciones y control de comprobantes.</div>
+          <div class="module"><strong>Inscripcion publica</strong>Link externo para reservar clases o eventos sin carga manual.</div>
+          <div class="module"><strong>Actividades y rutinas</strong>Disciplinas, instructores, horarios y contenido reutilizable.</div>
+          <div class="module"><strong>Gastos y reportes</strong>Visibilidad sobre egresos, utilidad y resultados del periodo.</div>
+          <div class="module"><strong>Facturas</strong>Consulta y descarga de comprobantes emitidos desde el sistema.</div>
+        </div>
+
+        <div class="impact">
+          <h2>Como impacta en el gimnasio</h2>
+          <ul>
+            <li><strong>Recepcion mas organizada.</strong> Socios, pagos, clases e interesados se coordinan desde un solo lugar.</li>
+            <li><strong>Mejor seguimiento comercial.</strong> Las consultas dejan de perderse y pasan a formar parte de un proceso real de conversion.</li>
+            <li><strong>Mas control administrativo.</strong> Pagos, gastos, facturas y reportes ayudan a entender mejor el funcionamiento economico del gimnasio.</li>
+            <li><strong>Base preparada para crecer.</strong> La estructura del sistema acompana gimnasios que buscan profesionalizarse y escalar.</li>
+          </ul>
+        </div>
+
+        <h2>Planes sugeridos</h2>
+        <div class="plans">
+          <div class="plan">
+            <strong>Plan base</strong>
+            Gimnasios que buscan gestion completa y orden profesional.
+            <ul>
+              <li>Socios y membresias</li>
+              <li>Pagos y gastos</li>
+              <li>Interesados e inactivos</li>
+              <li>Actividades y rutinas</li>
+              <li>Reportes operativos</li>
+              <li>Soporte en horario comercial</li>
+            </ul>
+          </div>
+          <div class="plan">
+            <strong>Plan premium</strong>
+            Gimnasios con mayor volumen o foco fuerte en crecimiento comercial.
+            <ul>
+              <li>Todo lo incluido en el plan base</li>
+              <li>Clases y eventos con gestion de cupos</li>
+              <li>Link publico de inscripcion</li>
+              <li>Solicitud de comprobantes en reservas</li>
+              <li>Facturacion y soporte ampliado</li>
+            </ul>
+          </div>
+        </div>
+
+        <h2>Servicios complementarios</h2>
+        <p>
+          Tambien se puede evaluar una capa adicional de automatizaciones para
+          acompanar la operacion comercial y la experiencia del socio.
+        </p>
+        <ul>
+          <li>Recordatorios de vencimiento</li>
+          <li>Mensajes automatizados de seguimiento comercial</li>
+          <li>Confirmaciones o avisos para clases y eventos</li>
+          <li>Flujos especiales segun la necesidad del gimnasio</li>
+        </ul>
+
+        <p class="fine">
+          Documento comercial base para presentar ManagerPro 2.0 a gimnasios,
+          estudios y centros fitness.
+        </p>
+      </section>
+    </article>
+  </body>
+</html>
