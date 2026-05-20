@@ -2,21 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Copy,
-  ExternalLink,
-  RefreshCcw,
-  DoorOpen,
-  UserCheck,
-  AlertTriangle,
-  SearchX,
-  Download,
-  Clock3,
-  MonitorSmartphone,
   BarChart3,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Copy,
+  DoorOpen,
+  Download,
+  ExternalLink,
+  MonitorSmartphone,
+  RefreshCcw,
 } from "lucide-react";
 
-import { supabase, type MemberAccessLog } from "@/lib/supabase";
+import type { MemberAccessLog } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,18 +36,54 @@ interface IncomeManagementProps {
 }
 
 type ReportRange = "week" | "month";
+type StatusFilter = MemberAccessLog["result"] | "all";
+
+interface SummaryPayload {
+  total: number;
+  active: number;
+  expiring: number;
+  expired: number;
+  notFound: number;
+  unique: number;
+}
+
+interface TopHourPayload {
+  hour: number;
+  count: number;
+}
+
+interface TopMemberPayload {
+  memberId: string | null;
+  name: string | null;
+  count: number;
+  lastAccess: string | null;
+}
+
+interface AdminPayload {
+  history: {
+    items: MemberAccessLog[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
+  todaySummary: SummaryPayload;
+  rangeSummary: SummaryPayload;
+  topHoursToday: TopHourPayload[];
+  topMembersThisMonth: TopMemberPayload[];
+  meta: {
+    reportRange: ReportRange;
+    rangeStart: string;
+    rangeEnd: string;
+  };
+}
+
+const PAGE_SIZE = 20;
 
 const parseDateTime = (value?: string | null) => {
   if (!value) return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const toDateInputValue = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 };
 
 const formatDateTime = (value?: string | null) => {
@@ -62,11 +97,6 @@ const formatDateTime = (value?: string | null) => {
     minute: "2-digit",
   });
 };
-
-const isSameDay = (value: Date, day: Date) =>
-  value.getFullYear() === day.getFullYear() &&
-  value.getMonth() === day.getMonth() &&
-  value.getDate() === day.getDate();
 
 const maskCedula = (value: string) => {
   const normalized = value.replace(/\D+/g, "");
@@ -90,24 +120,26 @@ const statusBadgeClassMap: Record<MemberAccessLog["result"], string> = {
   not_found: "bg-slate-200 text-slate-700 hover:bg-slate-200",
 };
 
-const setupHint =
-  "Si no aparecen ingresos, revisa que la tabla member_access_logs exista y tenga permisos RLS para el gimnasio.";
-
 export function IncomeManagement({
   gymId,
   gymName,
 }: IncomeManagementProps) {
-  const [logs, setLogs] = useState<MemberAccessLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<
-    MemberAccessLog["result"] | "all"
-  >("all");
+  const [copied, setCopied] = useState<"normal" | "kiosco" | null>(null);
   const [reportRange, setReportRange] = useState<ReportRange>("week");
+  const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [appliedFilters, setAppliedFilters] = useState({
+    search: "",
+    status: "all" as StatusFilter,
+    startDate: "",
+    endDate: "",
+  });
+  const [data, setData] = useState<AdminPayload | null>(null);
 
   const accessUrl = useMemo(() => {
     if (!gymId) return "";
@@ -122,253 +154,100 @@ export function IncomeManagement({
     return `${accessUrl}?kiosco=1`;
   }, [accessUrl]);
 
-  const loadLogs = async () => {
+  const loadDashboard = async () => {
     if (!gymId) return;
 
     setLoading(true);
     setLoadError(null);
 
     try {
-      const { data, error } = await supabase
-        .from("member_access_logs")
-        .select(
-          "id, gym_id, member_id, member_name, cedula_entered, normalized_cedula, result, status_color, message, days_remaining, days_expired, created_at"
-        )
-        .eq("gym_id", gymId)
-        .order("created_at", { ascending: false })
-        .limit(500);
+      const params = new URLSearchParams({
+        gymId,
+        page: String(page),
+        pageSize: String(PAGE_SIZE),
+        reportRange,
+        status: appliedFilters.status,
+        search: appliedFilters.search,
+        startDate: appliedFilters.startDate,
+        endDate: appliedFilters.endDate,
+      });
 
-      if (error) {
-        throw error;
-      }
+      const response = await fetch(`/api/member-access/admin?${params}`, {
+        method: "GET",
+        cache: "no-store",
+      });
 
-      setLogs((data ?? []) as MemberAccessLog[]);
-    } catch (error: any) {
-      console.error("Error loading member access logs", error);
-      const normalizedMessage = error?.message?.toLowerCase?.() ?? "";
-      if (
-        normalizedMessage.includes("does not exist") ||
-        normalizedMessage.includes("schema cache") ||
-        normalizedMessage.includes("permission denied")
-      ) {
-        setLoadError(setupHint);
-      } else {
-        setLoadError(
-          "No se pudieron cargar los ingresos. Intenta nuevamente en unos segundos."
+      const payload = (await response.json().catch(() => null)) as
+        | (AdminPayload & { error?: string })
+        | { error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(
+          payload?.error ??
+            "No se pudieron cargar los reportes de ingresos."
         );
       }
+
+      setData(payload as AdminPayload);
+    } catch (error) {
+      console.error("Error loading income dashboard", error);
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : "No se pudieron cargar los ingresos."
+      );
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadLogs();
-  }, [gymId]);
+    loadDashboard();
+  }, [gymId, page, reportRange, appliedFilters]);
 
-  const filteredLogs = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-    const fromDate = startDate ? new Date(`${startDate}T00:00:00`) : null;
-    const toDate = endDate ? new Date(`${endDate}T23:59:59`) : null;
+  const handleCopy = async (value: string, kind: "normal" | "kiosco") => {
+    if (!value) return;
 
-    return logs.filter((log) => {
-      if (statusFilter !== "all" && log.result !== statusFilter) {
-        return false;
-      }
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(kind);
+      window.setTimeout(() => setCopied(null), 1800);
+    } catch (error) {
+      console.error("Error copying access URL", error);
+    }
+  };
 
-      if (normalizedSearch) {
-        const haystack = [
-          log.member_name ?? "",
-          log.cedula_entered,
-          log.message,
-          statusLabelMap[log.result],
-        ]
-          .join(" ")
-          .toLowerCase();
+  const handleOpenAccess = (value: string) => {
+    if (!value) return;
+    window.open(value, "_blank", "noopener,noreferrer");
+  };
 
-        if (!haystack.includes(normalizedSearch)) {
-          return false;
-        }
-      }
-
-      const createdAt = parseDateTime(log.created_at);
-      if (!createdAt) return false;
-      if (fromDate && createdAt < fromDate) return false;
-      if (toDate && createdAt > toDate) return false;
-
-      return true;
+  const applyFilters = () => {
+    setPage(1);
+    setAppliedFilters({
+      search: searchTerm.trim(),
+      status: statusFilter,
+      startDate,
+      endDate,
     });
-  }, [logs, searchTerm, statusFilter, startDate, endDate]);
+  };
 
-  const today = useMemo(() => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    return now;
-  }, []);
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setStartDate("");
+    setEndDate("");
+    setPage(1);
+    setAppliedFilters({
+      search: "",
+      status: "all",
+      startDate: "",
+      endDate: "",
+    });
+  };
 
-  const startOfWeek = useMemo(() => {
-    const date = new Date(today);
-    const day = date.getDay();
-    const offset = day === 0 ? 6 : day - 1;
-    date.setDate(date.getDate() - offset);
-    date.setHours(0, 0, 0, 0);
-    return date;
-  }, [today]);
-
-  const startOfMonth = useMemo(
-    () => new Date(today.getFullYear(), today.getMonth(), 1),
-    [today]
-  );
-
-  const reportStart = reportRange === "week" ? startOfWeek : startOfMonth;
-
-  const rangeLogs = useMemo(
-    () =>
-      logs.filter((log) => {
-        const createdAt = parseDateTime(log.created_at);
-        return createdAt ? createdAt >= reportStart : false;
-      }),
-    [logs, reportStart]
-  );
-
-  const todayLogs = useMemo(
-    () =>
-      logs.filter((log) => {
-        const createdAt = parseDateTime(log.created_at);
-        return createdAt ? isSameDay(createdAt, today) : false;
-      }),
-    [logs, today]
-  );
-
-  const todayActiveCount = todayLogs.filter((log) => log.result === "active").length;
-  const todayExpiringCount = todayLogs.filter((log) => log.result === "expiring").length;
-  const todayExpiredCount = todayLogs.filter((log) => log.result === "expired").length;
-  const todayNotFoundCount = todayLogs.filter((log) => log.result === "not_found").length;
-
-  const uniqueMembersToday = useMemo(
-    () =>
-      new Set(
-        todayLogs
-          .map((log) => log.member_id)
-          .filter((memberId): memberId is string => Boolean(memberId))
-      ).size,
-    [todayLogs]
-  );
-
-  const accessesByHour = useMemo(() => {
-    const buckets = Array.from({ length: 24 }, (_, hour) => ({
-      hour,
-      count: 0,
-    }));
-
-    for (const log of todayLogs) {
-      const createdAt = parseDateTime(log.created_at);
-      if (!createdAt) continue;
-      buckets[createdAt.getHours()].count += 1;
-    }
-
-    return buckets
-      .filter((bucket) => bucket.count > 0)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-  }, [todayLogs]);
-
-  const topMembers = useMemo(() => {
-    const counts = new Map<
-      string,
-      { name: string; count: number; lastAccess: string | null }
-    >();
-
-    for (const log of filteredLogs) {
-      if (!log.member_id || !log.member_name) continue;
-      const existing = counts.get(log.member_id);
-      if (existing) {
-        existing.count += 1;
-        if (
-          log.created_at &&
-          (!existing.lastAccess || log.created_at > existing.lastAccess)
-        ) {
-          existing.lastAccess = log.created_at;
-        }
-      } else {
-        counts.set(log.member_id, {
-          name: log.member_name,
-          count: 1,
-          lastAccess: log.created_at ?? null,
-        });
-      }
-    }
-
-    return Array.from(counts.entries())
-      .map(([memberId, value]) => ({
-        memberId,
-        ...value,
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
-  }, [filteredLogs]);
-
-  const topMembersThisMonth = useMemo(() => {
-    const counts = new Map<
-      string,
-      { name: string; count: number; lastAccess: string | null }
-    >();
-
-    for (const log of logs) {
-      const createdAt = parseDateTime(log.created_at);
-      if (!createdAt || createdAt < startOfMonth) continue;
-      if (!log.member_id || !log.member_name) continue;
-
-      const existing = counts.get(log.member_id);
-      if (existing) {
-        existing.count += 1;
-        if (
-          log.created_at &&
-          (!existing.lastAccess || log.created_at > existing.lastAccess)
-        ) {
-          existing.lastAccess = log.created_at;
-        }
-      } else {
-        counts.set(log.member_id, {
-          name: log.member_name,
-          count: 1,
-          lastAccess: log.created_at ?? null,
-        });
-      }
-    }
-
-    return Array.from(counts.entries())
-      .map(([memberId, value]) => ({
-        memberId,
-        ...value,
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-  }, [logs, startOfMonth]);
-
-  const rangeSummary = useMemo(() => {
-    const total = rangeLogs.length;
-    const active = rangeLogs.filter((log) => log.result === "active").length;
-    const expiring = rangeLogs.filter((log) => log.result === "expiring").length;
-    const expired = rangeLogs.filter((log) => log.result === "expired").length;
-    const notFound = rangeLogs.filter((log) => log.result === "not_found").length;
-    const unique = new Set(
-      rangeLogs
-        .map((log) => log.member_id)
-        .filter((memberId): memberId is string => Boolean(memberId))
-    ).size;
-
-    return {
-      total,
-      active,
-      expiring,
-      expired,
-      notFound,
-      unique,
-    };
-  }, [rangeLogs]);
-
-  const exportCsv = () => {
+  const exportCurrentPageCsv = () => {
     const rows = [
       [
         "fecha_hora",
@@ -379,7 +258,7 @@ export function IncomeManagement({
         "dias_restantes",
         "dias_vencido",
       ],
-      ...filteredLogs.map((log) => [
+      ...((data?.history.items ?? []).map((log) => [
         log.created_at ?? "",
         log.member_name ?? "",
         log.cedula_entered,
@@ -387,7 +266,7 @@ export function IncomeManagement({
         log.message,
         log.days_remaining ?? "",
         log.days_expired ?? "",
-      ]),
+      ]) as string[][]),
     ];
 
     const csvContent = rows
@@ -404,34 +283,27 @@ export function IncomeManagement({
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `ingresos-${gymId}.csv`;
+    anchor.download = `ingresos-${gymId}-pagina-${page}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
 
-  const handleCopy = async () => {
-    if (!accessUrl) return;
+  const rangeStartLabel = useMemo(() => {
+    const raw = data?.meta.rangeStart;
+    if (!raw) return "-";
+    return new Date(raw).toLocaleDateString("es-UY", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  }, [data?.meta.rangeStart]);
 
-    try {
-      await navigator.clipboard.writeText(accessUrl);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch (error) {
-      console.error("Error copying access URL", error);
-    }
-  };
-
-  const handleOpenAccess = () => {
-    if (!accessUrl) return;
-    window.open(accessUrl, "_blank", "noopener,noreferrer");
-  };
-
-  const clearFilters = () => {
-    setSearchTerm("");
-    setStatusFilter("all");
-    setStartDate("");
-    setEndDate("");
-  };
+  const pageStart = data?.history.total
+    ? (data.history.page - 1) * data.history.pageSize + 1
+    : 0;
+  const pageEnd = data?.history.total
+    ? Math.min(data.history.page * data.history.pageSize, data.history.total)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -439,7 +311,7 @@ export function IncomeManagement({
         <h2 className="text-3xl font-bold tracking-tight">Ingresos</h2>
         <p className="text-muted-foreground">
           Gestiona el acceso de socios, copia la ruta pública del teclado de
-          ingreso y analiza los registros del gimnasio.
+          ingreso y analiza los registros sin cargar historiales eternos.
         </p>
       </div>
 
@@ -453,11 +325,15 @@ export function IncomeManagement({
         <CardContent className="space-y-4">
           <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto]">
             <Input value={accessUrl} readOnly className="font-mono text-sm" />
-            <Button type="button" variant="outline" onClick={handleCopy}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleCopy(accessUrl, "normal")}
+            >
               <Copy className="mr-2 h-4 w-4" />
-              {copied ? "Copiado" : "Copiar"}
+              {copied === "normal" ? "Copiado" : "Copiar"}
             </Button>
-            <Button type="button" onClick={handleOpenAccess}>
+            <Button type="button" onClick={() => handleOpenAccess(accessUrl)}>
               <ExternalLink className="mr-2 h-4 w-4" />
               Abrir
             </Button>
@@ -467,27 +343,15 @@ export function IncomeManagement({
             <Button
               type="button"
               variant="outline"
-              onClick={async () => {
-                if (!kioskUrl) return;
-                try {
-                  await navigator.clipboard.writeText(kioskUrl);
-                  setCopied(true);
-                  window.setTimeout(() => setCopied(false), 1800);
-                } catch (error) {
-                  console.error("Error copying kiosk URL", error);
-                }
-              }}
+              onClick={() => handleCopy(kioskUrl, "kiosco")}
             >
               <MonitorSmartphone className="mr-2 h-4 w-4" />
-              Copiar kiosco
+              {copied === "kiosco" ? "Copiado" : "Copiar kiosco"}
             </Button>
             <Button
               type="button"
               variant="outline"
-              onClick={() =>
-                kioskUrl &&
-                window.open(kioskUrl, "_blank", "noopener,noreferrer")
-              }
+              onClick={() => handleOpenAccess(kioskUrl)}
             >
               <ExternalLink className="mr-2 h-4 w-4" />
               Abrir kiosco
@@ -508,13 +372,12 @@ export function IncomeManagement({
             <CardTitle className="text-sm font-medium">Ingresos hoy</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{todayLogs.length}</div>
+            <div className="text-2xl font-bold">{data?.todaySummary.total ?? 0}</div>
             <p className="text-xs text-muted-foreground">
               Total de consultas del día
             </p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">
@@ -522,48 +385,42 @@ export function IncomeManagement({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{uniqueMembersToday}</div>
+            <div className="text-2xl font-bold">{data?.todaySummary.unique ?? 0}</div>
             <p className="text-xs text-muted-foreground">
               Sin contar repeticiones
             </p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Activos hoy</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600">
-              {todayActiveCount}
+              {data?.todaySummary.active ?? 0}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Accesos en verde
-            </p>
+            <p className="text-xs text-muted-foreground">Accesos en verde</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Por vencer</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-600">
-              {todayExpiringCount}
+              {data?.todaySummary.expiring ?? 0}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Accesos en amarillo
-            </p>
+            <p className="text-xs text-muted-foreground">Accesos en amarillo</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Rojos hoy</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-rose-600">
-              {todayExpiredCount + todayNotFoundCount}
+              {(data?.todaySummary.expired ?? 0) +
+                (data?.todaySummary.notFound ?? 0)}
             </div>
             <p className="text-xs text-muted-foreground">
               Vencidos y no encontrados
@@ -572,10 +429,10 @@ export function IncomeManagement({
         </Card>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Filtros y acciones</CardTitle>
+            <CardTitle>Filtros e historial</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -595,9 +452,7 @@ export function IncomeManagement({
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={statusFilter}
                   onChange={(event) =>
-                    setStatusFilter(
-                      event.target.value as MemberAccessLog["result"] | "all"
-                    )
+                    setStatusFilter(event.target.value as StatusFilter)
                   }
                 >
                   <option value="all">Todos</option>
@@ -628,9 +483,12 @@ export function IncomeManagement({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={loadLogs} disabled={loading}>
+              <Button type="button" variant="outline" onClick={loadDashboard} disabled={loading}>
                 <RefreshCcw className="mr-2 h-4 w-4" />
                 {loading ? "Actualizando..." : "Actualizar"}
+              </Button>
+              <Button type="button" onClick={applyFilters}>
+                Aplicar filtros
               </Button>
               <Button type="button" variant="outline" onClick={clearFilters}>
                 Limpiar filtros
@@ -638,11 +496,11 @@ export function IncomeManagement({
               <Button
                 type="button"
                 variant="outline"
-                onClick={exportCsv}
-                disabled={filteredLogs.length === 0}
+                onClick={exportCurrentPageCsv}
+                disabled={!data?.history.items.length}
               >
                 <Download className="mr-2 h-4 w-4" />
-                Exportar CSV
+                Exportar página
               </Button>
             </div>
 
@@ -651,242 +509,7 @@ export function IncomeManagement({
                 {loadError}
               </div>
             ) : null}
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Resumen rápido</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-xl border bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                <Clock3 className="h-4 w-4" />
-                Horas pico de hoy
-              </div>
-              <div className="mt-3 space-y-2">
-                {accessesByHour.length > 0 ? (
-                  accessesByHour.map((bucket) => (
-                    <div
-                      key={bucket.hour}
-                      className="flex items-center justify-between text-sm"
-                    >
-                      <span>{String(bucket.hour).padStart(2, "0")}:00 hs</span>
-                      <Badge variant="secondary">{bucket.count} ingresos</Badge>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Aún no hay ingresos registrados hoy.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                  <UserCheck className="h-4 w-4 text-emerald-600" />
-                  Activos
-                </div>
-                <div className="mt-2 text-2xl font-bold text-emerald-600">
-                  {filteredLogs.filter((log) => log.result === "active").length}
-                </div>
-              </div>
-              <div className="rounded-xl border p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  Por vencer
-                </div>
-                <div className="mt-2 text-2xl font-bold text-amber-600">
-                  {filteredLogs.filter((log) => log.result === "expiring").length}
-                </div>
-              </div>
-              <div className="rounded-xl border p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                  <AlertTriangle className="h-4 w-4 text-rose-600" />
-                  Vencidos
-                </div>
-                <div className="mt-2 text-2xl font-bold text-rose-600">
-                  {filteredLogs.filter((log) => log.result === "expired").length}
-                </div>
-              </div>
-              <div className="rounded-xl border p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                  <SearchX className="h-4 w-4 text-slate-600" />
-                  No encontrados
-                </div>
-                <div className="mt-2 text-2xl font-bold text-slate-700">
-                  {filteredLogs.filter((log) => log.result === "not_found").length}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-cyan-700" />
-                Reportes por rango
-              </CardTitle>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant={reportRange === "week" ? "default" : "outline"}
-                onClick={() => setReportRange("week")}
-              >
-                Semanal
-              </Button>
-              <Button
-                type="button"
-                variant={reportRange === "month" ? "default" : "outline"}
-                onClick={() => setReportRange("month")}
-              >
-                Mensual
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-xl border p-4">
-                <p className="text-sm font-medium text-slate-500">
-                  Total del período
-                </p>
-                <p className="mt-2 text-3xl font-bold">{rangeSummary.total}</p>
-              </div>
-              <div className="rounded-xl border p-4">
-                <p className="text-sm font-medium text-slate-500">
-                  Socios únicos
-                </p>
-                <p className="mt-2 text-3xl font-bold">{rangeSummary.unique}</p>
-              </div>
-              <div className="rounded-xl border p-4">
-                <p className="text-sm font-medium text-slate-500">
-                  Verdes del período
-                </p>
-                <p className="mt-2 text-3xl font-bold text-emerald-600">
-                  {rangeSummary.active}
-                </p>
-              </div>
-              <div className="rounded-xl border p-4">
-                <p className="text-sm font-medium text-slate-500">
-                  Amarillos del período
-                </p>
-                <p className="mt-2 text-3xl font-bold text-amber-600">
-                  {rangeSummary.expiring}
-                </p>
-              </div>
-              <div className="rounded-xl border p-4">
-                <p className="text-sm font-medium text-slate-500">
-                  Rojos vencidos
-                </p>
-                <p className="mt-2 text-3xl font-bold text-rose-600">
-                  {rangeSummary.expired}
-                </p>
-              </div>
-              <div className="rounded-xl border p-4">
-                <p className="text-sm font-medium text-slate-500">
-                  No encontrados
-                </p>
-                <p className="mt-2 text-3xl font-bold text-slate-700">
-                  {rangeSummary.notFound}
-                </p>
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Mostrando datos desde{" "}
-              {reportStart.toLocaleDateString("es-UY", {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-              })}{" "}
-              hasta hoy.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-cyan-700" />
-              Socios que más vinieron este mes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {topMembersThisMonth.length > 0 ? (
-                topMembersThisMonth.map((member, index) => (
-                  <div
-                    key={member.memberId}
-                    className="flex items-center justify-between rounded-xl border p-3"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-100 text-sm font-bold text-cyan-800">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900">{member.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Último ingreso: {formatDateTime(member.lastAccess)}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary">
-                      {member.count} ingreso{member.count === 1 ? "" : "s"}
-                    </Badge>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Aún no hay ingresos registrados este mes para construir el ranking.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Socios con más ingresos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {topMembers.length > 0 ? (
-                topMembers.map((member) => (
-                  <div
-                    key={member.memberId}
-                    className="flex items-center justify-between rounded-xl border p-3"
-                  >
-                    <div>
-                      <p className="font-medium text-slate-900">{member.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Último ingreso: {formatDateTime(member.lastAccess)}
-                      </p>
-                    </div>
-                    <Badge variant="secondary">{member.count} ingresos</Badge>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Aún no hay suficientes datos para mostrar un ranking de socios.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Historial de ingresos</CardTitle>
-          </CardHeader>
-          <CardContent>
             <div className="rounded-xl border">
               <Table>
                 <TableHeader>
@@ -899,8 +522,8 @@ export function IncomeManagement({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredLogs.length > 0 ? (
-                    filteredLogs.slice(0, 120).map((log) => (
+                  {data?.history.items.length ? (
+                    data.history.items.map((log) => (
                       <TableRow key={log.id}>
                         <TableCell className="whitespace-nowrap">
                           {formatDateTime(log.created_at)}
@@ -930,8 +553,180 @@ export function IncomeManagement({
                 </TableBody>
               </Table>
             </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {pageStart} a {pageEnd} de {data?.history.total ?? 0} ingresos.
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page <= 1 || loading}
+                >
+                  <ChevronLeft className="mr-2 h-4 w-4" />
+                  Anterior
+                </Button>
+                <Badge variant="secondary">
+                  Página {data?.history.page ?? page} de {data?.history.totalPages ?? 1}
+                </Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    setPage((current) =>
+                      Math.min(data?.history.totalPages ?? current, current + 1)
+                    )
+                  }
+                  disabled={
+                    loading ||
+                    page >= (data?.history.totalPages ?? 1)
+                  }
+                >
+                  Siguiente
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
+
+        <div className="space-y-4">
+          <Card className="border-slate-800 bg-slate-950 text-slate-100">
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-cyan-700" />
+                Reportes por rango
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={reportRange === "week" ? "default" : "outline"}
+                  onClick={() => setReportRange("week")}
+                >
+                  Semanal
+                </Button>
+                <Button
+                  type="button"
+                  variant={reportRange === "month" ? "default" : "outline"}
+                  onClick={() => setReportRange("month")}
+                >
+                  Mensual
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  <p className="text-sm font-medium text-slate-400">Total del período</p>
+                  <p className="mt-2 text-3xl font-bold">{data?.rangeSummary.total ?? 0}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  <p className="text-sm font-medium text-slate-400">Socios únicos</p>
+                  <p className="mt-2 text-3xl font-bold">{data?.rangeSummary.unique ?? 0}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  <p className="text-sm font-medium text-slate-400">Activos</p>
+                  <p className="mt-2 text-3xl font-bold text-emerald-600">
+                    {data?.rangeSummary.active ?? 0}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  <p className="text-sm font-medium text-slate-400">Por vencer</p>
+                  <p className="mt-2 text-3xl font-bold text-amber-600">
+                    {data?.rangeSummary.expiring ?? 0}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  <p className="text-sm font-medium text-slate-400">Vencidos</p>
+                  <p className="mt-2 text-3xl font-bold text-rose-600">
+                    {data?.rangeSummary.expired ?? 0}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  <p className="text-sm font-medium text-slate-400">No encontrados</p>
+                  <p className="mt-2 text-3xl font-bold text-slate-200">
+                    {data?.rangeSummary.notFound ?? 0}
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-300">
+                Mostrando datos desde {rangeStartLabel} hasta hoy.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-800 bg-slate-950 text-slate-100">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock3 className="h-5 w-5 text-cyan-700" />
+                Horas pico de hoy
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {data?.topHoursToday.length ? (
+                data.topHoursToday.map((bucket) => (
+                  <div
+                    key={bucket.hour}
+                    className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm"
+                  >
+                    <span className="text-slate-100">
+                      {String(bucket.hour).padStart(2, "0")}:00 hs
+                    </span>
+                    <Badge variant="secondary">{bucket.count} ingresos</Badge>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-300">
+                  Aún no hay ingresos registrados hoy.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-800 bg-slate-950 text-slate-100">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-cyan-700" />
+                Socios que más vinieron este mes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {data?.topMembersThisMonth.length ? (
+                  data.topMembersThisMonth.map((member, index) => (
+                    <div
+                      key={`${member.memberId ?? "unknown"}-${index}`}
+                      className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 p-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-100 text-sm font-bold text-cyan-800">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <p className="font-medium text-white">
+                            {member.name ?? "Socio sin nombre"}
+                          </p>
+                          <p className="text-xs text-slate-300">
+                            Último ingreso: {formatDateTime(member.lastAccess)}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="secondary">
+                        {member.count} ingreso{member.count === 1 ? "" : "s"}
+                      </Badge>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-300">
+                    Aún no hay ingresos registrados este mes para construir el ranking.
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
