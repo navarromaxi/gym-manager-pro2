@@ -101,9 +101,12 @@ export default function MemberAccessPage() {
           | null;
 
         if (!response.ok) {
-          throw new Error(
+          setGymName(null);
+          setGymLogoUrl(null);
+          setPageError(
             payload?.error ?? "No se pudo obtener la información del gimnasio."
           );
+          return;
         }
 
         setGymName(payload?.data?.name ?? null);
@@ -300,7 +303,7 @@ export default function MemberAccessPage() {
                           )
                         )
                       }
-                      className={`rounded-2xl border-slate-300 bg-white px-5 text-center font-semibold tracking-[0.32em] text-slate-950 ${
+                      className={`rounded-2xl border-slate-300 bg-white px-5 text-center font-semibold tracking-[0.32em] text-slate-950 placeholder:text-slate-400 ${
                         kioskMode ? "h-24 text-4xl" : "h-20 text-3xl"
                       }`}
                       placeholder="00000000"
@@ -314,7 +317,7 @@ export default function MemberAccessPage() {
                           key={digit}
                           type="button"
                           variant="outline"
-                          className={`rounded-3xl border-slate-300 font-bold text-slate-900 hover:bg-slate-100 ${
+                          className={`rounded-3xl border-slate-300 bg-white font-bold text-slate-950 shadow-sm hover:bg-slate-100 hover:text-slate-950 ${
                             kioskMode ? "h-24 text-4xl" : "h-20 text-3xl"
                           }`}
                           onClick={() => appendDigit(digit)}
@@ -327,7 +330,7 @@ export default function MemberAccessPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className={`rounded-3xl border-slate-300 text-base font-semibold text-slate-700 hover:bg-slate-100 ${
+                      className={`rounded-3xl border-slate-300 bg-white text-base font-semibold text-slate-700 shadow-sm hover:bg-slate-100 hover:text-slate-900 ${
                         kioskMode ? "h-24" : "h-20"
                       }`}
                       onClick={handleClear}
@@ -338,7 +341,7 @@ export default function MemberAccessPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className={`rounded-3xl border-slate-300 font-bold text-slate-900 hover:bg-slate-100 ${
+                      className={`rounded-3xl border-slate-300 bg-white font-bold text-slate-950 shadow-sm hover:bg-slate-100 hover:text-slate-950 ${
                         kioskMode ? "h-24 text-4xl" : "h-20 text-3xl"
                       }`}
                       onClick={() => appendDigit("0")}
@@ -349,7 +352,7 @@ export default function MemberAccessPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className={`rounded-3xl border-slate-300 text-base font-semibold text-slate-700 hover:bg-slate-100 ${
+                      className={`rounded-3xl border-slate-300 bg-white text-base font-semibold text-slate-700 shadow-sm hover:bg-slate-100 hover:text-slate-900 ${
                         kioskMode ? "h-24" : "h-20"
                       }`}
                       onClick={handleBackspace}
@@ -362,7 +365,7 @@ export default function MemberAccessPage() {
 
                   <Button
                     type="button"
-                    className={`w-full rounded-3xl bg-cyan-700 text-lg font-semibold hover:bg-cyan-800 ${
+                    className={`w-full rounded-3xl bg-cyan-700 text-lg font-semibold text-white hover:bg-cyan-800 hover:text-white ${
                       kioskMode ? "h-20 text-xl" : "h-16"
                     }`}
                     onClick={handleSubmit}
