@@ -175,9 +175,13 @@ export function ExpenseManagement({
     setVisibleCount(EXPENSES_PER_BATCH);
   }, [searchTerm, categoryFilter, monthFilter, yearFilter]);
 
-  const currentVisibleCount = Math.min(visibleCount, filteredExpenses.length);
+  const hasActiveSearch = searchTerm.trim().length > 0;
+  const currentVisibleCount = hasActiveSearch
+    ? filteredExpenses.length
+    : Math.min(visibleCount, filteredExpenses.length);
   const displayedExpenses = filteredExpenses.slice(0, currentVisibleCount);
-  const canLoadMore = currentVisibleCount < filteredExpenses.length;
+  const canLoadMore =
+    !hasActiveSearch && currentVisibleCount < filteredExpenses.length;
 
   const handleLoadMore = () => {
     setVisibleCount((prev) =>

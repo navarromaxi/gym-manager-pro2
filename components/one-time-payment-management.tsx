@@ -291,11 +291,15 @@ export function OneTimePaymentManagement({
     setVisibleCount(ONE_TIME_PAGE_SIZE);
   }, [searchTerm, sourceFilter, timeFilter]);
 
+  const hasActiveSearch = searchTerm.trim().length > 0;
   const visibleRecords = useMemo(() => {
-    return filteredRecords.slice(0, visibleCount);
-  }, [filteredRecords, visibleCount]);
+    return hasActiveSearch
+      ? filteredRecords
+      : filteredRecords.slice(0, visibleCount);
+  }, [filteredRecords, visibleCount, hasActiveSearch]);
 
-  const canLoadMore = visibleCount < filteredRecords.length;
+  const canLoadMore =
+    !hasActiveSearch && visibleCount < filteredRecords.length;
 
   const handleLoadMoreRecords = () => {
     setVisibleCount((prev) =>

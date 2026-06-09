@@ -690,6 +690,29 @@ export function ProspectManagement({
     serverPaging,
   ]);
 
+  const hasActiveSearch = searchTerm.trim().length > 0;
+
+  useEffect(() => {
+    if (
+      !serverPaging ||
+      !hasActiveSearch ||
+      !hasMoreOnServer ||
+      loadingMoreFromServer ||
+      !onLoadMoreFromServer
+    ) {
+      return;
+    }
+
+    onLoadMoreFromServer();
+  }, [
+    serverPaging,
+    hasActiveSearch,
+    hasMoreOnServer,
+    loadingMoreFromServer,
+    onLoadMoreFromServer,
+    prospects.length,
+  ]);
+
   const sortedProspects = [...filteredProspects].sort((a, b) => {
     const dateA = new Date(`${a.contact_date}T00:00:00`).getTime();
     const dateB = new Date(`${b.contact_date}T00:00:00`).getTime();
@@ -699,9 +722,12 @@ export function ProspectManagement({
   const totalFiltered = sortedProspects.length;
   const currentVisibleCount = serverPaging
     ? totalFiltered
+    : hasActiveSearch
+    ? totalFiltered
     : Math.min(visibleCount, totalFiltered);
   const displayedProspects = sortedProspects.slice(0, currentVisibleCount);
-  const canLoadMoreLocal = !serverPaging && currentVisibleCount < totalFiltered;
+  const canLoadMoreLocal =
+    !serverPaging && !hasActiveSearch && currentVisibleCount < totalFiltered;
 
   const handleLoadMore = () => {
     setVisibleCount((prev) =>
@@ -714,7 +740,9 @@ export function ProspectManagement({
       ? totalProspectsCount
       : totalFiltered;
 
-  const showLoadMoreButton = serverPaging
+  const showLoadMoreButton = hasActiveSearch
+    ? false
+    : serverPaging
     ? hasMoreOnServer || loadingMoreFromServer
     : canLoadMoreLocal;
 

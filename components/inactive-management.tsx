@@ -101,8 +101,12 @@ export function InactiveManagement({
     setVisibleCount(MEMBERS_PER_BATCH);
   }, [searchTerm, colorFilter, dateFilter, inactiveMembers.length]);
 
-  const displayedInactiveMembers = sortedInactiveMembers.slice(0, visibleCount);
-  const canLoadMore = visibleCount < sortedInactiveMembers.length;
+  const hasActiveSearch = searchTerm.trim().length > 0;
+  const displayedInactiveMembers = hasActiveSearch
+    ? sortedInactiveMembers
+    : sortedInactiveMembers.slice(0, visibleCount);
+  const canLoadMore =
+    !hasActiveSearch && visibleCount < sortedInactiveMembers.length;
 
   const handleLoadMore = () => {
     setVisibleCount((prev) =>

@@ -624,10 +624,13 @@ export function MemberManagement({
     setVisibleCount(MEMBERS_PER_BATCH);
   }, [debouncedSearch, sortOption, statusFilter]);
 
+  const hasActiveSearch = debouncedSearch.length > 0;
   const totalFiltered = filteredMembers.length;
-  const currentVisibleCount = Math.min(visibleCount, totalFiltered);
+  const currentVisibleCount = hasActiveSearch
+    ? totalFiltered
+    : Math.min(visibleCount, totalFiltered);
   const displayedMembers = filteredMembers.slice(0, currentVisibleCount);
-  const canLoadMore = currentVisibleCount < totalFiltered;
+  const canLoadMore = !hasActiveSearch && currentVisibleCount < totalFiltered;
 
   const handleLoadMore = () => {
     setVisibleCount((prev) =>
@@ -1814,6 +1817,7 @@ export function MemberManagement({
                 <TableHead>Nombre</TableHead>
                 <TableHead>Teléfono</TableHead>
                 <TableHead>Plan actual</TableHead>
+                <TableHead>Fecha de registro</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Fin del plan</TableHead>
                 <TableHead>Días Restantes</TableHead>
@@ -1849,6 +1853,11 @@ export function MemberManagement({
                           {(customPlan.name?.trim() || "Personalizado")} - {customPlanEndDate}
                         </div>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      {member.join_date
+                        ? toLocalDate(member.join_date).toLocaleDateString()
+                        : "-"}
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(

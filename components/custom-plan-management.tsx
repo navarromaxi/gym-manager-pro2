@@ -293,13 +293,16 @@ export function CustomPlanManagement({
     setVisiblePlanCount(PLANS_PER_BATCH);
   }, [searchTerm, statusFilter, customPlans]);
 
+  const hasActiveSearch = searchTerm.trim().length > 0;
   const visiblePlans = useMemo(() => {
     if (!sortedPlans.length) return [];
+    if (hasActiveSearch) return sortedPlans;
     const limit = Math.min(visiblePlanCount, sortedPlans.length);
     return sortedPlans.slice(0, limit);
-  }, [sortedPlans, visiblePlanCount]);
+  }, [sortedPlans, visiblePlanCount, hasActiveSearch]);
 
-  const canLoadMorePlans = visiblePlanCount < sortedPlans.length;
+  const canLoadMorePlans =
+    !hasActiveSearch && visiblePlanCount < sortedPlans.length;
 
   const handleLoadMorePlans = () => {
     setVisiblePlanCount((prev) =>

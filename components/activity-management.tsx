@@ -100,8 +100,12 @@ export function ActivityManagement({
     setVisibleCount(ACTIVITIES_PER_BATCH);
   }, [searchTerm, activities]);
 
-  const displayedActivities = filteredActivities.slice(0, visibleCount);
-  const canLoadMore = visibleCount < filteredActivities.length;
+  const hasActiveSearch = searchTerm.trim().length > 0;
+  const displayedActivities = hasActiveSearch
+    ? filteredActivities
+    : filteredActivities.slice(0, visibleCount);
+  const canLoadMore =
+    !hasActiveSearch && visibleCount < filteredActivities.length;
 
   const handleLoadMore = () => {
     setVisibleCount((prev) =>

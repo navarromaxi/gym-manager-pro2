@@ -2013,13 +2013,16 @@ export function PaymentManagement({
     payments,
   ]);
 
+  const hasActiveSearch = searchTerm.trim().length > 0;
   const visiblePayments = useMemo(() => {
     if (!filteredPayments.length) return [];
+    if (hasActiveSearch) return filteredPayments;
     const limit = Math.min(visibleCount, filteredPayments.length);
     return filteredPayments.slice(0, limit);
-  }, [filteredPayments, visibleCount]);
+  }, [filteredPayments, visibleCount, hasActiveSearch]);
 
-  const canLoadMore = visibleCount < filteredPayments.length;
+  const canLoadMore =
+    !hasActiveSearch && visibleCount < filteredPayments.length;
 
   const handleLoadMorePayments = () => {
     setVisibleCount((prev) =>
