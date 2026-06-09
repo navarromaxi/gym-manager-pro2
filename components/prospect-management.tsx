@@ -38,6 +38,7 @@ import {
   Search,
   UserPlus,
   AlertTriangle,
+  Check,
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -538,6 +539,28 @@ export function ProspectManagement({
     );
   };
 
+  const handleMarkNextContactDone = async (prospectId: string) => {
+    try {
+      const { error } = await supabase
+        .from("prospects")
+        .update({ next_contact_date: null })
+        .eq("id", prospectId);
+
+      if (error) throw error;
+
+      setProspects((prev) =>
+        prev.map((prospect) =>
+          prospect.id === prospectId
+            ? { ...prospect, next_contact_date: null }
+            : prospect
+        )
+      );
+    } catch (error) {
+      console.error("Error marcando contacto de interesado como realizado:", error);
+      alert("Error al marcar el contacto como realizado. Inténtalo de nuevo.");
+    }
+  };
+
   useEffect(() => {
     const checkTable = async () => {
       const table = await detectContractTable();
@@ -589,9 +612,7 @@ export function ProspectManagement({
     if (!isClient) return [] as Prospect[];
 
     const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setHours(0, 0, 0, 0);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    today.setHours(0, 0, 0, 0);
 
     return prospects.filter((prospect) => {
       if (!prospect.next_contact_date) {
@@ -611,7 +632,7 @@ export function ProspectManagement({
       const normalized = new Date(nextContact);
       normalized.setHours(0, 0, 0, 0);
 
-      return normalized.getTime() === tomorrow.getTime();
+      return normalized.getTime() === today.getTime();
     });
   })();
 
@@ -2189,7 +2210,7 @@ export function ProspectManagement({
                 <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-purple-600" />
                 <div className="flex-1">
                   <p className="font-semibold">
-                    Mañana debes contactar a {prospect.name}
+                    Hoy debes contactar a {prospect.name}
                   </p>
                   {nextContactLabel ? (
                     <p className="text-xs text-purple-700">
@@ -2202,14 +2223,26 @@ export function ProspectManagement({
                     </p>
                   ) : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleDismissReminder(reminderKey)}
-                  className="ml-2 text-purple-600 transition hover:text-purple-800"
-                  aria-label={`Cerrar recordatorio para ${prospect.name}`}
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="ml-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleMarkNextContactDone(prospect.id)}
+                    className="text-purple-600 transition hover:text-purple-800"
+                    aria-label={`Marcar contacto realizado para ${prospect.name}`}
+                    title="Marcar como contactado"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDismissReminder(reminderKey)}
+                    className="text-purple-600 transition hover:text-purple-800"
+                    aria-label={`Cerrar recordatorio para ${prospect.name}`}
+                    title="Cerrar recordatorio"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             );
           })}
