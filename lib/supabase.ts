@@ -112,6 +112,7 @@ export interface Member {
   inactive_comment?: string
   //balance_due: number
   followed_up?: boolean;
+  expiring_soon_contacted?: boolean;
 }
 
 export interface Payment {

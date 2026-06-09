@@ -389,7 +389,7 @@ export default function GymManagementSystem() {
         supabase
           .from("members")
           .select(
-            "id, gym_id, name, email, phone, cedula, referral_source, join_date, plan, plan_price, last_payment, next_payment, next_installment_due, status, inactive_level, inactive_comment, followed_up, balance_due"
+            "id, gym_id, name, email, phone, cedula, referral_source, join_date, plan, plan_price, last_payment, next_payment, next_installment_due, status, inactive_level, inactive_comment, followed_up, expiring_soon_contacted, balance_due"
           )
           .eq("gym_id", gymId)
           .order("balance_due", { ascending: false })
@@ -740,7 +740,12 @@ export default function GymManagementSystem() {
 
       const next = toLocalDate(member.next_payment);
       const diffDaysToNext = Math.ceil((next.getTime() - todayMs) / 86400000);
-      if (diffDaysToNext <= 7 && diffDaysToNext >= 0) {
+      if (
+        diffDaysToNext <= 10 &&
+        diffDaysToNext >= 0 &&
+        status === "active" &&
+        !member.expiring_soon_contacted
+      ) {
         upcoming += 1;
       }
 

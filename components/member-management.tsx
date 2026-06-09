@@ -564,7 +564,25 @@ export function MemberManagement({
         const diffDays = Math.ceil(
           (nextPayment.getTime() - today.getTime()) / 86400000
         );
-        return diffDays <= 10 && diffDays >= 0 && realStatus === "active";
+        return (
+          diffDays <= 10 &&
+          diffDays >= 0 &&
+          realStatus === "active" &&
+          !member.expiring_soon_contacted
+        );
+      }
+
+      if (statusFilter === "expiring_soon_contacted") {
+        const nextPayment = toLocalDate(member.next_payment);
+        const diffDays = Math.ceil(
+          (nextPayment.getTime() - today.getTime()) / 86400000
+        );
+        return (
+          diffDays <= 10 &&
+          diffDays >= 0 &&
+          realStatus === "active" &&
+          !!member.expiring_soon_contacted
+        );
       }
 
       if (statusFilter === "follow_up") {
@@ -707,6 +725,7 @@ export function MemberManagement({
         inactive_level: inactiveLevel,
         balance_due: newMember.planPrice - paymentAmount,
         followed_up: false,
+        expiring_soon_contacted: false,
       };
 
       // Guardar en Supabase
@@ -799,6 +818,10 @@ export function MemberManagement({
     if (!editingMember) return;
 
     try {
+      const currentMember = members.find((member) => member.id === editingMember.id);
+      const resetExpiringSoonContacted =
+        !!currentMember &&
+        currentMember.next_payment !== editingMember.next_payment;
       const nextPaymentDate = new Date(editingMember.next_payment);
       const today = new Date();
       const diffDays = Math.ceil(
@@ -825,6 +848,9 @@ export function MemberManagement({
           next_payment: editingMember.next_payment,
           next_installment_due:
             editingMember.next_installment_due || editingMember.next_payment,
+          expiring_soon_contacted: resetExpiringSoonContacted
+            ? false
+            : editingMember.expiring_soon_contacted ?? false,
           status: newStatus,
           inactive_level: newInactive,
         })
@@ -850,6 +876,9 @@ export function MemberManagement({
         m.id === editingMember.id
           ? {
               ...editingMember,
+              expiring_soon_contacted: resetExpiringSoonContacted
+                ? false
+                : editingMember.expiring_soon_contacted,
               status: newStatus,
               inactive_level: newInactive,
             }
@@ -952,7 +981,26 @@ export function MemberManagement({
         (nextPayment.getTime() - today.getTime()) / 86400000
       );
       return (
-        diffDays <= 10 && diffDays >= 0 && getRealStatus(member) === "active"
+        diffDays <= 10 &&
+        diffDays >= 0 &&
+        getRealStatus(member) === "active" &&
+        !member.expiring_soon_contacted
+      );
+    });
+  };
+
+  const getExpiringSoonContactedMembers = () => {
+    const today = new Date();
+    return members.filter((member) => {
+      const nextPayment = toLocalDate(member.next_payment);
+      const diffDays = Math.ceil(
+        (nextPayment.getTime() - today.getTime()) / 86400000
+      );
+      return (
+        diffDays <= 10 &&
+        diffDays >= 0 &&
+        getRealStatus(member) === "active" &&
+        !!member.expiring_soon_contacted
       );
     });
   };
@@ -997,7 +1045,29 @@ export function MemberManagement({
     }
   };
 
+  const handleMarkExpiringSoonContacted = async (memberId: string) => {
+    try {
+      const { error } = await supabase
+        .from("members")
+        .update({ expiring_soon_contacted: true })
+        .eq("id", memberId);
+
+      if (error) throw error;
+
+      setMembers(
+        members.map((m) =>
+          m.id === memberId ? { ...m, expiring_soon_contacted: true } : m
+        )
+      );
+      setRefreshKey((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error al marcar próximo a vencerse como contactado:", error);
+      alert("No se pudo marcar el próximo vencimiento como contactado.");
+    }
+  };
+
   const expiringMembers = getExpiringMembers();
+  const expiringSoonContactedMembers = getExpiringSoonContactedMembers();
   const expiredMembers = getExpiredMembers();
   const membersWithBalanceDue = getMembersWithBalanceDue();
   const todayMidnight = new Date();
@@ -1516,6 +1586,9 @@ export function MemberManagement({
                 <SelectItem value="expiring_soon">
                   Próximo a vencerse (10 días)
                 </SelectItem>
+                <SelectItem value="expiring_soon_contacted">
+                  Próximo a vencerse - contactados
+                </SelectItem>
                 <SelectItem value="custom_expiring">
                   Personalizados por vencer (10 días)
                 </SelectItem>
@@ -1621,6 +1694,20 @@ export function MemberManagement({
                 onClick={() => setStatusFilter("expiring_soon")}
               >
                 Ver socios por vencer
+              </Button>
+            </div>
+          )}
+
+          {expiringSoonContactedMembers.length > 0 && (
+            <div className="mt-2 text-sm text-emerald-700 bg-emerald-100 border-l-4 border-emerald-500 p-3 rounded flex justify-between items-center">
+              Tienes {expiringSoonContactedMembers.length} socios próximos a
+              vencer ya contactados.
+              <Button
+                variant="ghost"
+                className="text-emerald-700 hover:underline"
+                onClick={() => setStatusFilter("expiring_soon_contacted")}
+              >
+                Ver contactados
               </Button>
             </div>
           )}
@@ -1818,7 +1905,17 @@ export function MemberManagement({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleMarkAsFollowedUp(member.id)}
+                          onClick={() => {
+                            if (statusFilter === "expiring_soon") {
+                              handleMarkExpiringSoonContacted(member.id);
+                              return;
+                            }
+                            if (statusFilter === "expiring_soon_contacted") {
+                              return;
+                            }
+                            handleMarkAsFollowedUp(member.id);
+                          }}
+                          disabled={statusFilter === "expiring_soon_contacted"}
                         >
                           <span role="img" aria-label="check">
                             ✅

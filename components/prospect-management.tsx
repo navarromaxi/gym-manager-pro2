@@ -955,6 +955,7 @@ export function ProspectManagement({
         inactive_level: inactiveLevel,
         balance_due: conversionData.planPrice - paymentAmount,
         followed_up: false,
+        expiring_soon_contacted: false,
       };
 
       const { description: _memberDescription, ...memberInsert } = newMember;
