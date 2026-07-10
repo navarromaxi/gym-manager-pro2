@@ -113,6 +113,7 @@ export interface Member {
   //balance_due: number
   followed_up?: boolean;
   expiring_soon_contacted?: boolean;
+  long_plan_followed_up?: boolean;
 }
 
 export interface Payment {

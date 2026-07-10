@@ -238,8 +238,6 @@ export function MemberManagement({
   const [visibleCount, setVisibleCount] = useState(MEMBERS_PER_BATCH);
   const [dismissedCustomPlanAlertIds, setDismissedCustomPlanAlertIds] =
     useState<string[]>([]);
-  const [dismissedLongPlanMemberIds, setDismissedLongPlanMemberIds] =
-    useState<string[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeleteMemberId, setPendingDeleteMemberId] =
     useState<string | null>(null);
@@ -485,7 +483,7 @@ export function MemberManagement({
       const member = members.find((m) => m.id === memberId);
       if (!member) continue;
 
-      if (member.followed_up) {
+      if (member.long_plan_followed_up) {
         continue;
       }
 
@@ -534,6 +532,26 @@ export function MemberManagement({
 
     return alerts.sort((a, b) => b.daysSinceStart - a.daysSinceStart);
   }, [payments, members, planById, planByName]);
+  const latestPlanStartDateByMember = useMemo(() => {
+    const map = new Map<string, string>();
+    const timestampByMember = new Map<string, number>();
+
+    for (const payment of payments) {
+      if (payment.type !== "plan" || !payment.start_date) continue;
+
+      const startDate = toLocalDate(payment.start_date);
+      const time = startDate.getTime();
+      if (Number.isNaN(time)) continue;
+
+      const current = timestampByMember.get(payment.member_id) ?? -Infinity;
+      if (time > current) {
+        timestampByMember.set(payment.member_id, time);
+        map.set(payment.member_id, payment.start_date);
+      }
+    }
+
+    return map;
+  }, [payments]);
   const longTermFollowUpMemberIds = useMemo(
     () => new Set(longTermPlanFollowUps.map((alert) => alert.memberId)),
     [longTermPlanFollowUps]
@@ -729,6 +747,7 @@ export function MemberManagement({
         balance_due: newMember.planPrice - paymentAmount,
         followed_up: false,
         expiring_soon_contacted: false,
+        long_plan_followed_up: false,
       };
 
       // Guardar en Supabase
@@ -854,6 +873,7 @@ export function MemberManagement({
           expiring_soon_contacted: resetExpiringSoonContacted
             ? false
             : editingMember.expiring_soon_contacted ?? false,
+          long_plan_followed_up: editingMember.long_plan_followed_up ?? false,
           status: newStatus,
           inactive_level: newInactive,
         })
@@ -882,6 +902,7 @@ export function MemberManagement({
               expiring_soon_contacted: resetExpiringSoonContacted
                 ? false
                 : editingMember.expiring_soon_contacted,
+              long_plan_followed_up: editingMember.long_plan_followed_up,
               status: newStatus,
               inactive_level: newInactive,
             }
@@ -1038,13 +1059,34 @@ export function MemberManagement({
         m.id === memberId ? { ...m, followed_up: true } : m
       );
       setMembers(updatedMembers);
-      setDismissedLongPlanMemberIds((prev) =>
-        prev.includes(memberId) ? prev : [...prev, memberId]
-      );
       setRefreshKey((prev) => prev + 1); // Forzar rerender
     } catch (error) {
       console.error("Error al marcar como contactado:", error);
       alert("No se pudo marcar como contactado.");
+    }
+  };
+
+  const handleMarkLongPlanFollowedUp = async (memberId: string) => {
+    try {
+      const { error } = await supabase
+        .from("members")
+        .update({ long_plan_followed_up: true })
+        .eq("id", memberId);
+
+      if (error) throw error;
+
+      setMembers(
+        members.map((m) =>
+          m.id === memberId ? { ...m, long_plan_followed_up: true } : m
+        )
+      );
+      setRefreshKey((prev) => prev + 1);
+    } catch (error) {
+      console.error(
+        "Error al marcar seguimiento de plan largo como realizado:",
+        error
+      );
+      alert("No se pudo marcar el seguimiento del plan largo.");
     }
   };
 
@@ -1811,19 +1853,20 @@ export function MemberManagement({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          <Table>
+          <Table className="table-fixed text-xs">
             <TableHeader>
               <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Teléfono</TableHead>
-                <TableHead>Plan actual</TableHead>
-                <TableHead>Fecha de registro</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Fin del plan</TableHead>
-                <TableHead>Días Restantes</TableHead>
-                <TableHead>Próxima cuota</TableHead>
-                <TableHead>Saldo Pendiente</TableHead>
-                <TableHead>Acciones</TableHead>
+                <TableHead className="px-2">Nombre</TableHead>
+                <TableHead className="px-2">Teléfono</TableHead>
+                <TableHead className="px-2">Plan actual</TableHead>
+                <TableHead className="px-2">Fecha de registro</TableHead>
+                <TableHead className="px-2">Estado</TableHead>
+                <TableHead className="px-2">Inicio del plan</TableHead>
+                <TableHead className="px-2">Fin del plan</TableHead>
+                <TableHead className="px-2">Días restantes</TableHead>
+                <TableHead className="px-2">Próxima cuota</TableHead>
+                <TableHead className="px-2">Saldo pendiente</TableHead>
+                <TableHead className="px-2">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1831,6 +1874,7 @@ export function MemberManagement({
                 const daysUntilExpiration = getDaysUntilExpiration(
                   member.next_payment
                 );
+                const planStartDate = latestPlanStartDateByMember.get(member.id);
                 const customPlan = latestCustomPlanByMember.get(member.id);
                 const parsedCustomPlanEndDate = customPlan?.end_date
                   ? toLocalDate(customPlan.end_date)
@@ -1842,35 +1886,40 @@ export function MemberManagement({
                     : customPlan?.end_date ?? null;
                 return (
                   <TableRow key={member.id}>
-                    <TableCell className="font-medium">{member.name}</TableCell>
-                    <TableCell>{member.phone || "-"}</TableCell>
-                    <TableCell>
+                    <TableCell className="px-2 font-medium">{member.name}</TableCell>
+                    <TableCell className="px-2">{member.phone || "-"}</TableCell>
+                    <TableCell className="px-2">
                       <div>
                         {member.plan} - ${member.plan_price}
                       </div>
                       {customPlan && customPlanEndDate && (
-                        <div className="ml-4 text-sm text-muted-foreground">
+                        <div className="ml-2 text-[11px] text-muted-foreground">
                           {(customPlan.name?.trim() || "Personalizado")} - {customPlanEndDate}
                         </div>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-2">
                       {member.join_date
                         ? toLocalDate(member.join_date).toLocaleDateString()
                         : "-"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-2">
                       {getStatusBadge(
                         getRealStatus(member),
                         member.inactive_level
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-2">
+                      {planStartDate
+                        ? toLocalDate(planStartDate).toLocaleDateString()
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="px-2">
                       {member.next_payment
                         ? toLocalDate(member.next_payment).toLocaleDateString()
                         : "-"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-2">
                       <span
                         className={`font-medium ${
                           daysUntilExpiration < 0
@@ -1891,7 +1940,7 @@ export function MemberManagement({
                           : `${daysUntilExpiration} días`}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-2">
                       {member.next_installment_due
                         ? toLocalDate(
                             member.next_installment_due
@@ -1900,7 +1949,7 @@ export function MemberManagement({
                         ? toLocalDate(member.next_payment).toLocaleDateString()
                         : "-"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-2">
                       {(member.balance_due ?? 0) > 0 ? (
                         <span className="text-red-600 font-semibold">
                           {`$${(member.balance_due ?? 0).toFixed(2)}`}
@@ -1909,14 +1958,18 @@ export function MemberManagement({
                         "$0.00"
                       )}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
+                    <TableCell className="px-2">
+                      <div className="flex gap-1">
                         <Button
                           variant="outline"
-                          size="sm"
+                          size="icon"
                           onClick={() => {
                             if (statusFilter === "expiring_soon") {
                               handleMarkExpiringSoonContacted(member.id);
+                              return;
+                            }
+                            if (statusFilter === "long_plan_follow_up") {
+                              handleMarkLongPlanFollowedUp(member.id);
                               return;
                             }
                             if (statusFilter === "expiring_soon_contacted") {
@@ -1932,7 +1985,7 @@ export function MemberManagement({
                         </Button>
                         <Button
                           variant="outline"
-                          size="sm"
+                          size="icon"
                           onClick={() => {
                             setEditingMember(member);
                             setIsEditDialogOpen(true);
@@ -1942,7 +1995,7 @@ export function MemberManagement({
                         </Button>
                         <Button
                           variant="outline"
-                          size="sm"
+                          size="icon"
                           onClick={() => {
                             setPendingDeleteMemberId(member.id);
                             setDeleteDialogOpen(true);

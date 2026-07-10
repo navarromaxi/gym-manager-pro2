@@ -247,6 +247,36 @@ const normalizePlan = (plan: any): Plan => ({
   is_active: plan?.is_active ?? true,
 });
 
+const MEMBER_SELECT_FIELDS =
+  "id, gym_id, name, email, phone, cedula, referral_source, join_date, plan, plan_price, last_payment, next_payment, next_installment_due, status, inactive_level, inactive_comment, followed_up, expiring_soon_contacted, long_plan_followed_up, balance_due";
+
+const MEMBER_LEGACY_SELECT_FIELDS =
+  "id, gym_id, name, email, phone, cedula, referral_source, join_date, plan, plan_price, last_payment, next_payment, next_installment_due, status";
+
+const loadMembersWithFallback = async (gymId: string) => {
+  const primaryQuery = await supabase
+    .from("members")
+    .select(MEMBER_SELECT_FIELDS)
+    .eq("gym_id", gymId)
+    .order("balance_due", { ascending: false })
+    .order("last_payment", { ascending: false });
+
+  if (!primaryQuery.error) {
+    return primaryQuery;
+  }
+
+  console.warn(
+    "Fallo la consulta extendida de miembros. Se reintenta con columnas legacy.",
+    primaryQuery.error
+  );
+
+  return supabase
+    .from("members")
+    .select(MEMBER_LEGACY_SELECT_FIELDS)
+    .eq("gym_id", gymId)
+    .order("last_payment", { ascending: false });
+};
+
 const getRealStatus = (m: Member): "active" | "expired" | "inactive" => {
   const today = new Date();
   const next = toLocalDate(m.next_payment);
@@ -386,14 +416,7 @@ export default function GymManagementSystem() {
         { data: customPlansData, error: customPlansError },
         { data: oneTimePaymentsData, error: oneTimePaymentsError },
       ] = await Promise.all([
-        supabase
-          .from("members")
-          .select(
-            "id, gym_id, name, email, phone, cedula, referral_source, join_date, plan, plan_price, last_payment, next_payment, next_installment_due, status, inactive_level, inactive_comment, followed_up, expiring_soon_contacted, balance_due"
-          )
-          .eq("gym_id", gymId)
-          .order("balance_due", { ascending: false })
-          .order("last_payment", { ascending: false }),
+        loadMembersWithFallback(gymId),
         supabase
           .from("payments")
           .select(

@@ -2261,6 +2261,7 @@ export function PaymentManagement({
             next_payment: nextPaymentISO,
             next_installment_due: nextInstallmentDue,
             expiring_soon_contacted: false,
+            long_plan_followed_up: false,
             status: "active",
           })
           .eq("id", selectedMember.id);
@@ -2275,6 +2276,7 @@ export function PaymentManagement({
           next_payment: nextPaymentISO,
           next_installment_due: nextInstallmentDue,
           expiring_soon_contacted: false,
+          long_plan_followed_up: false,
           status: "active" as const,
         };
 
