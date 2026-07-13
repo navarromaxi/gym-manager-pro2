@@ -2,7 +2,7 @@
 
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, updateMemberWithFallback } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getRealStatus } from "@/lib/utils";
@@ -119,10 +119,9 @@ export function InactiveManagement({
     memberId: string,
     newLevel: "green" | "yellow" | "red"
   ) => {
-    const { error } = await supabase
-      .from("members")
-      .update({ inactive_level: newLevel })
-      .eq("id", memberId);
+    const { error } = await updateMemberWithFallback(memberId, {
+      inactive_level: newLevel,
+    });
 
     if (error) {
       console.error("Error actualizando nivel inactivo:", error);
@@ -163,10 +162,9 @@ export function InactiveManagement({
 
   const updateMemberComment = async (memberId: string, comment: string) => {
     // Actualizar en Supabase
-    const { error } = await supabase
-      .from("members")
-      .update({ inactive_comment: comment })
-      .eq("id", memberId);
+    const { error } = await updateMemberWithFallback(memberId, {
+      inactive_comment: comment,
+    });
 
     if (error) {
       console.error("Error actualizando comentario:", error);

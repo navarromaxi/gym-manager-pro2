@@ -42,7 +42,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Edit, Trash2, Search, CalendarClock, X } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import {
+  insertMemberWithFallback,
+  supabase,
+  updateMemberWithFallback,
+} from "@/lib/supabase";
 import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
 import { detectContractTable } from "@/lib/contract-table";
 import type { ContractTableName } from "@/lib/contract-table";
@@ -752,9 +756,7 @@ export function MemberManagement({
 
       // Guardar en Supabase
       const { description: _memberDescription, ...memberInsert } = member;
-      const { error: memberError } = await supabase
-        .from("members")
-        .insert([memberInsert]);
+      const { error: memberError } = await insertMemberWithFallback(memberInsert);
 
       if (memberError) throw memberError;
 
@@ -859,25 +861,21 @@ export function MemberManagement({
           newInactive = "yellow";
         }
       }
-      const { error } = await supabase
-        .from("members")
-        .update({
-          name: editingMember.name,
-          email: editingMember.email,
-          phone: editingMember.phone,
-          cedula: editingMember.cedula ?? null,
-          //description: editingMember.description || null,
-          next_payment: editingMember.next_payment,
-          next_installment_due:
-            editingMember.next_installment_due || editingMember.next_payment,
-          expiring_soon_contacted: resetExpiringSoonContacted
-            ? false
-            : editingMember.expiring_soon_contacted ?? false,
-          long_plan_followed_up: editingMember.long_plan_followed_up ?? false,
-          status: newStatus,
-          inactive_level: newInactive,
-        })
-        .eq("id", editingMember.id);
+      const { error } = await updateMemberWithFallback(editingMember.id, {
+        name: editingMember.name,
+        email: editingMember.email,
+        phone: editingMember.phone,
+        cedula: editingMember.cedula ?? null,
+        next_payment: editingMember.next_payment,
+        next_installment_due:
+          editingMember.next_installment_due || editingMember.next_payment,
+        expiring_soon_contacted: resetExpiringSoonContacted
+          ? false
+          : editingMember.expiring_soon_contacted ?? false,
+        long_plan_followed_up: editingMember.long_plan_followed_up ?? false,
+        status: newStatus,
+        inactive_level: newInactive,
+      });
 
       if (error) throw error;
 
@@ -1048,10 +1046,9 @@ export function MemberManagement({
   //Función para marcar como contactado
   const handleMarkAsFollowedUp = async (memberId: string) => {
     try {
-      const { error } = await supabase
-        .from("members")
-        .update({ followed_up: true })
-        .eq("id", memberId);
+      const { error } = await updateMemberWithFallback(memberId, {
+        followed_up: true,
+      });
 
       if (error) throw error;
 
@@ -1068,10 +1065,9 @@ export function MemberManagement({
 
   const handleMarkLongPlanFollowedUp = async (memberId: string) => {
     try {
-      const { error } = await supabase
-        .from("members")
-        .update({ long_plan_followed_up: true })
-        .eq("id", memberId);
+      const { error } = await updateMemberWithFallback(memberId, {
+        long_plan_followed_up: true,
+      });
 
       if (error) throw error;
 
@@ -1092,10 +1088,9 @@ export function MemberManagement({
 
   const handleMarkExpiringSoonContacted = async (memberId: string) => {
     try {
-      const { error } = await supabase
-        .from("members")
-        .update({ expiring_soon_contacted: true })
-        .eq("id", memberId);
+      const { error } = await updateMemberWithFallback(memberId, {
+        expiring_soon_contacted: true,
+      });
 
       if (error) throw error;
 

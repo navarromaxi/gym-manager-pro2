@@ -41,7 +41,7 @@ import {
   Check,
   X,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { insertMemberWithFallback, supabase } from "@/lib/supabase";
 import type { Prospect, Member, Payment, Plan } from "@/lib/supabase";
 import { mapProspectStatusToDb } from "@/lib/prospect-status";
 import { detectContractTable } from "@/lib/contract-table";
@@ -988,9 +988,7 @@ export function ProspectManagement({
       };
 
       const { description: _memberDescription, ...memberInsert } = newMember;
-      const { error: memberError } = await supabase
-        .from("members")
-        .insert([memberInsert]);
+      const { error: memberError } = await insertMemberWithFallback(memberInsert);
       if (memberError) throw memberError;
 
       // 2. Crear el pago inicial

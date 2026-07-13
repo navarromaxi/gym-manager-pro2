@@ -116,6 +116,138 @@ export interface Member {
   long_plan_followed_up?: boolean;
 }
 
+const MEMBER_BASE_SELECT_COLUMNS = [
+  "id",
+  "gym_id",
+  "name",
+  "email",
+  "phone",
+  "cedula",
+  "referral_source",
+  "join_date",
+  "plan",
+  "plan_price",
+  "last_payment",
+  "next_payment",
+  "status",
+] as const
+
+const MEMBER_OPTIONAL_SELECT_COLUMNS = [
+  "next_installment_due",
+  "inactive_level",
+  "inactive_comment",
+  "followed_up",
+  "expiring_soon_contacted",
+  "long_plan_followed_up",
+  "balance_due",
+] as const
+
+const buildMemberSelectColumns = (optionalColumns: readonly string[]) =>
+  [...MEMBER_BASE_SELECT_COLUMNS, ...optionalColumns].join(", ")
+
+const getErrorText = (error: any) =>
+  [error?.message, error?.details, error?.hint].filter(Boolean).join(" ")
+
+const extractMissingMembersColumn = (error: any): string | null => {
+  const text = getErrorText(error)
+  if (!text) return null
+
+  const qualifiedMatch = text.match(/members\.([a-zA-Z0-9_]+)/i)
+  if (qualifiedMatch?.[1]) {
+    return qualifiedMatch[1]
+  }
+
+  const genericMatch = text.match(/column ['"]?([a-zA-Z0-9_]+)['"]? does not exist/i)
+  return genericMatch?.[1] ?? null
+}
+
+export async function selectMembersWithFallback(gymId: string) {
+  const optionalColumns = [...MEMBER_OPTIONAL_SELECT_COLUMNS]
+
+  while (true) {
+    const selectedColumns = buildMemberSelectColumns(optionalColumns)
+    let query = supabase
+      .from("members")
+      .select(selectedColumns)
+      .eq("gym_id", gymId)
+
+    if (optionalColumns.includes("balance_due")) {
+      query = query
+        .order("balance_due", { ascending: false })
+        .order("last_payment", { ascending: false })
+    } else {
+      query = query.order("last_payment", { ascending: false })
+    }
+
+    const result = await query
+    if (!result.error) {
+      return result
+    }
+
+    const missingColumn = extractMissingMembersColumn(result.error)
+    if (!missingColumn || !optionalColumns.includes(missingColumn as any)) {
+      return result
+    }
+
+    const index = optionalColumns.indexOf(missingColumn as any)
+    optionalColumns.splice(index, 1)
+    console.warn(
+      `Columna opcional de members no disponible: ${missingColumn}. Se reintenta sin ella.`,
+      result.error
+    )
+  }
+}
+
+const cloneWithoutKey = <T extends Record<string, any>>(value: T, key: string) => {
+  const next = { ...value }
+  delete next[key]
+  return next
+}
+
+async function runMembersWriteWithFallback<T>(
+  initialPayload: Record<string, any>,
+  execute: (payload: Record<string, any>) => PromiseLike<T & { error?: any }>
+) {
+  let payload = { ...initialPayload }
+
+  while (true) {
+    const result = await execute(payload)
+    if (!result.error) {
+      return result
+    }
+
+    const missingColumn = extractMissingMembersColumn(result.error)
+    if (!missingColumn || !(missingColumn in payload)) {
+      return result
+    }
+
+    payload = cloneWithoutKey(payload, missingColumn)
+    console.warn(
+      `Columna opcional de members no disponible en escritura: ${missingColumn}. Se reintenta sin ella.`,
+      result.error
+    )
+  }
+}
+
+export async function insertMemberWithFallback(member: Record<string, any>) {
+  return runMembersWriteWithFallback(member, (payload) =>
+    supabase.from("members").insert([payload]).then((result) => result)
+  )
+}
+
+export async function updateMemberWithFallback(
+  memberId: string,
+  changes: Record<string, any>
+) {
+  return runMembersWriteWithFallback(changes, (payload) =>
+    supabase
+      .from("members")
+      .update(payload)
+      .eq("id", memberId)
+      .then((result) => result)
+  )
+}
+
 export interface Payment {
   id: string
   gym_id: string

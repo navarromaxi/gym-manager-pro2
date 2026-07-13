@@ -42,7 +42,7 @@ import {
   Receipt,
   ShieldAlert,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase, updateMemberWithFallback } from "@/lib/supabase";
 import type {
   Member,
   Payment,
@@ -1546,10 +1546,10 @@ export function PaymentManagement({
       last_payment: latestDate ?? null,
     };
 
-    const { error: memberError } = await supabase
-      .from("members")
-      .update(memberUpdate)
-      .eq("id", member.id);
+    const { error: memberError } = await updateMemberWithFallback(
+      member.id,
+      memberUpdate
+    );
 
     if (memberError) throw memberError;
 
@@ -1593,10 +1593,10 @@ export function PaymentManagement({
       last_payment: latestDate ?? null,
     };
 
-    const { error: memberError } = await supabase
-      .from("members")
-      .update(memberUpdate)
-      .eq("id", member.id);
+    const { error: memberError } = await updateMemberWithFallback(
+      member.id,
+      memberUpdate
+    );
 
     if (memberError) throw memberError;
 
@@ -2251,9 +2251,9 @@ export function PaymentManagement({
           ? balanceDueActual + planAmountValue - newPayment.amount
           : balanceDueActual - newPayment.amount;
 
-        const { error: memberError } = await supabase
-          .from("members")
-          .update({
+        const { error: memberError } = await updateMemberWithFallback(
+          selectedMember.id,
+          {
             plan: selectedPlan.name,
             plan_price: planAmountValue,
             balance_due: Math.max(newBalance, 0),
@@ -2263,8 +2263,8 @@ export function PaymentManagement({
             expiring_soon_contacted: false,
             long_plan_followed_up: false,
             status: "active",
-          })
-          .eq("id", selectedMember.id);
+          }
+        );
         if (memberError) throw memberError;
 
         const updatedMember = {
@@ -2355,16 +2355,16 @@ export function PaymentManagement({
           .insert([payment]);
         if (paymentError) throw paymentError;
 
-        const { error: memberError } = await supabase
-          .from("members")
-          .update({
+        const { error: memberError } = await updateMemberWithFallback(
+          selectedMember.id,
+          {
             balance_due: Math.max(newBalance, 0),
             last_payment: newPayment.date,
             next_installment_due:
               newBalance > 0 ? newPayment.nextInstallmentDue : null,
             status: "active",
-          })
-          .eq("id", selectedMember.id);
+          }
+        );
         if (memberError) throw memberError;
 
         const updatedMember = {
