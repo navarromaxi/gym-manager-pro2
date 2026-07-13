@@ -984,7 +984,6 @@ export function ProspectManagement({
         balance_due: conversionData.planPrice - paymentAmount,
         followed_up: false,
         expiring_soon_contacted: false,
-        long_plan_followed_up: false,
       };
 
       const { description: _memberDescription, ...memberInsert } = newMember;

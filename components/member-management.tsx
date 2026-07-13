@@ -751,7 +751,6 @@ export function MemberManagement({
         balance_due: newMember.planPrice - paymentAmount,
         followed_up: false,
         expiring_soon_contacted: false,
-        long_plan_followed_up: false,
       };
 
       // Guardar en Supabase
@@ -872,7 +871,6 @@ export function MemberManagement({
         expiring_soon_contacted: resetExpiringSoonContacted
           ? false
           : editingMember.expiring_soon_contacted ?? false,
-        long_plan_followed_up: editingMember.long_plan_followed_up ?? false,
         status: newStatus,
         inactive_level: newInactive,
       });
@@ -900,7 +898,6 @@ export function MemberManagement({
               expiring_soon_contacted: resetExpiringSoonContacted
                 ? false
                 : editingMember.expiring_soon_contacted,
-              long_plan_followed_up: editingMember.long_plan_followed_up,
               status: newStatus,
               inactive_level: newInactive,
             }
@@ -1065,12 +1062,6 @@ export function MemberManagement({
 
   const handleMarkLongPlanFollowedUp = async (memberId: string) => {
     try {
-      const { error } = await updateMemberWithFallback(memberId, {
-        long_plan_followed_up: true,
-      });
-
-      if (error) throw error;
-
       setMembers(
         members.map((m) =>
           m.id === memberId ? { ...m, long_plan_followed_up: true } : m

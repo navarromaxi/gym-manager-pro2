@@ -138,7 +138,6 @@ const MEMBER_OPTIONAL_SELECT_COLUMNS = [
   "inactive_comment",
   "followed_up",
   "expiring_soon_contacted",
-  "long_plan_followed_up",
   "balance_due",
 ] as const
 
