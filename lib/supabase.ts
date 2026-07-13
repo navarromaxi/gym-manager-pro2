@@ -157,6 +157,13 @@ const extractMissingMembersColumn = (error: any): string | null => {
     return qualifiedMatch[1]
   }
 
+  const schemaCacheMatch = text.match(
+    /could not find the ['"]?([a-zA-Z0-9_]+)['"]? column of ['"]?members['"]? in the schema cache/i
+  )
+  if (schemaCacheMatch?.[1]) {
+    return schemaCacheMatch[1]
+  }
+
   const genericMatch = text.match(/column ['"]?([a-zA-Z0-9_]+)['"]? does not exist/i)
   return genericMatch?.[1] ?? null
 }
