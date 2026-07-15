@@ -414,14 +414,14 @@ export function InactiveManagement({
           <Table className="w-full table-fixed text-xs">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[15%] px-2 text-[11px]">Socio</TableHead>
-                <TableHead className="w-[11%] px-2 text-[11px]">Contacto</TableHead>
+                <TableHead className="w-[16%] px-1 text-[11px]">Socio</TableHead>
+                <TableHead className="w-[12%] px-1 text-[11px]">Contacto</TableHead>
                 <TableHead>Último Plan</TableHead>
                 <TableHead>Último Pago</TableHead>
                 <TableHead>Días Inactivo</TableHead>
                 <TableHead>Clasificación</TableHead>
-                <TableHead className="w-[12%] px-2 text-[11px]">Comentario</TableHead>
-                <TableHead className="w-[7%] px-2 text-[11px]">Acciones</TableHead>
+                <TableHead className="w-[14%] px-1 text-[11px]">Comentario</TableHead>
+                <TableHead className="w-[8%] px-1 text-[11px]">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -433,7 +433,7 @@ export function InactiveManagement({
 
                 return (
                   <TableRow key={member.id}>
-                    <TableCell className="px-2 align-top">
+                    <TableCell className="px-1.5 align-top">
                       <div>
                         <div className="break-words font-medium leading-snug">
                           {member.name}
@@ -444,7 +444,7 @@ export function InactiveManagement({
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="px-2 align-top">
+                    <TableCell className="px-1.5 align-top">
                       <div className="space-y-1">
                         <div className="flex items-start gap-1 text-[11px] leading-snug">
                           <Mail className="mt-0.5 h-3 w-3 shrink-0" />
@@ -456,7 +456,7 @@ export function InactiveManagement({
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="px-2 align-top">
+                    <TableCell className="px-1.5 align-top">
                       <div>
                         <div className="break-words font-medium leading-snug">
                           {member.plan}
@@ -466,7 +466,7 @@ export function InactiveManagement({
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="px-2 align-top">
+                    <TableCell className="px-1.5 align-top">
                       <div>
                         <div className="font-medium">
                           {new Date(member.last_payment).toLocaleDateString()}
@@ -476,7 +476,7 @@ export function InactiveManagement({
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="px-2 align-top">
+                    <TableCell className="px-1.5 align-top">
                       <div className="flex items-center gap-1">
                         <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
                         <span className="font-medium text-red-600">
@@ -484,10 +484,10 @@ export function InactiveManagement({
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="px-2 align-top">
+                    <TableCell className="px-1.5 align-top">
                       {getColorBadge(member.inactive_level)}
                     </TableCell>
-                    <TableCell className="px-2 align-top">
+                    <TableCell className="px-1.5 align-top">
                       <div className="line-clamp-3 break-words text-[11px] leading-snug text-gray-300">
                         {member.inactive_comment || (
                           <span className="text-xs text-muted-foreground">
@@ -496,12 +496,12 @@ export function InactiveManagement({
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="px-2 align-top">
-                      <div className="flex gap-1">
+                    <TableCell className="px-1.5 align-top">
+                      <div className="flex flex-nowrap items-center gap-1">
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-9 w-9 bg-green-50 hover:bg-green-100"
+                          className="h-8 w-8 rounded-full border-green-200 bg-green-50 p-0 hover:bg-green-100"
                           onClick={() =>
                             updateInactiveLevel(member.id, "green")
                           }
@@ -511,7 +511,7 @@ export function InactiveManagement({
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-9 w-9 bg-yellow-50 hover:bg-yellow-100"
+                          className="h-8 w-8 rounded-full border-yellow-200 bg-yellow-50 p-0 hover:bg-yellow-100"
                           onClick={() =>
                             updateInactiveLevel(member.id, "yellow")
                           }
@@ -521,7 +521,7 @@ export function InactiveManagement({
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-9 w-9 bg-red-50 hover:bg-red-100"
+                          className="h-8 w-8 rounded-full border-red-200 bg-red-50 p-0 hover:bg-red-100"
                           onClick={() => updateInactiveLevel(member.id, "red")}
                         >
                           <div className="w-3 h-3 bg-red-500 rounded-full"></div>
@@ -529,7 +529,7 @@ export function InactiveManagement({
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-9 w-9"
+                          className="h-8 w-8 rounded-full p-0"
                           onClick={() => {
                             setEditingComment({
                               memberId: member.id,
@@ -598,7 +598,7 @@ export function InactiveManagement({
               <div className="text-lg font-semibold text-white">
                 {editingComment?.memberName || "-"}
               </div>
-              <div className="mt-2 text-sm text-zinc-400">
+              <div className="hidden">
                 Este comentario quedarÃ¡ asociado al seguimiento del contacto.
               </div>
             </div>
