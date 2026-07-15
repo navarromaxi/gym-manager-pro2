@@ -24,7 +24,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Users, Phone, Mail, AlertTriangle } from "lucide-react";
+import {
+  Search,
+  Users,
+  Phone,
+  Mail,
+  AlertTriangle,
+  Sparkles,
+} from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -55,6 +62,7 @@ export function InactiveManagement({
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
   const [editingComment, setEditingComment] = useState<{
     memberId: string;
+    memberName: string;
     comment: string;
   } | null>(null);
 
@@ -402,19 +410,18 @@ export function InactiveManagement({
             Socios Inactivos ({filteredInactiveMembers.length})
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
+        <CardContent className="overflow-x-hidden">
+          <Table className="w-full table-fixed text-xs">
             <TableHeader>
               <TableRow>
-                <TableHead>Socio</TableHead>
-                <TableHead>Contacto</TableHead>
+                <TableHead className="w-[15%] px-2 text-[11px]">Socio</TableHead>
+                <TableHead className="w-[11%] px-2 text-[11px]">Contacto</TableHead>
                 <TableHead>Último Plan</TableHead>
                 <TableHead>Último Pago</TableHead>
                 <TableHead>Días Inactivo</TableHead>
-                <TableHead>Total Pagado</TableHead>
                 <TableHead>Clasificación</TableHead>
-                <TableHead>Comentarios</TableHead>
-                <TableHead>Acciones</TableHead>
+                <TableHead className="w-[12%] px-2 text-[11px]">Comentario</TableHead>
+                <TableHead className="w-[7%] px-2 text-[11px]">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -426,68 +433,62 @@ export function InactiveManagement({
 
                 return (
                   <TableRow key={member.id}>
-                    <TableCell>
+                    <TableCell className="px-2 align-top">
                       <div>
-                        <div className="font-medium">{member.name}</div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="break-words font-medium leading-snug">
+                          {member.name}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
                           Socio desde:{" "}
                           {new Date(member.join_date).toLocaleDateString()}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-2 align-top">
                       <div className="space-y-1">
-                        <div className="flex items-center text-sm">
-                          <Mail className="h-3 w-3 mr-1" />
-                          {member.email}
+                        <div className="flex items-start gap-1 text-[11px] leading-snug">
+                          <Mail className="mt-0.5 h-3 w-3 shrink-0" />
+                          <span className="break-all">{member.email || "-"}</span>
                         </div>
-                        <div className="flex items-center text-sm">
-                          <Phone className="h-3 w-3 mr-1" />
-                          {member.phone}
+                        <div className="flex items-start gap-1 text-[11px] leading-snug">
+                          <Phone className="mt-0.5 h-3 w-3 shrink-0" />
+                          <span className="break-all">{member.phone || "-"}</span>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-2 align-top">
                       <div>
-                        <div className="font-medium">{member.plan}</div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="break-words font-medium leading-snug">
+                          {member.plan}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
                           ${member.plan_price}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-2 align-top">
                       <div>
                         <div className="font-medium">
                           {new Date(member.last_payment).toLocaleDateString()}
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-[11px] text-muted-foreground">
                           ${paymentInfo.lastPaymentAmount}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <AlertTriangle className="h-4 w-4 mr-1 text-red-500" />
+                    <TableCell className="px-2 align-top">
+                      <div className="flex items-center gap-1">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
                         <span className="font-medium text-red-600">
                           {daysSinceLastPayment} días
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">
-                          ${paymentInfo.totalPaid.toLocaleString()}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {paymentInfo.paymentCount} pagos
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
+                    <TableCell className="px-2 align-top">
                       {getColorBadge(member.inactive_level)}
                     </TableCell>
-                    <TableCell>
-                      <div className="w-[150px] overflow-hidden whitespace-nowrap text-ellipsis text-sm text-gray-300">
+                    <TableCell className="px-2 align-top">
+                      <div className="line-clamp-3 break-words text-[11px] leading-snug text-gray-300">
                         {member.inactive_comment || (
                           <span className="text-xs text-muted-foreground">
                             Sin comentarios
@@ -495,12 +496,12 @@ export function InactiveManagement({
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-1">
+                    <TableCell className="px-2 align-top">
+                      <div className="flex gap-1">
                         <Button
                           variant="outline"
-                          size="sm"
-                          className="bg-green-50 hover:bg-green-100"
+                          size="icon"
+                          className="h-9 w-9 bg-green-50 hover:bg-green-100"
                           onClick={() =>
                             updateInactiveLevel(member.id, "green")
                           }
@@ -509,8 +510,8 @@ export function InactiveManagement({
                         </Button>
                         <Button
                           variant="outline"
-                          size="sm"
-                          className="bg-yellow-50 hover:bg-yellow-100"
+                          size="icon"
+                          className="h-9 w-9 bg-yellow-50 hover:bg-yellow-100"
                           onClick={() =>
                             updateInactiveLevel(member.id, "yellow")
                           }
@@ -519,18 +520,20 @@ export function InactiveManagement({
                         </Button>
                         <Button
                           variant="outline"
-                          size="sm"
-                          className="bg-red-50 hover:bg-red-100"
+                          size="icon"
+                          className="h-9 w-9 bg-red-50 hover:bg-red-100"
                           onClick={() => updateInactiveLevel(member.id, "red")}
                         >
                           <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                         </Button>
                         <Button
                           variant="outline"
-                          size="sm"
+                          size="icon"
+                          className="h-9 w-9"
                           onClick={() => {
                             setEditingComment({
                               memberId: member.id,
+                              memberName: member.name,
                               comment: member.inactive_comment || "",
                             });
                             setIsCommentDialogOpen(true);
@@ -568,16 +571,41 @@ export function InactiveManagement({
 
       {/* Comment Dialog */}
       <Dialog open={isCommentDialogOpen} onOpenChange={setIsCommentDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="overflow-hidden border-0 bg-zinc-950 p-0 text-zinc-50 sm:max-w-[460px]">
           <DialogHeader>
-            <DialogTitle>Agregar Comentario</DialogTitle>
-            <DialogDescription>
-              Agrega un comentario sobre el estado del socio inactivo.
-            </DialogDescription>
+            <div className="bg-[linear-gradient(135deg,#f59e0b_0%,#f97316_45%,#fb7185_100%)] px-6 py-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <DialogTitle className="flex items-center gap-2 text-xl text-white">
+                    <Sparkles className="h-5 w-5" />
+                    Agregar comentario
+                  </DialogTitle>
+                  <DialogDescription className="mt-1 text-sm text-orange-50/90">
+                    Deja una nota clara y útil para el seguimiento del socio.
+                  </DialogDescription>
+                </div>
+                <div className="rounded-full bg-white/20 px-3 py-1 text-xs font-medium text-white backdrop-blur">
+                  Inactivos
+                </div>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="space-y-5 px-6 py-5">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.25)]">
+              <div className="mb-1 text-xs uppercase tracking-[0.24em] text-orange-300">
+                Socio seleccionado
+              </div>
+              <div className="text-lg font-semibold text-white">
+                {editingComment?.memberName || "-"}
+              </div>
+              <div className="mt-2 text-sm text-zinc-400">
+                Este comentario quedarÃ¡ asociado al seguimiento del contacto.
+              </div>
+            </div>
             <div className="grid gap-2">
-              <Label htmlFor="comment">Comentario</Label>
+              <Label htmlFor="comment" className="text-zinc-200">
+                Comentario
+              </Label>
               <Textarea
                 id="comment"
                 value={editingComment?.comment || ""}
@@ -587,18 +615,20 @@ export function InactiveManagement({
                   )
                 }
                 placeholder="Ej: Me contacté y ya no es posible que vuelva, se fue del país."
-                className="min-h-[100px]"
+                className="min-h-[140px] rounded-2xl border-white/10 bg-white/5 text-zinc-50 placeholder:text-zinc-500 focus-visible:ring-orange-400"
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-white/10 bg-black/20 px-6 py-4">
             <Button
               variant="outline"
+              className="border-white/15 bg-transparent text-zinc-200 hover:bg-white/10 hover:text-white"
               onClick={() => setIsCommentDialogOpen(false)}
             >
               Cancelar
             </Button>
             <Button
+              className="bg-[linear-gradient(135deg,#f59e0b_0%,#f97316_100%)] text-white hover:opacity-95"
               onClick={() => {
                 if (editingComment) {
                   updateMemberComment(
