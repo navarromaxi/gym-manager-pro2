@@ -49,6 +49,10 @@ import { ReportsSummaryCards } from "@/features/reports/components/summary-cards
 import { PaymentDistributionCards } from "@/features/reports/components/payment-distribution-cards";
 import { LeadConversionCards } from "@/features/reports/components/lead-conversion-cards";
 import { AdditionalIncomeCards } from "@/features/reports/components/additional-income-cards";
+import { ReportsToolbar } from "@/features/reports/components/reports-toolbar";
+import { UpcomingExpirationsCard } from "@/features/reports/components/upcoming-expirations-card";
+import { calculateAverageActiveMembersByMonth } from "@/features/reports/average-active-members-calculation";
+import { calculateLast6MonthsIncome, calculateRenewalStats } from "@/features/reports/report-calculations";
 import {
   addMonthsClamped,
   downloadBlob,
@@ -556,48 +560,13 @@ const isWithinPeriod = (date: Date) => {
     (payment) => !payment.type || payment.type === "plan"
   );
 
-  const getRenewalStats = () => {
-    // Conteo histórico de pagos de planes por socio
-    const historicalCounts: Record<string, number> = {};
-    for (const payment of payments) {
-      if (payment.type && payment.type !== "plan") continue;
-      const memberId = memberIdOf(payment);
-      if (!memberId) continue;
-      historicalCounts[memberId] = (historicalCounts[memberId] || 0) + 1;
-    }
-
-  const filteredMemberIds = new Set<string>();
-    for (const payment of filteredPlanPayments) {
-      const memberId = memberIdOf(payment);
-      if (!memberId) continue;
-      filteredMemberIds.add(memberId);
-    }
-
-   const renewedCount = Array.from(filteredMemberIds).filter(
-      (memberId) => (historicalCounts[memberId] || 0) > 1
-    ).length;
-
-  const notRenewedMembers = membersWithDerived.filter((member) => {
-      if (member.derivedStatus === "active") return false;
-      if (periodStart || periodEnd) {
-        if (!member._next) return false;
-        if (periodStart && member._next < periodStart) return false;
-        if (periodEnd && member._next > periodEnd) return false;
-      }
-      return true;
-    });
-
-    const notRenewedCount = notRenewedMembers.length;
-    const totalEligible = renewedCount + notRenewedCount;
-    const renewalRate =
-      totalEligible > 0 ? Math.round((renewedCount / totalEligible) * 100) : 0;
-
-    return { renewedCount, notRenewedCount, renewalRate, totalEligible };
-  };
-
-
-
-  const renewalStats = getRenewalStats();
+  const renewalStats = calculateRenewalStats(
+    payments,
+    filteredPlanPayments,
+    membersWithDerived,
+    periodStart,
+    periodEnd
+  );
 
 
   const renewalChartData = [
@@ -1024,33 +993,7 @@ const isWithinPeriod = (date: Date) => {
       Otros: entry.Otros,
     }));
 
-  const last6MonthsIncome = Array.from({ length: 6 }, (_, i) => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    const month = date.getMonth();
-    const year = date.getFullYear();
-
-    const monthPayments = payments.filter((p) => {
-      const paymentDate = toLocalDate(p.date);
-      return (
-        paymentDate.getMonth() === month && paymentDate.getFullYear() === year
-      );
-    });
-
-    
-    const monthPaymentsIncome = monthPayments.reduce(
-      (sum, p) => sum + p.amount,
-      0
-    );
-
-    return {
-      month: date.toLocaleDateString("es-ES", {
-        month: "short",
-        year: "numeric",
-      }),
-      income: monthPaymentsIncome,
-    };
-  }).reverse();
+  const last6MonthsIncome = calculateLast6MonthsIncome(payments, currentDate);
 
   type MemberCoverageRange = { memberId: string; start: Date; end: Date };
 
@@ -1168,19 +1111,11 @@ const isWithinPeriod = (date: Date) => {
     });
   });
 
-  const averageActiveMembersByMonth = last13Months.map((month) => {
-    const totalActiveDays = totalActiveDaysByMonth.get(month.key) ?? 0;
-    const average = totalActiveDays / month.daysInMonth;
-    const roundedAverage = Math.round(average * 10) / 10;
-    const averageAsInteger = Math.round(average);
-
-    return {
-      month: month.label,
-      average,
-      roundedAverage,
-      averageAsInteger,
-    };
-  });
+  const averageActiveMembersByMonth = calculateAverageActiveMembersByMonth(
+    membersWithDerived,
+    payments,
+    currentDate
+  );
 
   const customRangeLabel = useMemo(() => {
     if (customRange?.from && customRange?.to) {
@@ -1641,7 +1576,21 @@ const isWithinPeriod = (date: Date) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <ReportsToolbar
+        gymName={gymName}
+        timeFilter={timeFilter}
+        customRange={customRange}
+        hasCustomRange={hasCustomRange}
+        customRangeLabel={customRangeLabel}
+        periodLabel={getTimeFilterLabel()}
+        onTimeFilterChange={handleTimeFilterChange}
+        onCustomRangeChange={handleCustomRangeSelect}
+        onClearCustomRange={handleClearCustomRange}
+        onExportJSON={exportJSON}
+        onExportCSV={exportCSV}
+      />
+
+      {false && <div className="flex justify-between items-center">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">
             Reportes y Estadísticas
@@ -1666,8 +1615,9 @@ const isWithinPeriod = (date: Date) => {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
+      </div>}
 
+      {false && <>
       {/* FILTRO DE TIEMPO */}
       <Card>
         <CardHeader>
@@ -1730,6 +1680,8 @@ const isWithinPeriod = (date: Date) => {
           </div>
         </CardContent>
       </Card>
+
+      </>}
 
       <ReportsSummaryCards
         periodLabel={getTimeFilterLabel()}
@@ -1890,6 +1842,17 @@ const isWithinPeriod = (date: Date) => {
       </>}
 
       {/* Upcoming Expirations Detail */}
+      <UpcomingExpirationsCard
+        today={todayMid}
+        entries={upcomingExpirations.map((member) => ({
+          id: member.id,
+          name: member.name,
+          plan: member.plan,
+          nextPayment: member._next ?? parseDateSafe(member.next_payment)!,
+        }))}
+      />
+
+      {false && <>
       {upcomingExpirations.length > 0 && (
         <Card>
           <CardHeader>
@@ -1944,6 +1907,7 @@ const isWithinPeriod = (date: Date) => {
           </CardContent>
         </Card>
       )}
+      </>}
     </div>
   );
 }

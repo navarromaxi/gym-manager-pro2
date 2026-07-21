@@ -1163,10 +1163,10 @@ export default function GymManagementSystem() {
               { id: "prospects", label: "Leads", title: "Interesados" },
               { id: "inactives", label: "Inactivos" },
               { id: "plans", label: "Planes" },
-              { id: "custom_plans", label: "Complementos", title: "Plan Complementario" },
-              { id: "one_time_payments", label: "Únicos", title: "Pago único" },
-              { id: "class_registrations", label: "Clases", title: "Clases y eventos" },
-              { id: "activities", label: "Actividades" },
+              { id: "custom_plans", label: "Plan complemento", compact: true },
+              { id: "one_time_payments", label: "Pagos únicos", compact: true },
+              { id: "class_registrations", label: "Eventos", title: "Eventos" },
+              { id: "activities", label: "Actividades", compact: true },
               { id: "routines", label: "Rutinas" },
               { id: "expenses", label: "Gastos" },
               { id: "reports", label: "Reportes" },
@@ -1183,7 +1183,13 @@ export default function GymManagementSystem() {
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
                 }`}
               >
-                <span className="block truncate">{tab.label}</span>
+                <span
+                  className={`block whitespace-nowrap ${
+                    tab.compact ? "text-[10px] tracking-tight sm:text-[11px]" : ""
+                  }`}
+                >
+                  {tab.label}
+                </span>
               </button>
             ))}
           </div>
