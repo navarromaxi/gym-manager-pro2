@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
+import { AverageActiveMembersCard } from "@/features/reports/components/average-active-members-card";
 interface Member {
   id: string;
   name: string;
@@ -1124,7 +1125,7 @@ const isWithinPeriod = (date: Date) => {
       }),
       income: monthPaymentsIncome,
     };
-  }).reverse();
+  });
 
   type MemberCoverageRange = { memberId: string; start: Date; end: Date };
 
@@ -1255,10 +1256,6 @@ const isWithinPeriod = (date: Date) => {
       averageAsInteger,
     };
   });
-
-  const hasAverageActiveData = averageActiveMembersByMonth.some(
-    (entry) => entry.roundedAverage > 0
-  );
 
   const customRangeLabel = useMemo(() => {
     if (customRange?.from && customRange?.to) {
@@ -1946,57 +1943,7 @@ const isWithinPeriod = (date: Date) => {
         </CardContent>
       </Card>
 
-      {/* Monthly average of active members */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Users className="mr-2 h-5 w-5" />
-            Promedio de socios por mes
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Socios activos promedio durante los últimos 13 meses.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {hasAverageActiveData ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mes</TableHead>
-                    <TableHead className="text-right">
-                      Promedio de socios activos
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {averageActiveMembersByMonth.map((entry) => (
-                    <TableRow key={entry.month}>
-                      <TableCell className="font-medium">
-                        {entry.month}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {entry.averageAsInteger} socios
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          ({entry.roundedAverage.toLocaleString("es-ES", {
-                            minimumFractionDigits: 1,
-                            maximumFractionDigits: 1,
-                          })})
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No hay datos suficientes para calcular el promedio de socios
-              activos por mes.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <AverageActiveMembersCard entries={averageActiveMembersByMonth} />
 
      {/* Distribuciones y Conversión */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
