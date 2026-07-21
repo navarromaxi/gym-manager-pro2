@@ -1153,36 +1153,37 @@ export default function GymManagementSystem() {
       </header>
 
       {/* Navigation */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:gap-3 lg:gap-4">
+      <nav className="border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+        <div className="max-w-7xl mx-auto px-3 py-2 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-4 gap-1 sm:grid-cols-6 md:gap-1.5 lg:grid-cols-8 xl:grid-cols-12">
             {[
               { id: "dashboard", label: "Dashboard" },
               { id: "members", label: "Socios" },
               { id: "payments", label: "Pagos" },
-              { id: "prospects", label: "Interesados" },
+              { id: "prospects", label: "Leads", title: "Interesados" },
               { id: "inactives", label: "Inactivos" },
               { id: "plans", label: "Planes" },
-              { id: "custom_plans", label: "Plan Complementario" },
-              { id: "one_time_payments", label: "Pago único" },
-              { id: "class_registrations", label: "Clases/Evento" },
+              { id: "custom_plans", label: "Complementos", title: "Plan Complementario" },
+              { id: "one_time_payments", label: "Únicos", title: "Pago único" },
+              { id: "class_registrations", label: "Clases", title: "Clases y eventos" },
               { id: "activities", label: "Actividades" },
               { id: "routines", label: "Rutinas" },
               { id: "expenses", label: "Gastos" },
               { id: "reports", label: "Reportes" },
-              { id: "income_access", label: "Ingresos" },
+              { id: "income_access", label: "Accesos", title: "Ingresos y accesos" },
               { id: "invoices", label: "Facturas" },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                title={tab.title ?? tab.label}
+                className={`min-w-0 rounded-lg px-2 py-2 text-center text-xs font-semibold transition-all sm:text-sm ${
                   activeTab === tab.id
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
                 }`}
               >
-                {tab.label}
+                <span className="block truncate">{tab.label}</span>
               </button>
             ))}
           </div>
