@@ -469,7 +469,10 @@ function PublicClassRegistrationPageContent() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-5 py-6 sm:px-8 sm:py-8">
-                <form className="space-y-7" onSubmit={handleSubmit}>
+                <form
+                  className="space-y-7 [&_input]:!border [&_input]:!border-slate-300 [&_input]:!bg-white [&_input]:!text-slate-950 [&_input::placeholder]:!text-slate-400 [&_label]:!text-slate-800"
+                  onSubmit={handleSubmit}
+                >
                   <div className="space-y-2.5">
                     <Label className="text-sm font-semibold text-slate-800">Elegí clase o evento</Label>
                     <Select
