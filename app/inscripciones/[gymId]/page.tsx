@@ -410,11 +410,11 @@ function PublicClassRegistrationPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-10">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4">
-        <header className="text-center space-y-3">
-          <div className="flex flex-col items-center gap-2">
-            <div className="relative h-16 w-16">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#e0f2fe_0%,_#f8fafc_42%,_#f0fdf4_100%)] py-8 text-slate-900 sm:py-12">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-7 px-4 sm:px-6">
+        <header className="text-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="relative h-20 w-20 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
               <Image
                 src={gymLogoUrl ?? "/logos/demo-gym-logo.svg"}
                 alt={
@@ -429,13 +429,13 @@ function PublicClassRegistrationPageContent() {
                 unoptimized={Boolean(gymLogoUrl)}
               />
             </div>
-            <p className="text-sm uppercase tracking-wide text-gray-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
               {gymName
                 ? `Sistema de reservas`
                 : "Sistema de reservas del gimnasio"}
             </p>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
             {gymName ? `${gymName}` : "Reserva tu clase"}
           </h1>
         </header>
@@ -459,21 +459,24 @@ function PublicClassRegistrationPageContent() {
           </Card>
         ) : (
           <>
-             <Card className="border-none shadow-lg">
-              <CardHeader className="space-y-2 text-center md:text-left">
-                <CardTitle className="text-2xl font-semibold text-white-900">
+             <Card className="overflow-hidden border border-slate-200 bg-white shadow-[0_20px_55px_rgba(15,23,42,0.10)]">
+              <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-sky-50 to-emerald-50 px-5 py-6 sm:px-8">
+                <CardTitle className="text-2xl font-bold text-slate-950">
                   Reserva tu lugar
                 </CardTitle>
+                <CardDescription className="text-slate-600">
+                  Elegí una actividad y completá tus datos para confirmar tu cupo.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="px-4 pb-6 pt-0 sm:px-6">
-                <form className="space-y-6" onSubmit={handleSubmit}>
-                  <div className="space-y-2">
-                    <Label>Elige Clase/Evento</Label>
+              <CardContent className="px-5 py-6 sm:px-8 sm:py-8">
+                <form className="space-y-7" onSubmit={handleSubmit}>
+                  <div className="space-y-2.5">
+                    <Label className="text-sm font-semibold text-slate-800">Elegí clase o evento</Label>
                     <Select
                       value={selectedSessionId}
                       onValueChange={setSelectedSessionId}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="h-12 border-slate-300 bg-white text-slate-950 shadow-sm focus:ring-sky-500">
                         <SelectValue placeholder="Selecciona una clase" />
                       </SelectTrigger>
                       <SelectContent>
@@ -506,49 +509,50 @@ function PublicClassRegistrationPageContent() {
                   </div>
 
                   {selectedSession && (
-                    <div className="space-y-3 rounded-xl border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
-                      <div className="flex flex-wrap gap-4">
-                        <span className="flex items-center gap-2">
+                    <div className="space-y-5 rounded-2xl border border-sky-100 bg-slate-50 p-4 text-sm sm:p-5">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="flex items-center gap-2 rounded-xl bg-white p-3 text-slate-700 shadow-sm">
                           <Calendar className="h-4 w-4" />
-                          {new Date(
+                          <span>{new Date(
                             `${selectedSession.date}T00:00:00`
-                          ).toLocaleDateString()}
-                        </span>
-                        <span className="flex items-center gap-2">
+                          ).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-xl bg-white p-3 text-slate-700 shadow-sm">
                           <Clock className="h-4 w-4" />
-                          {selectedSession.start_time} hs
-                        </span>
-                        <span className="flex items-center gap-2">
+                          <span>{selectedSession.start_time} hs</span>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-xl bg-sky-100 p-3 font-semibold text-sky-800">
                           <Users className="h-4 w-4" />
-                          {selectedSession.capacity} cupos
-                        </span>
+                          <span>{selectedSession.capacity} cupos</span>
+                        </div>
                         {formatCurrency(selectedSession.price) && (
-                          <span className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 rounded-xl bg-amber-50 p-3 font-semibold text-amber-800">
                             <Ticket className="h-4 w-4" />
-                            {formatCurrency(selectedSession.price)}
-                          </span>
+                            <span>{formatCurrency(selectedSession.price)}</span>
+                          </div>
                         )}
-                        <Badge
-                           variant={
-                            hasSelectedSessionStarted || spotsLeft <= 0
-                              ? "destructive"
-                              : "secondary"
-                          }
-                        >
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <Badge className={hasSelectedSessionStarted || spotsLeft <= 0 ? "rounded-full bg-rose-100 px-3 py-1.5 text-rose-700 hover:bg-rose-100" : "rounded-full bg-emerald-100 px-3 py-1.5 text-emerald-800 hover:bg-emerald-100"}>
                           {hasSelectedSessionStarted
                             ? "Clase iniciada"
                             : spotsLeft > 0
                             ? `${spotsLeft} lugares disponibles`
                             : "Sin cupos"}
                         </Badge>
+                        {spotsLeft > 0 && !hasSelectedSessionStarted && (
+                          <span className="text-xs font-medium text-slate-500">
+                            Quedan {spotsLeft} de {selectedSession.capacity} lugares
+                          </span>
+                        )}
                       </div>
                       {selectedSession.notes && (
-                        <p className="whitespace-pre-wrap">
+                        <p className="whitespace-pre-wrap leading-relaxed text-slate-600">
                           {selectedSession.notes}
                         </p>
                       )}
                       {selectedSession.accept_receipts && (
-                        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-primary">
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
                           Se solicita que adjuntes el comprobante de
                           pago al confirmar tu lugar.
                         </div>
@@ -563,7 +567,7 @@ function PublicClassRegistrationPageContent() {
                     </div>
                   )}
 
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-5 md:grid-cols-2">
                     <div className="md:col-span-2 space-y-2">
                       <Label htmlFor="full-name">Nombre y apellido</Label>
                       <Input
@@ -573,6 +577,7 @@ function PublicClassRegistrationPageContent() {
                           handleFormChange("fullName", event.target.value)
                         }
                         required
+                        className="h-11 border-slate-300 bg-white text-slate-950 placeholder:text-slate-400 focus-visible:ring-sky-500"
                       />
                     </div>
                     <div className="space-y-2">
@@ -585,6 +590,7 @@ function PublicClassRegistrationPageContent() {
                           handleFormChange("email", event.target.value)
                         }
                         placeholder="nombre@correo.com"
+                        className="h-11 border-slate-300 bg-white text-slate-950 placeholder:text-slate-400 focus-visible:ring-sky-500"
                       />
                     </div>
                     <div className="space-y-2">
@@ -596,6 +602,7 @@ function PublicClassRegistrationPageContent() {
                           handleFormChange("phone", event.target.value)
                         }
                         placeholder="54911..."
+                        className="h-11 border-slate-300 bg-white text-slate-950 placeholder:text-slate-400 focus-visible:ring-sky-500"
                       />
                     </div>
                   </div>
@@ -642,11 +649,7 @@ function PublicClassRegistrationPageContent() {
                    {(formError || successMessage) && (
                     <Alert
                       variant={formError ? "destructive" : "default"}
-                      className={
-                        formError
-                          ? undefined
-                          : "border-green-200 bg-green-50 text-green-800 [&>svg]:text-green-600"
-                      }
+                    className={formError ? undefined : "border-emerald-200 bg-emerald-50 text-emerald-800 [&>svg]:text-emerald-600"}
                     >
                       <AlertDescription>
                         {formError ? formError : successMessage}
@@ -656,7 +659,7 @@ function PublicClassRegistrationPageContent() {
 
                   <Button
                     type="submit"
-                    className="w-full"
+                    className="h-12 w-full rounded-xl bg-sky-600 text-base font-semibold text-white shadow-sm hover:bg-sky-700 disabled:bg-slate-300"
                     disabled={
                       submitting || spotsLeft <= 0 || hasSelectedSessionStarted
                     }
