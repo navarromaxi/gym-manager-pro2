@@ -13,6 +13,7 @@ import {
   Copy,
   Download,
   Edit,
+  Plus,
   RefreshCw,
   Trash2,
   Users,
@@ -106,6 +107,7 @@ export function ClassRegistrationManagement({
   const [formState, setFormState] =
     useState<ClassSessionFormState>(INITIAL_FORM_STATE);
   const [creating, setCreating] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     message: string;
@@ -348,9 +350,10 @@ export function ClassRegistrationManagement({
       setSessions((prev) => [...prev, data]);
       setFeedback({
         type: "success",
-        message: "Clase creada correctamente.",
+        message: "Evento creado correctamente.",
       });
       resetForm();
+      setIsCreateDialogOpen(false);
     } catch (error) {
       console.error("Error creando la clase", error);
       setFeedback({
@@ -733,14 +736,25 @@ export function ClassRegistrationManagement({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2">
-        <h2 className="text-3xl font-bold tracking-tight">
-          Clases registradas
-        </h2>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-2">
+          <h2 className="text-3xl font-bold tracking-tight">Eventos</h2>
         <p className="text-muted-foreground">
-          Crea clases puntuales con cupos limitados y comparte el enlace con tus
-          socios para que se anoten de forma sencilla.
+          Organiza eventos con cupos limitados y comparte el enlace con tus
+          socios para que reserven su lugar de forma sencilla.
         </p>
+        </div>
+        <Button
+          type="button"
+          onClick={() => {
+            resetForm();
+            setFeedback(null);
+            setIsCreateDialogOpen(true);
+          }}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Crear evento
+        </Button>
       </div>
 
       {feedback && (
@@ -749,11 +763,13 @@ export function ClassRegistrationManagement({
         </Alert>
       )}
 
-      <Card>
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <Card className="border-0 shadow-none">
         <CardHeader>
-          <CardTitle>Crear nueva clase</CardTitle>
+          <CardTitle>Crear nuevo evento</CardTitle>
           <CardDescription>
-            Completa los datos para agregar una clase especial y controlar su
+            Completa los datos para agregar un evento y controlar su
             cupo.
           </CardDescription>
         </CardHeader>
@@ -763,10 +779,10 @@ export function ClassRegistrationManagement({
             onSubmit={handleCreateSession}
           >
             <div className="md:col-span-2 space-y-2">
-              <Label htmlFor="class-title">Nombre de la clase</Label>
+              <Label htmlFor="class-title">Nombre del evento</Label>
               <Input
                 id="class-title"
-                placeholder="Por ejemplo: Lunes 18 hs - Funcional"
+                placeholder="Por ejemplo: Ida a Colonia"
                 value={formState.title}
                 onChange={(event) => handleChange("title", event.target.value)}
               />
@@ -825,7 +841,7 @@ export function ClassRegistrationManagement({
               <Label htmlFor="class-notes">Notas (opcional)</Label>
               <Textarea
                 id="class-notes"
-                placeholder="Agrega detalles como nivel de la clase, qué llevar, etc."
+                placeholder="Agrega detalles importantes, qué llevar, punto de encuentro, etc."
                 value={formState.notes}
                 onChange={(event) => handleChange("notes", event.target.value)}
               />
@@ -855,27 +871,28 @@ export function ClassRegistrationManagement({
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleRefresh}
-                disabled={refreshing}
+                onClick={() => setIsCreateDialogOpen(false)}
+                disabled={creating}
               >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Actualizar datos
+                Cancelar
               </Button>
               <Button type="submit" disabled={creating}>
-                Crear clase
+                {creating ? "Creando..." : "Crear evento"}
               </Button>
             </div>
           </form>
         </CardContent>
-      </Card>
+          </Card>
+        </DialogContent>
+      </Dialog>
 
       <div className="space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h3 className="text-xl font-semibold">Clases programadas</h3>
+            <h3 className="text-xl font-semibold">Eventos programados</h3>
             <p className="text-sm text-muted-foreground">
-              Comparte este enlace general con tus socios para que vean todas
-              las clases y elijan su cupo.
+              Comparte este enlace general con tus socios para que vean todos
+              los eventos y reserven su lugar.
             </p>
             {generalSignupLink && (
               <p className="text-sm font-medium break-all text-primary">
@@ -884,6 +901,18 @@ export function ClassRegistrationManagement({
             )}
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              aria-label="Actualizar eventos"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+              />
+              <span className="sr-only">Actualizar eventos</span>
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -903,7 +932,7 @@ export function ClassRegistrationManagement({
           <Card>
             <CardContent className="p-6">
               <p className="text-muted-foreground">
-                Todavía no hay clases cargadas. Crea la primera para comenzar a
+                Todavía no hay eventos cargados. Crea el primero para comenzar a
                 tomar reservas.
               </p>
             </CardContent>
@@ -921,7 +950,7 @@ export function ClassRegistrationManagement({
                       <TableHead>Fecha</TableHead>
                       <TableHead>Hora</TableHead>
                       <TableHead>Inscriptos</TableHead>
-                      <TableHead>Notas para los socios</TableHead>
+                      <TableHead>Detalles</TableHead>
                       <TableHead>Comprobantes</TableHead>
                       <TableHead className="w-[320px]">Acciones</TableHead>
                     </TableRow>

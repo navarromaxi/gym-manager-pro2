@@ -52,7 +52,8 @@ import { AdditionalIncomeCards } from "@/features/reports/components/additional-
 import { ReportsToolbar } from "@/features/reports/components/reports-toolbar";
 import { UpcomingExpirationsCard } from "@/features/reports/components/upcoming-expirations-card";
 import { calculateAverageActiveMembersByMonth } from "@/features/reports/average-active-members-calculation";
-import { calculateLast6MonthsIncome, calculateRenewalStats } from "@/features/reports/report-calculations";
+import { calculateFinancialSummary, calculateLast6MonthsIncome, calculateRenewalStats } from "@/features/reports/report-calculations";
+import { getReportPeriodBounds, isDateWithinReportPeriod } from "@/features/reports/report-period";
 import {
   addMonthsClamped,
   downloadBlob,
@@ -430,74 +431,13 @@ const overdueMembers = membersWithDerived.filter((m) => m.derivedStatus === "exp
 
   /** =================== Filtro por período (ingresos/gastos) =================== */
   const getFilteredData = () => {
-    let periodStart: Date | null = null;
-    let periodEnd: Date | null = null;
-
-    const startOfMonth = (year: number, month: number) =>
-      toLocalMidnight(new Date(year, month, 1));
-    const endOfMonth = (year: number, month: number) =>
-      toLocalMidnight(new Date(year, month + 1, 0));
-
-    switch (timeFilter) {
-      case "current_month": {
-        const year = currentDate.getFullYear();
-        const month = currentDate.getMonth();
-        periodStart = startOfMonth(year, month);
-        periodEnd = endOfMonth(year, month);
-        break;
-        }
-
-      case "previous_month": {
-        const month = currentDate.getMonth() === 0 ? 11 : currentDate.getMonth() - 1;
-        const year =
-          currentDate.getMonth() === 0
-            ? currentDate.getFullYear() - 1
-            : currentDate.getFullYear();
-       periodStart = startOfMonth(year, month);
-        periodEnd = endOfMonth(year, month);
-        break;
-      }
-
-      case "last_6_months": {
-         const start = new Date(currentDate);
-        start.setHours(0, 0, 0, 0);
-        start.setMonth(start.getMonth() - 6);
-        periodStart = start;
-        periodEnd = todayMid;
-        break;
-      }
-
-       case "current_year": {
-        const year = currentDate.getFullYear();
-        periodStart = startOfMonth(year, 0);
-        periodEnd = endOfMonth(year, 11);
-        break;
-        }
-
-      case "last_year": {
-        const year = currentDate.getFullYear() - 1;
-        periodStart = startOfMonth(year, 0);
-        periodEnd = endOfMonth(year, 11);
-        break;
-      }
-       case "custom": {
-        if (customRange?.from) {
-          periodStart = toLocalMidnight(customRange.from);
-        }
-        if (customRange?.to) {
-          periodEnd = toLocalMidnight(customRange.to);
-        }
-        break;
-      }
-      default:
-        periodStart = null;
-        periodEnd = null;
-    }
-const isWithinPeriod = (date: Date) => {
-      if (periodStart && date < periodStart) return false;
-      if (periodEnd && date > periodEnd) return false;
-      return true;
-    };
+    const { periodStart, periodEnd } = getReportPeriodBounds(
+      timeFilter,
+      currentDate,
+      customRange
+    );
+    const isWithinPeriod = (date: Date) =>
+      isDateWithinReportPeriod(date, { periodStart, periodEnd });
 
     const filteredPayments = payments.filter((payment) =>
       isWithinPeriod(toLocalDate(payment.date))
@@ -541,20 +481,14 @@ const isWithinPeriod = (date: Date) => {
   } = getFilteredData();
 
   // Cálculos con datos filtrados
-  const totalPaymentsIncome = filteredPayments.reduce(
-    (sum, p) => sum + p.amount,
-    0
-  );
   const totalOneTimeExpectedAmount = filteredOneTimeExpected.reduce(
     (sum, record) => sum + getOneTimeAmount(record),
     0
   );
-  const totalIncome = totalPaymentsIncome;
-  const totalExpenseAmount = filteredExpenses.reduce(
-    (sum, e) => sum + e.amount,
-    0
+  const { totalIncome, totalExpenseAmount, totalProfit } = calculateFinancialSummary(
+    filteredPayments,
+    filteredExpenses
   );
-  const totalProfit = totalIncome - totalExpenseAmount;
 
   const filteredPlanPayments = filteredPayments.filter(
     (payment) => !payment.type || payment.type === "plan"

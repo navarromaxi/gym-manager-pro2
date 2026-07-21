@@ -48,18 +48,18 @@ export function ReportsSummaryCards({
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-lg bg-green-50 p-4 text-center">
-              <div className="text-2xl font-bold text-green-600">${totalIncome.toLocaleString()}</div>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-center dark:border-blue-900 dark:bg-blue-950/60">
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">${totalIncome.toLocaleString()}</div>
               <div className="text-sm text-muted-foreground">Ingresos</div>
               <div className="text-xs text-muted-foreground">{totalPaymentCount} pagos</div>
             </div>
-            <div className="rounded-lg bg-red-50 p-4 text-center">
-              <div className="text-2xl font-bold text-red-600">${totalExpenseAmount.toLocaleString()}</div>
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center dark:border-red-900 dark:bg-red-950/50">
+              <div className="text-2xl font-bold text-red-600 dark:text-red-300">${totalExpenseAmount.toLocaleString()}</div>
               <div className="text-sm text-muted-foreground">Gastos</div>
               <div className="text-xs text-muted-foreground">{expenseCount} gastos</div>
             </div>
-            <div className="rounded-lg bg-blue-50 p-4 text-center">
-              <div className={`text-2xl font-bold ${totalProfit >= 0 ? "text-blue-600" : "text-red-600"}`}>
+            <div className={`rounded-lg border p-4 text-center ${totalProfit >= 0 ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/60" : "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/50"}`}>
+              <div className={`text-2xl font-bold ${totalProfit >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-red-600 dark:text-red-300"}`}>
                 ${totalProfit.toLocaleString()}
               </div>
               <div className="text-sm text-muted-foreground">Ganancia</div>
@@ -78,10 +78,10 @@ export function ReportsSummaryCards({
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-4">
-            <SummaryMetric value={renewalStats.renewedCount} label="Socios que Renovaron" detail="Tienen más de 1 pago" className="bg-green-50 text-green-600" />
-            <SummaryMetric value={renewalStats.notRenewedCount} label="No Renovaron" detail="Vencidos/Inactivos" className="bg-red-50 text-red-600" />
-            <SummaryMetric value={`${renewalStats.renewalRate}%`} label="Tasa de Renovación" detail="% que renovaron" className="bg-blue-50 text-blue-600" />
-            <SummaryMetric value={renewalStats.totalEligible} label="Total Elegibles" detail="Para renovación" className="border" />
+            <SummaryMetric value={renewalStats.renewedCount} label="Socios que Renovaron" detail="Tienen más de 1 pago" className="border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300" />
+            <SummaryMetric value={renewalStats.notRenewedCount} label="No Renovaron" detail="Vencidos/Inactivos" className="border border-red-200 bg-red-50 text-red-600 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300" />
+            <SummaryMetric value={`${renewalStats.renewalRate}%`} label="Tasa de Renovación" detail="% que renovaron" className="border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300" />
+            <SummaryMetric value={renewalStats.totalEligible} label="Total Elegibles" detail="Para renovación" className="border border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-200" />
           </div>
         </CardContent>
       </Card>

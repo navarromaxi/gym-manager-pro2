@@ -11,6 +11,15 @@ export type RenewalStats = {
   totalEligible: number;
 };
 
+export function calculateFinancialSummary(
+  payments: Array<{ amount: number }>,
+  expenses: Array<{ amount: number }>
+) {
+  const totalIncome = payments.reduce((total, payment) => total + payment.amount, 0);
+  const totalExpenseAmount = expenses.reduce((total, expense) => total + expense.amount, 0);
+  return { totalIncome, totalExpenseAmount, totalProfit: totalIncome - totalExpenseAmount };
+}
+
 /** Builds the income series shown in the six-month trend card. */
 export function calculateLast6MonthsIncome(payments: DatedAmount[], currentDate: Date) {
   return Array.from({ length: 6 }, (_, index) => {
