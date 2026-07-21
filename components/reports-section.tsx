@@ -29,12 +29,9 @@ import {
 import {
   Download,
   Calendar as CalendarIcon,
-  Users,
   DollarSign,
   TrendingUp,
   Filter,
-  RefreshCw,
-  UserCheck,
 } from "lucide-react";
 import { DateRange } from "react-day-picker";
 import { PieChart, Pie } from "recharts";
@@ -48,6 +45,10 @@ import {
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { AverageActiveMembersCard } from "@/features/reports/components/average-active-members-card";
+import { ReportsSummaryCards } from "@/features/reports/components/summary-cards";
+import { PaymentDistributionCards } from "@/features/reports/components/payment-distribution-cards";
+import { LeadConversionCards } from "@/features/reports/components/lead-conversion-cards";
+import { AdditionalIncomeCards } from "@/features/reports/components/additional-income-cards";
 import {
   addMonthsClamped,
   downloadBlob,
@@ -1730,370 +1731,58 @@ const isWithinPeriod = (date: Date) => {
         </CardContent>
       </Card>
 
-      {/* Financial Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <DollarSign className="mr-2 h-5 w-5" />
-            Resumen Financiero - {getTimeFilterLabel()}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">
-                ${totalIncome.toLocaleString()}
-              </div>
-              <div className="text-sm text-muted-foreground">Ingresos</div>
-              <div className="text-xs text-muted-foreground">
-                {totalPaymentCount} pagos
-              </div>
-            </div>
-            <div className="text-center p-4 bg-red-50 rounded-lg">
-              <div className="text-2xl font-bold text-red-600">
-                ${totalExpenseAmount.toLocaleString()}
-              </div>
-              <div className="text-sm text-muted-foreground">Gastos</div>
-              <div className="text-xs text-muted-foreground">
-                {filteredExpenses.length} gastos
-              </div>
-            </div>
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div
-                className={`text-2xl font-bold ${
-                  totalProfit >= 0 ? "text-blue-600" : "text-red-600"
-                }`}
-              >
-                ${totalProfit.toLocaleString()}
-              </div>
-              <div className="text-sm text-muted-foreground">Ganancia</div>
-              <div className="text-xs text-muted-foreground">
-                {totalProfit >= 0 ? "Positiva" : "Negativa"}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ANÁLISIS DE RENOVACIONES */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <RefreshCw className="mr-2 h-5 w-5" />
-            Análisis de Renovaciones
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">
-                {renewalStats.renewedCount}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Socios que Renovaron
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Tienen más de 1 pago
-              </div>
-            </div>
-            <div className="text-center p-4 bg-red-50 rounded-lg">
-              <div className="text-2xl font-bold text-red-600">
-                {renewalStats.notRenewedCount}
-              </div>
-              <div className="text-sm text-muted-foreground">No Renovaron</div>
-              <div className="text-xs text-muted-foreground">
-                Vencidos/Inactivos
-              </div>
-            </div>
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">
-                {renewalStats.renewalRate}%
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Tasa de Renovación
-              </div>
-              <div className="text-xs text-muted-foreground">
-                % que renovaron
-              </div>
-            </div>
-            <div className="text-center p-4 border rounded-lg">
-              <div className="text-2xl font-bold">
-                {renewalStats.totalEligible}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Total Elegibles
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Para renovación
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Member Statistics */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Users className="mr-2 h-5 w-5" />
-            Estadísticas de Socios
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="text-center p-4 border rounded-lg">
-              <div className="text-2xl font-bold text-green-600">
-                {activeMembers}
-              </div>
-              <div className="text-sm text-muted-foreground">Activos</div>
-            </div>
-            <div className="text-center p-4 border rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">
-                {expiredMembers}
-              </div>
-              <div className="text-sm text-muted-foreground">Vencidos</div>
-            </div>
-            <div className="text-center p-4 border rounded-lg">
-              <div className="text-2xl font-bold text-gray-600">
-                {inactiveMembers}
-              </div>
-              <div className="text-sm text-muted-foreground">Inactivos</div>
-            </div>
-            <div className="text-center p-4 border rounded-lg">
-              <div className="text-2xl font-bold">{members.length}</div>
-              <div className="text-sm text-muted-foreground">Total</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <ReportsSummaryCards
+        periodLabel={getTimeFilterLabel()}
+        totalIncome={totalIncome}
+        totalExpenseAmount={totalExpenseAmount}
+        totalProfit={totalProfit}
+        totalPaymentCount={totalPaymentCount}
+        expenseCount={filteredExpenses.length}
+        renewalStats={renewalStats}
+        activeMembers={activeMembers}
+        expiredMembers={expiredMembers}
+        inactiveMembers={inactiveMembers}
+        totalMembers={members.length}
+      />
 
       <AverageActiveMembersCard entries={averageActiveMembersByMonth} />
 
-     {/* Distribuciones y Conversión */}
+      {/* Distribuciones y Conversión */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Métodos de Pago - {getTimeFilterLabel()}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {Object.entries(paymentMethodDistribution).map(
-                ([method, count]) => (
-                  <div
-                    key={method}
-                    className="flex items-center justify-between"
-                  >
-                    <span className="font-medium">{method}</span>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-muted-foreground">
-                        {count} pagos
-                      </span>
-                      <Badge variant="outline">
-                         {totalPaymentCount > 0
-                          ? Math.round((count / totalPaymentCount) * 100)
-                          : 0}
-                        %
-                      </Badge>
-                    </div>
-                  </div>
-                )
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Pagos con Débito - {getTimeFilterLabel()}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {debitCardDistribution.map((item) => (
-                <div
-                  key={item.brand}
-                  className="flex items-center justify-between"
-                >
-                  <span className="font-medium">{item.brand}</span>
-                  <div className="flex items-center space-x-4">
-                    <span className="text-sm text-muted-foreground">
-                      {item.count} pagos
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      ${item.amount.toLocaleString()}
-                    </span>
-                    <Badge variant="outline">{item.percentage}%</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Pagos con Crédito - {getTimeFilterLabel()}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {creditCardDistribution.map((item) => (
-                <div
-                  key={item.brand}
-                  className="flex items-center justify-between"
-                >
-                  <span className="font-medium">{item.brand}</span>
-                  <div className="flex items-center space-x-4">
-                    <span className="text-sm text-muted-foreground">
-                      {item.count} pagos
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      ${item.amount.toLocaleString()}
-                    </span>
-                    <Badge variant="outline">{item.percentage}%</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      <Card>
-          <CardHeader>
-            <CardTitle>Distribución por Planes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {planDistributionEntries.length > 0 ? (
-                planDistributionEntries.map(({ plan, count }) => (
-                  <div key={plan} className="flex items-center justify-between">
-                    <span className="font-medium">{plan}</span>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-muted-foreground">
-                        {count} socios
-                      </span>
-                      <Badge variant="outline">
-                        {totalPlanMembers > 0
-                          ? Math.round((count / totalPlanMembers) * 100)
-                          : 0}
-                        %
-                      </Badge>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No hay pagos de planes en el período seleccionado.
-                </p>
-              )}
-            </div>
-           </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Users className="mr-2 h-5 w-5" />
-              Socios que nos conocieron por
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {totalNewMembers > 0
-                ? `Período: ${getTimeFilterLabel()} · Nuevos socios: ${totalNewMembers}`
-                : `No se registraron nuevos socios en ${getTimeFilterLabel()}.`}
-            </p>
-           </CardHeader>
-          <CardContent>
-            {totalNewMembers > 0 ? (
-              <div className="space-y-3">
-                {referralDistributionEntries.map(
-                  ({ source, count, percentage }) => (
-                    <div key={source} className="rounded-lg border p-3">
-                      <p className="font-medium">{source}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Cantidad: {count} · Porcentaje sobre el total: {percentage}%
-                      </p>
-                    </div>
-                  )
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No se registraron nuevos socios en {getTimeFilterLabel()}.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <UserCheck className="mr-2 h-5 w-5" />
-              Conversión de Interesados
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Seguimiento de interesados con filtro de {getTimeFilterLabel()}
-            </p>
-          </CardHeader>
-          <CardContent>
-            {totalProspectsInPeriod > 0 ? (
-              <div className="space-y-4">
-                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-lg border p-3">
-                    <p className="text-sm text-muted-foreground">
-                       Averiguadores cargados
-                    </p>
-                    <p className="text-2xl font-bold">
-                      {totalProspectsInPeriod}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-sm text-muted-foreground">
-                      Coordinamos clase de prueba
-                    </p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {scheduledProspectsCount}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-sm text-muted-foreground">Asistieron</p>
-                    <p className="text-2xl font-bold text-emerald-600">
-                      {attendedProspectsCount}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-sm text-muted-foreground">
-                      Convertidos a socios
-                    </p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {convertedProspectsCount}
-                    </p>
-                  </div>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-lg border p-3">
-                    <p className="text-sm text-muted-foreground">
-                      Tasa de conversión
-                    </p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {conversionRate}%
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {convertedProspectsCount} de {totalProspectsInPeriod} interesados
-                    </p>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-sm text-muted-foreground">No convertidos</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {notConvertedProspectsCount}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {nonConversionRate}% del total
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No se registraron interesados en {getTimeFilterLabel()}.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <PaymentDistributionCards
+          periodLabel={getTimeFilterLabel()}
+          paymentMethodDistribution={paymentMethodDistribution}
+          totalPaymentCount={totalPaymentCount}
+          debitCardDistribution={debitCardDistribution}
+          creditCardDistribution={creditCardDistribution}
+          planDistributionEntries={planDistributionEntries}
+          totalPlanMembers={totalPlanMembers}
+        />
+        <LeadConversionCards
+          periodLabel={getTimeFilterLabel()}
+          totalNewMembers={totalNewMembers}
+          referralEntries={referralDistributionEntries}
+          totalProspectsInPeriod={totalProspectsInPeriod}
+          scheduledProspectsCount={scheduledProspectsCount}
+          attendedProspectsCount={attendedProspectsCount}
+          convertedProspectsCount={convertedProspectsCount}
+          notConvertedProspectsCount={notConvertedProspectsCount}
+          conversionRate={conversionRate}
+          nonConversionRate={nonConversionRate}
+        />
       </div>
 
+      <AdditionalIncomeCards
+        periodLabel={getTimeFilterLabel()}
+        totalVisits={totalOneTimeVisits}
+        expectedAmount={totalOneTimeExpectedAmount}
+        expectedCount={totalOneTimeExpectedCount}
+        sourceTotals={oneTimeSourceTotals}
+        monthlyStats={monthlyOneTimeStats}
+        last6MonthsIncome={last6MonthsIncome}
+      />
+
+      {false && <>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
@@ -2197,6 +1886,8 @@ const isWithinPeriod = (date: Date) => {
           </div>
         </CardContent>
       </Card>
+
+      </>}
 
       {/* Upcoming Expirations Detail */}
       {upcomingExpirations.length > 0 && (
