@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import type { MemberAccessLog } from "@/lib/supabase";
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -172,7 +173,7 @@ export function IncomeManagement({
         endDate: appliedFilters.endDate,
       });
 
-      const response = await fetch(`/api/member-access/admin?${params}`, {
+      const response = await authenticatedFetch(`/api/member-access/admin?${params}`, {
         method: "GET",
         cache: "no-store",
       });

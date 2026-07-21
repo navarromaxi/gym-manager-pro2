@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase-server";
+import { authorizeGymRequest } from "@/lib/api-auth";
 
 const querySchema = z.object({
   gymId: z.string().min(1, "El gimnasio es obligatorio."),
@@ -202,6 +203,9 @@ export async function GET(request: Request) {
   }
 
   const params = parsed.data;
+
+  const authorization = await authorizeGymRequest(request, params.gymId);
+  if (authorization.error) return authorization.error;
 
   try {
     const supabase = createClient();

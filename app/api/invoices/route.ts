@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase-server";
+import { authorizeGymRequest } from "@/lib/api-auth";
 
 const FACTURA_LIVE_BASE_ENDPOINT = process.env.FACTURA_LIVE_ENDPOINT?.trim();
 const FACTURA_LIVE_TEST_ENDPOINT =
@@ -487,6 +488,9 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    const authorization = await authorizeGymRequest(request, gymId);
+    if (authorization.error) return authorization.error;
 
     let sanitizedLineas = String(invoice.lineas ?? "");
     sanitizedLineas = sanitizedLineas.replace(/<\s*col\s*\/>/gi, "</col/>");

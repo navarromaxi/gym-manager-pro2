@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { CLASS_RECEIPTS_BUCKET } from "@/lib/storage";
+import { authorizeGymRequest } from "@/lib/api-auth";
 import { createClient } from "@/lib/supabase-server";
 
 const createSessionSchema = z.object({
@@ -80,6 +81,9 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    const authorization = await authorizeGymRequest(request, parsed.data.gymId);
+    if (authorization.error) return authorization.error;
 
     const supabase = createClient();
 
@@ -163,6 +167,9 @@ export async function PATCH(request: Request) {
         { status: 400 }
       );
     }
+
+    const authorization = await authorizeGymRequest(request, parsed.data.gymId);
+    if (authorization.error) return authorization.error;
 
     const supabase = createClient();
 
@@ -259,6 +266,9 @@ export async function DELETE(request: Request) {
         { status: 400 }
       );
     }
+
+    const authorization = await authorizeGymRequest(request, parsed.data.gymId);
+    if (authorization.error) return authorization.error;
 
     const supabase = createClient();
 

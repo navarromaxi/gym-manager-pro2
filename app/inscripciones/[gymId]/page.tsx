@@ -5,8 +5,7 @@ import Image from "next/image";
 import { useParams, useSearchParams } from "next/navigation";
 import { Calendar, Clock, Ticket, Users } from "lucide-react";
 
-import { supabase } from "@/lib/supabase";
-import type { ClassRegistration, ClassSession } from "@/lib/supabase";
+import type { ClassSession } from "@/lib/supabase";
 import {
   Card,
   CardContent,
@@ -61,7 +60,7 @@ function PublicClassRegistrationPageContent() {
   const gymId = params?.gymId;
   const searchParams = useSearchParams();
   const [sessions, setSessions] = useState<ClassSession[]>([]);
-  const [registrations, setRegistrations] = useState<ClassRegistration[]>([]);
+  const [occupiedSeats, setOccupiedSeats] = useState<Record<string, number>>({});
   const [gymName, setGymName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -77,17 +76,6 @@ function PublicClassRegistrationPageContent() {
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const [receiptInputKey, setReceiptInputKey] = useState(0);
 
-  const registrationsBySession = useMemo(() => {
-    const counts = new Map<string, ClassRegistration[]>();
-    for (const registration of registrations) {
-      if (!counts.has(registration.session_id)) {
-        counts.set(registration.session_id, []);
-      }
-      counts.get(registration.session_id)!.push(registration);
-    }
-    return counts;
-  }, [registrations]);
-
   const sortedSessions = useMemo(() => {
     return [...sessions].sort((a, b) => {
       if (a.date === b.date) {
@@ -100,12 +88,9 @@ function PublicClassRegistrationPageContent() {
   const selectedSession = sortedSessions.find(
     (session) => session.id === selectedSessionId
   );
-  const selectedSessionRegistrations = selectedSession
-    ? registrationsBySession.get(selectedSession.id) ?? []
-    : [];
   const spotsLeft = selectedSession
     ? Math.max(
-        selectedSession.capacity - selectedSessionRegistrations.length,
+        selectedSession.capacity - (occupiedSeats[selectedSession.id] ?? 0),
         0
       )
     : 0;
@@ -146,36 +131,26 @@ function PublicClassRegistrationPageContent() {
           "El enlace utilizado no es válido. Revisa la dirección e inténtalo nuevamente."
         );
         setSessions([]);
-        setRegistrations([]);
+        setOccupiedSeats({});
         setLoading(false);
         return;
       }
 
       try {
-        const [sessionsResponse, registrationsResponse] = await Promise.all([
-            supabase
-              .from("class_sessions")
-              .select(
-                 "id, gym_id, title, date, start_time, capacity, price, notes, created_at, accept_receipts"
-              )
-              .eq("gym_id", gymId ?? "")
-              .order("date", { ascending: true })
-              .order("start_time", { ascending: true }),
-            supabase
-              .from("class_registrations")
-              .select(
-                "id, session_id, gym_id, full_name, email, phone, created_at, receipt_url, receipt_storage_path"
-              )
-              .eq("gym_id", gymId ?? ""),
-          ]);
-
-        if (sessionsResponse.error) throw sessionsResponse.error;
-        if (registrationsResponse.error) throw registrationsResponse.error;
-
-        setSessions((sessionsResponse.data ?? []) as ClassSession[]);
-        setRegistrations(
-          (registrationsResponse.data ?? []) as ClassRegistration[]
+        const classesResponse = await fetch(
+          `/api/public-gyms/${gymId}/class-sessions`,
+          { method: "GET", cache: "no-store" }
         );
+        const classesPayload = (await classesResponse.json().catch(() => null)) as
+          | { sessions?: ClassSession[]; occupiedSeats?: Record<string, number>; error?: string }
+          | null;
+
+        if (!classesResponse.ok) {
+          throw new Error(classesPayload?.error ?? "No se pudieron cargar las clases.");
+        }
+
+        setSessions(classesPayload?.sessions ?? []);
+        setOccupiedSeats(classesPayload?.occupiedSeats ?? {});
 
         let resolvedGymName: string | null | undefined = undefined;
         let resolvedGymLogoUrl: string | null | undefined = undefined;
@@ -254,44 +229,6 @@ function PublicClassRegistrationPageContent() {
     setReceiptError(null);
     setReceiptInputKey((prev) => prev + 1);
   }, [selectedSessionId]);
-
-  useEffect(() => {
-    if (!gymId) {
-      return;
-    }
-
-    const registrationsChannel = supabase
-      .channel(`public:class_registrations:${gymId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "class_registrations",
-          filter: `gym_id=eq.${gymId}`,
-        },
-        () => fetchData(false)
-      )
-      .subscribe();
-
-    const sessionsChannel = supabase
-      .channel(`public:class_sessions:${gymId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "class_sessions",
-          filter: `gym_id=eq.${gymId}`,
-        },
-        () => fetchData(false)
-      )
-      .subscribe();
-      return () => {
-      supabase.removeChannel(registrationsChannel);
-      supabase.removeChannel(sessionsChannel);
-    };
-  }, [fetchData, gymId]);
 
   useEffect(() => {
     if (sortedSessions.length === 0) {
@@ -439,11 +376,14 @@ function PublicClassRegistrationPageContent() {
       }
 
       const { registration } = (await response.json()) as {
-        registration: ClassRegistration;
+        registration: { session_id: string };
       };
 
-      if (registration) {
-        setRegistrations((prev) => [...prev, registration]);
+      if (registration?.session_id) {
+        setOccupiedSeats((current) => ({
+          ...current,
+          [registration.session_id]: (current[registration.session_id] ?? 0) + 1,
+        }));
       }
 
       setSuccessMessage(
@@ -538,8 +478,7 @@ function PublicClassRegistrationPageContent() {
                       </SelectTrigger>
                       <SelectContent>
                         {sortedSessions.map((session) => {
-                          const count =
-                            registrationsBySession.get(session.id)?.length ?? 0;
+                          const count = occupiedSeats[session.id] ?? 0;
                           const available = Math.max(
                             session.capacity - count,
                             0

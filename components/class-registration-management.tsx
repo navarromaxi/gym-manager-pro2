@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import type { ClassRegistration, ClassSession } from "@/lib/supabase";
 import {
   Card,
@@ -308,7 +309,7 @@ export function ClassRegistrationManagement({
     setFeedback(null);
 
     try {
-      const response = await fetch("/api/class-sessions", {
+      const response = await authenticatedFetch("/api/class-sessions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -383,7 +384,7 @@ export function ClassRegistrationManagement({
     setFeedback(null);
 
     try {
-      const response = await fetch("/api/class-sessions", {
+      const response = await authenticatedFetch("/api/class-sessions", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -456,7 +457,7 @@ export function ClassRegistrationManagement({
     const previousRegistrations = registrations;
     setDeletingId(sessionId);
     try {
-      const response = await fetch("/api/class-sessions", {
+      const response = await authenticatedFetch("/api/class-sessions", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -577,7 +578,7 @@ export function ClassRegistrationManagement({
     );
 
     try {
-      const response = await fetch("/api/class-registrations", {
+      const response = await authenticatedFetch("/api/class-registrations", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

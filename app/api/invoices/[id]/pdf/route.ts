@@ -4,6 +4,7 @@ import { Buffer } from "node:buffer";
 import { buildInvoicePdfFileName } from "@/lib/invoice-pdf";
 import { extractFacturaId, toTrimmedString } from "@/lib/invoice-utils";
 import { createClient } from "@/lib/supabase-server";
+import { authorizeGymRequest } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -94,6 +95,9 @@ export async function GET(_request: Request, context: RouteContext) {
       { status: 400 }
     );
   }
+
+  const authorization = await authorizeGymRequest(_request, invoice.gym_id);
+  if (authorization.error) return authorization.error;
 
   const { data: gym, error: gymError } = await supabase
     .from("gyms")

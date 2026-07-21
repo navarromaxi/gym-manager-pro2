@@ -43,6 +43,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { supabase, updateMemberWithFallback } from "@/lib/supabase";
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import type {
   Member,
   Payment,
@@ -1305,7 +1306,7 @@ export function PaymentManagement({
     });
 
     try {
-      const response = await fetch("/api/invoices", {
+      const response = await authenticatedFetch("/api/invoices", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

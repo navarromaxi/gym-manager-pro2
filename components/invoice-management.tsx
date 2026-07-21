@@ -19,6 +19,7 @@ import { RefreshCcw, Download } from "lucide-react";
 
 import type { Invoice } from "@/lib/supabase";
 import { supabase } from "@/lib/supabase";
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import { resolveInvoiceNumber } from "@/lib/invoice-utils";
 import { buildInvoicePdfFileName } from "@/lib/invoice-pdf";
 
@@ -156,7 +157,7 @@ export function InvoiceManagement({
   setDownloadError(null);
 
     try {
-      const response = await fetch(`/api/invoices/${invoice.id}/pdf`, {
+      const response = await authenticatedFetch(`/api/invoices/${invoice.id}/pdf`, {
         method: "GET",
       });
 
