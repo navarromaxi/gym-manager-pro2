@@ -50,106 +50,21 @@ import {
 import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
 import { detectContractTable } from "@/lib/contract-table";
 import type { ContractTableName } from "@/lib/contract-table";
-
-// Normaliza fechas a medianoche local admitiendo strings con o sin tiempo
-const toLocalDate = (isoDate: string) => {
-  if (!isoDate) return new Date(NaN);
-
-  const dateMatch = isoDate.match(/^(\d{4}-\d{2}-\d{2})/);
-  const dateOnly = dateMatch ? dateMatch[1] : null;
-
-  if (dateOnly) {
-    const [year, month, day] = dateOnly.split("-").map(Number);
-    return new Date(year, month - 1, day);
-  }
-
-  const parsed = new Date(isoDate);
-  if (Number.isNaN(parsed.getTime())) {
-    return new Date(NaN);
-  }
-
-  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
-};
-
-const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
-  if (!startDate) return "";
-  const baseDate = new Date(`${startDate}T00:00:00`);
-  if (Number.isNaN(baseDate.getTime())) {
-    return startDate;
-  }
-
-  if (plan) {
-    if (plan.duration_type === "days") {
-      baseDate.setDate(baseDate.getDate() + plan.duration);
-    } else if (plan.duration_type === "months") {
-      baseDate.setMonth(baseDate.getMonth() + plan.duration);
-    } else if (plan.duration_type === "years") {
-      baseDate.setFullYear(baseDate.getFullYear() + plan.duration);
-    }
-  }
-
-  return baseDate.toISOString().split("T")[0];
-};
-
-const MEMBERS_PER_BATCH = 10;
-
-type SortOption =
-  | "recent_activity_desc"
-  | "plan_end_asc"
-  | "plan_end_desc"
-  | "installment_due_asc"
-  | "installment_due_desc"
-  | "days_remaining_asc"
-  | "days_remaining_desc";
-
-const formatDateForAlert = (isoDate: string) => {
-  if (!isoDate) return "";
-  const date = toLocalDate(isoDate);
-  return Number.isNaN(date.getTime()) ? isoDate : date.toLocaleDateString();
-};
-
-const getRealStatus = (member: Member): "active" | "expired" | "inactive" => {
-  const today = new Date();
-  //const next = new Date(member.next_payment);
-  //const diffMs = today.getTime() - next.getTime();
-  //const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  const next = toLocalDate(member.next_payment);
-  const diffDays = Math.ceil((today.getTime() - next.getTime()) / 86400000);
-
-  if (diffDays <= 0) return "active";
-  if (diffDays <= 30) return "expired";
-  return "inactive";
-};
-
-const extractCustomPlanTimestamp = (plan: CustomPlan) => {
-  const parts = plan.id.split("_");
-  const maybeTimestamp = Number.parseInt(parts[parts.length - 1] ?? "", 10);
-  return Number.isNaN(maybeTimestamp) ? 0 : maybeTimestamp;
-};
-
-const getCustomPlanEndDate = (plan: CustomPlan) => {
-  if (!plan.end_date) return null;
-  const parsed = toLocalDate(plan.end_date);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const isCustomPlanMoreRecent = (candidate: CustomPlan, current: CustomPlan) => {
-  const candidateEnd = getCustomPlanEndDate(candidate);
-  const currentEnd = getCustomPlanEndDate(current);
-
-  if (candidateEnd && currentEnd) {
-    if (candidateEnd.getTime() !== currentEnd.getTime()) {
-      return candidateEnd.getTime() > currentEnd.getTime();
-    }
-  }
-
-  if (candidateEnd && !currentEnd) return true;
-  if (!candidateEnd && currentEnd) return false;
-
-  return (
-    extractCustomPlanTimestamp(candidate) > extractCustomPlanTimestamp(current)
-  );
-};
+import {
+  calculatePlanEndDate,
+  formatDateForAlert,
+  getRealMemberStatus as getRealStatus,
+  MEMBERS_PER_BATCH,
+  filterMembers,
+  getLatestPlanStartDateByMember,
+  getLatestCustomPlanByMember,
+  getMembersToFollowUp,
+  getExpiringCustomPlans,
+  getLongTermPlanFollowUps,
+  sortMembers,
+  type MemberSortOption,
+  toLocalDate,
+} from "@/features/members/member-utils";
 
 export interface MemberManagementProps {
   members: Member[];
@@ -194,7 +109,7 @@ export function MemberManagement({
   }, [searchTerm]);
 
   const [statusFilter, setStatusFilter] = useState(initialFilter);
-  const [sortOption, setSortOption] = useState<SortOption>(
+  const [sortOption, setSortOption] = useState<MemberSortOption>(
     "recent_activity_desc"
   );
   const [newMember, setNewMember] = useState({
@@ -265,21 +180,9 @@ export function MemberManagement({
     return map;
   }, [plans]);
 
-  const latestCustomPlanByMember = useMemo(() => {
-    const map = new Map<string, CustomPlan>();
-    for (const plan of customPlans) {
-      const stored = map.get(plan.member_id);
-      if (!stored || isCustomPlanMoreRecent(plan, stored)) {
-        map.set(plan.member_id, plan);
-      }
-    }
-    return map;
-  }, [customPlans]);
-
-  const isLatestCustomPlan = useCallback(
-    (plan: CustomPlan) =>
-      latestCustomPlanByMember.get(plan.member_id)?.id === plan.id,
-    [latestCustomPlanByMember]
+  const latestCustomPlanByMember = useMemo(
+    () => getLatestCustomPlanByMember(customPlans),
+    [customPlans]
   );
 
   const selectedPlanForNewMember = useMemo(() => {
@@ -323,321 +226,56 @@ export function MemberManagement({
     }
   }, [serverPaging]);
 
-  const getExpiringCustomPlans = useCallback(() => {
-    const today = new Date();
+  const expiringCustomPlans = useMemo(
+    () => getExpiringCustomPlans(customPlans, latestCustomPlanByMember),
+    [customPlans, latestCustomPlanByMember]
+  );
 
-    return customPlans.filter((plan) => {
-      if (!isLatestCustomPlan(plan)) return false;
-      if (!plan.is_active) return false;
-      if (!plan.end_date) return false;
-
-      const endDate = toLocalDate(plan.end_date);
-      if (Number.isNaN(endDate.getTime())) return false;
-
-      const diffDays = Math.ceil(
-        (endDate.getTime() - today.getTime()) / 86400000
-      );
-
-      return diffDays <= 10 && diffDays >= 0;
-    });
-  }, [customPlans, isLatestCustomPlan]);
-
-  const sortedMembers = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const getDateValue = (value?: string | null) => {
-      if (!value) return null;
-      const parsed = toLocalDate(value);
-      const time = parsed.getTime();
-      return Number.isNaN(time) ? null : time;
-    };
-
-    const compareOptional = (
-      aValue: number | null,
-      bValue: number | null,
-      ascending: boolean
-    ) => {
-      if (aValue === null && bValue === null) return 0;
-      if (aValue === null) return 1;
-      if (bValue === null) return -1;
-      return ascending ? aValue - bValue : bValue - aValue;
-    };
-
-    const getDaysRemaining = (member: Member) => {
-      const time = getDateValue(member.next_payment);
-      if (time === null) return null;
-      return Math.ceil((time - today.getTime()) / 86400000);
-    };
-
-    return [...members].sort((a, b) => {
-      if (sortOption === "plan_end_asc" || sortOption === "plan_end_desc") {
-        return compareOptional(
-          getDateValue(a.next_payment),
-          getDateValue(b.next_payment),
-          sortOption === "plan_end_asc"
-        );
-      }
-
-      if (
-        sortOption === "installment_due_asc" ||
-        sortOption === "installment_due_desc"
-      ) {
-        return compareOptional(
-          getDateValue(a.next_installment_due ?? a.next_payment),
-          getDateValue(b.next_installment_due ?? b.next_payment),
-          sortOption === "installment_due_asc"
-        );
-      }
-
-      if (
-        sortOption === "days_remaining_asc" ||
-        sortOption === "days_remaining_desc"
-      ) {
-        return compareOptional(
-          getDaysRemaining(a),
-          getDaysRemaining(b),
-          sortOption === "days_remaining_asc"
-        );
-      }
-
-      const aTime = Math.max(
-        getDateValue(a.last_payment) ?? -Infinity,
-        getDateValue(a.join_date) ?? -Infinity
-      );
-      const bTime = Math.max(
-        getDateValue(b.last_payment) ?? -Infinity,
-        getDateValue(b.join_date) ?? -Infinity
-      );
-      return compareOptional(aTime, bTime, false);
-    });
-  }, [members, sortOption]);
-
-  const getMembersToFollowUp = useCallback(() => {
-    const today = new Date();
-    return members.filter((member) => {
-      let referenceDate: Date | null = null;
-
-      for (const payment of payments) {
-        if (
-          payment.member_id === member.id &&
-          payment.type === "plan" &&
-          payment.start_date
-        ) {
-          const startDate = toLocalDate(payment.start_date);
-          if (Number.isNaN(startDate.getTime())) continue;
-          if (!referenceDate || startDate.getTime() > referenceDate.getTime()) {
-            referenceDate = startDate;
-          }
-        }
-      }
-
-      if (!referenceDate) {
-        const joinDate = toLocalDate(member.join_date);
-        if (Number.isNaN(joinDate.getTime())) return false;
-        referenceDate = joinDate;
-      }
-
-      const diffDays = Math.floor(
-        (today.getTime() - referenceDate.getTime()) / 86400000
-      );
-      return !member.followed_up && diffDays >= 5 && diffDays <= 12;
-    });
-  }, [members, payments]);
+  const sortedMembers = useMemo(
+    () => sortMembers(members, sortOption),
+    [members, sortOption]
+  );
 
   const membersToFollowUp = useMemo(
-    () => getMembersToFollowUp(),
-    [getMembersToFollowUp]
+    () => getMembersToFollowUp(members, payments),
+    [members, payments]
   );
   const followUpMemberIds = useMemo(
     () => new Set(membersToFollowUp.map((member) => member.id)),
     [membersToFollowUp]
   );
-  const longTermPlanFollowUps = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const latestPlanPaymentByMember = new Map<
-      string,
-      { payment: Payment; startDate: Date }
-    >();
-
-    for (const payment of payments) {
-      if (payment.type !== "plan" || !payment.start_date) continue;
-      const startDate = toLocalDate(payment.start_date);
-      if (Number.isNaN(startDate.getTime())) continue;
-
-      const existing = latestPlanPaymentByMember.get(payment.member_id);
-      if (!existing || startDate.getTime() > existing.startDate.getTime()) {
-        latestPlanPaymentByMember.set(payment.member_id, {
-          payment,
-          startDate,
-        });
-      }
-    }
-
-    const alerts: {
-      memberId: string;
-      memberName: string;
-      planName: string;
-      daysSinceStart: number;
-    }[] = [];
-
-    for (const [memberId, { payment, startDate }] of latestPlanPaymentByMember) {
-      const member = members.find((m) => m.id === memberId);
-      if (!member) continue;
-
-      if (member.long_plan_followed_up) {
-        continue;
-      }
-
-      const normalizedPlanName = payment.plan?.trim().toLowerCase();
-      const memberPlanName = member.plan?.trim().toLowerCase();
-      const plan =
-        (payment.plan_id && planById.get(payment.plan_id)) ||
-        (normalizedPlanName && planByName.get(normalizedPlanName)) ||
-        (memberPlanName && planByName.get(memberPlanName));
-
-      if (!plan) continue;
-
-      let qualifies = false;
-      if (plan.duration_type === "months") {
-        qualifies = plan.duration >= 5;
-      } else if (plan.duration_type === "years") {
-        qualifies = plan.duration * 12 >= 5;
-      } else if (plan.duration_type === "days") {
-        qualifies = plan.duration >= 150;
-      }
-
-      if (!qualifies) continue;
-
-      const startDateIso = payment.start_date;
-      if (!startDateIso) continue;
-
-      const planEndDateIso = calculatePlanEndDate(startDateIso, plan);
-      const planEndDate = planEndDateIso
-        ? toLocalDate(planEndDateIso)
-        : new Date(NaN);
-      if (Number.isNaN(planEndDate.getTime())) continue;
-      if (planEndDate.getTime() < today.getTime()) continue;
-
-      const daysSinceStart = Math.floor(
-        (today.getTime() - startDate.getTime()) / 86400000
-      );
-      if (daysSinceStart < 120) continue;
-
-      alerts.push({
-        memberId,
-        memberName: member.name || "Socio",
-        planName: plan.name,
-        daysSinceStart,
-      });
-    }
-
-    return alerts.sort((a, b) => b.daysSinceStart - a.daysSinceStart);
-  }, [payments, members, planById, planByName]);
-  const latestPlanStartDateByMember = useMemo(() => {
-    const map = new Map<string, string>();
-    const timestampByMember = new Map<string, number>();
-
-    for (const payment of payments) {
-      if (payment.type !== "plan" || !payment.start_date) continue;
-
-      const startDate = toLocalDate(payment.start_date);
-      const time = startDate.getTime();
-      if (Number.isNaN(time)) continue;
-
-      const current = timestampByMember.get(payment.member_id) ?? -Infinity;
-      if (time > current) {
-        timestampByMember.set(payment.member_id, time);
-        map.set(payment.member_id, payment.start_date);
-      }
-    }
-
-    return map;
-  }, [payments]);
+  const longTermPlanFollowUps = useMemo(
+    () => getLongTermPlanFollowUps(members, payments, planById, planByName),
+    [members, payments, planById, planByName]
+  );
+  const latestPlanStartDateByMember = useMemo(
+    () => getLatestPlanStartDateByMember(payments),
+    [payments]
+  );
   const longTermFollowUpMemberIds = useMemo(
     () => new Set(longTermPlanFollowUps.map((alert) => alert.memberId)),
     [longTermPlanFollowUps]
   );
 
   const filteredMembers = useMemo(() => {
-    const today = new Date();
     const expiringCustomPlanMemberIds =
       statusFilter === "custom_expiring"
-        ? new Set(getExpiringCustomPlans().map((plan) => plan.member_id))
+        ? new Set(expiringCustomPlans.map((plan) => plan.member_id))
         : null;
-    const filtered = sortedMembers.filter((member) => {
-      // búsqueda (debounced)
-      const name = (member.name ?? "").toLowerCase();
-      const email = (member.email ?? "").toLowerCase();
-      const matchesSearch =
-        !debouncedSearch ||
-        name.includes(debouncedSearch) ||
-        email.includes(debouncedSearch) ||
-        (member.phone ?? "").toLowerCase().includes(debouncedSearch);
-
-      if (!matchesSearch) return false;
-
-      const realStatus = getRealStatus(member);
-
-      if (statusFilter === "expiring_soon") {
-        const nextPayment = toLocalDate(member.next_payment);
-        const diffDays = Math.ceil(
-          (nextPayment.getTime() - today.getTime()) / 86400000
-        );
-        return (
-          diffDays <= 10 &&
-          diffDays >= 0 &&
-          realStatus === "active" &&
-          !member.expiring_soon_contacted
-        );
-      }
-
-      if (statusFilter === "expiring_soon_contacted") {
-        const nextPayment = toLocalDate(member.next_payment);
-        const diffDays = Math.ceil(
-          (nextPayment.getTime() - today.getTime()) / 86400000
-        );
-        return (
-          diffDays <= 10 &&
-          diffDays >= 0 &&
-          realStatus === "active" &&
-          !!member.expiring_soon_contacted
-        );
-      }
-
-      if (statusFilter === "follow_up") {
-        return followUpMemberIds.has(member.id);
-      }
-
-      if (statusFilter === "long_plan_follow_up") {
-        return longTermFollowUpMemberIds.has(member.id);
-      }
-
-      if (statusFilter === "balance_due") {
-        return hasOverduePartialInstallment(member);
-      }
-
-      if (statusFilter === "custom_expiring") {
-        return expiringCustomPlanMemberIds?.has(member.id) ?? false;
-      }
-
-      return statusFilter === "all" || realStatus === statusFilter;
+    return filterMembers({
+      members: sortedMembers,
+      search: debouncedSearch,
+      statusFilter,
+      followUpMemberIds,
+      longTermFollowUpMemberIds,
+      expiringCustomPlanMemberIds,
+      hasOverduePartialInstallment,
     });
-
-    if (statusFilter === "balance_due") {
-      return filtered.sort(
-        (a, b) => (b.balance_due || 0) - (a.balance_due || 0)
-      );
-    }
-
-    return filtered;
   }, [
     sortedMembers,
     debouncedSearch,
     statusFilter,
-    getExpiringCustomPlans,
+    expiringCustomPlans,
     longTermFollowUpMemberIds,
     followUpMemberIds,
   ]);
@@ -1115,7 +753,7 @@ export function MemberManagement({
   const membersWithPartialOverdue = members.filter(
     hasOverduePartialInstallment
   );
-  const expiringCustomPlansForAlert = getExpiringCustomPlans();
+  const expiringCustomPlansForAlert = expiringCustomPlans;
   const visibleExpiringCustomPlansForAlert = expiringCustomPlansForAlert.filter(
     (plan) => !dismissedCustomPlanAlertIds.includes(plan.id)
   );
@@ -1574,7 +1212,9 @@ export function MemberManagement({
             </div>
             <Select
               value={sortOption}
-              onValueChange={(value) => setSortOption(value as SortOption)}
+              onValueChange={(value) =>
+                setSortOption(value as MemberSortOption)
+              }
             >
               <SelectTrigger className="w-[230px]">
                 <SelectValue placeholder="Ordenar por" />

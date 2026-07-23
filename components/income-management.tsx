@@ -11,7 +11,6 @@ import {
   DoorOpen,
   Download,
   ExternalLink,
-  MonitorSmartphone,
   RefreshCcw,
 } from "lucide-react";
 
@@ -127,7 +126,7 @@ export function IncomeManagement({
 }: IncomeManagementProps) {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<"normal" | "kiosco" | null>(null);
+  const [copied, setCopied] = useState(false);
   const [reportRange, setReportRange] = useState<ReportRange>("week");
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -149,11 +148,6 @@ export function IncomeManagement({
     }
     return `${window.location.origin}/acceso/${gymId}`;
   }, [gymId]);
-
-  const kioskUrl = useMemo(() => {
-    if (!accessUrl) return "";
-    return `${accessUrl}?kiosco=1`;
-  }, [accessUrl]);
 
   const loadDashboard = async () => {
     if (!gymId) return;
@@ -207,13 +201,13 @@ export function IncomeManagement({
     loadDashboard();
   }, [gymId, page, reportRange, appliedFilters]);
 
-  const handleCopy = async (value: string, kind: "normal" | "kiosco") => {
+  const handleCopy = async (value: string) => {
     if (!value) return;
 
     try {
       await navigator.clipboard.writeText(value);
-      setCopied(kind);
-      window.setTimeout(() => setCopied(null), 1800);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
     } catch (error) {
       console.error("Error copying access URL", error);
     }
@@ -329,33 +323,14 @@ export function IncomeManagement({
             <Button
               type="button"
               variant="outline"
-              onClick={() => handleCopy(accessUrl, "normal")}
+              onClick={() => handleCopy(accessUrl)}
             >
               <Copy className="mr-2 h-4 w-4" />
-              {copied === "normal" ? "Copiado" : "Copiar"}
+              {copied ? "Copiado" : "Copiar"}
             </Button>
             <Button type="button" onClick={() => handleOpenAccess(accessUrl)}>
               <ExternalLink className="mr-2 h-4 w-4" />
               Abrir
-            </Button>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto]">
-            <Input value={kioskUrl} readOnly className="font-mono text-sm" />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleCopy(kioskUrl, "kiosco")}
-            >
-              <MonitorSmartphone className="mr-2 h-4 w-4" />
-              {copied === "kiosco" ? "Copiado" : "Copiar kiosco"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleOpenAccess(kioskUrl)}
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Abrir kiosco
             </Button>
           </div>
           <div className="rounded-xl border border-cyan-100 bg-white/80 p-4 text-sm text-slate-600">
