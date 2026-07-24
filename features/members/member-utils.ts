@@ -289,3 +289,45 @@ export const getLongTermPlanFollowUps = (
 
   return alerts.sort((a, b) => b.daysSinceStart - a.daysSinceStart);
 };
+
+export const getPlanIndexes = (plans: Plan[]) => {
+  const byId = new Map<string, Plan>();
+  const byName = new Map<string, Plan>();
+
+  for (const plan of plans) {
+    byId.set(plan.id, plan);
+    const normalizedName = plan.name?.trim().toLowerCase();
+    if (normalizedName) byName.set(normalizedName, plan);
+  }
+
+  return { byId, byName };
+};
+
+export const hasOverduePartialInstallment = (member: Member) => {
+  if ((member.balance_due ?? 0) <= 0 || !member.next_installment_due) return false;
+  const dueDate = toLocalDate(member.next_installment_due);
+  if (Number.isNaN(dueDate.getTime())) return false;
+
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+  return dueDate.getTime() <= todayMidnight.getTime();
+};
+
+export const getDaysUntilExpiration = (nextPayment: string) => {
+  const today = new Date();
+  return Math.ceil((toLocalDate(nextPayment).getTime() - today.getTime()) / 86400000);
+};
+
+export const getExpiringMembers = (members: Member[], contacted: boolean) =>
+  members.filter((member) => {
+    const daysUntilExpiration = getDaysUntilExpiration(member.next_payment);
+    return daysUntilExpiration <= 10 && daysUntilExpiration >= 0 &&
+      getRealMemberStatus(member) === "active" &&
+      Boolean(member.expiring_soon_contacted) === contacted;
+  });
+
+export const getExpiredMembers = (members: Member[]) =>
+  members.filter((member) => getRealMemberStatus(member) === "expired");
+
+export const getMembersWithBalanceDue = (members: Member[]) =>
+  members.filter((member) => (member.balance_due || 0) > 0);

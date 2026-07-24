@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -42,11 +41,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Edit, Trash2, Search, CalendarClock, X } from "lucide-react";
-import {
-  insertMemberWithFallback,
-  supabase,
-  updateMemberWithFallback,
-} from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
 import { detectContractTable } from "@/lib/contract-table";
 import type { ContractTableName } from "@/lib/contract-table";
@@ -60,11 +55,29 @@ import {
   getLatestCustomPlanByMember,
   getMembersToFollowUp,
   getExpiringCustomPlans,
+  getExpiringMembers,
+  getExpiredMembers,
+  getMembersWithBalanceDue,
+  getDaysUntilExpiration,
   getLongTermPlanFollowUps,
+  getPlanIndexes,
+  hasOverduePartialInstallment,
   sortMembers,
   type MemberSortOption,
   toLocalDate,
 } from "@/features/members/member-utils";
+import {
+  CARD_BRANDS,
+  createInitialNewMember,
+  PAYMENT_METHODS,
+} from "@/features/members/member-form";
+import { MemberStatusBadge } from "@/features/members/components/member-status-badge";
+import {
+  deleteMemberAndPayments,
+  createMemberWithInitialPayment,
+  updateMemberFlag,
+  updateMemberAndRelatedNames,
+} from "@/features/members/member-repository";
 
 export interface MemberManagementProps {
   members: Member[];
@@ -112,41 +125,7 @@ export function MemberManagement({
   const [sortOption, setSortOption] = useState<MemberSortOption>(
     "recent_activity_desc"
   );
-  const [newMember, setNewMember] = useState({
-    name: "",
-    email: "",
-    referralSource: "",
-    phone: "",
-    cedula: "",
-    plan: "",
-    planPrice: 0,
-    planStartDate: new Date().toISOString().split("T")[0],
-    paymentDate: new Date().toISOString().split("T")[0],
-    installments: 1,
-    paymentAmount: 0,
-    paymentMethod: "Efectivo",
-    cardBrand: "",
-    cardInstallments: 1,
-    description: "",
-    nextInstallmentDue: new Date().toISOString().split("T")[0],
-  });
-
-  const paymentMethods = [
-    "Efectivo",
-    "Transferencia",
-    "Tarjeta de Débito",
-    "Tarjeta de Crédito",
-  ];
-
-  const cardBrands = [
-    "VISA",
-    "OCA",
-    "MASTER",
-    "CABAL",
-    "AMEX",
-    "TARJETA D",
-    "MERCADO PAGO",
-  ];
+  const [newMember, setNewMember] = useState(createInitialNewMember);
   const isCardPayment = ["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
     newMember.paymentMethod
   );
@@ -161,24 +140,9 @@ export function MemberManagement({
   const [pendingDeleteMemberId, setPendingDeleteMemberId] =
     useState<string | null>(null);
 
-  const planById = useMemo(() => {
-    const map = new Map<string, Plan>();
-    for (const plan of plans) {
-      map.set(plan.id, plan);
-    }
-    return map;
-  }, [plans]);
-
-  const planByName = useMemo(() => {
-    const map = new Map<string, Plan>();
-    for (const plan of plans) {
-      const key = plan.name?.trim().toLowerCase();
-      if (key) {
-        map.set(key, plan);
-      }
-    }
-    return map;
-  }, [plans]);
+  const planIndexes = useMemo(() => getPlanIndexes(plans), [plans]);
+  const planById = planIndexes.byId;
+  const planByName = planIndexes.byName;
 
   const latestCustomPlanByMember = useMemo(
     () => getLatestCustomPlanByMember(customPlans),
@@ -391,30 +355,6 @@ export function MemberManagement({
         expiring_soon_contacted: false,
       };
 
-      // Guardar en Supabase
-      const { description: _memberDescription, ...memberInsert } = member;
-      const { error: memberError } = await insertMemberWithFallback(memberInsert);
-
-      if (memberError) throw memberError;
-
-      // Crear contrato de plan solo cuando hay cuotas
-      if (contractTable && installments > 1 && selectedPlan?.id) {
-        const contractId = `${memberId}_contract_${Date.now()}`;
-        const contract = {
-          id: contractId,
-          gym_id: gymId,
-          member_id: memberId,
-          plan_id: selectedPlan.id,
-          installments_total: installments,
-          installments_paid: 1,
-        };
-        const { error: contractError } = await supabase
-          .from(contractTable)
-          .insert([contract]);
-        if (contractError) {
-          console.warn("Error registrando contrato de plan:", contractError);
-        }
-      }
       // Crear pago inicial
       const payment: Payment = {
         id: `${gymId}_payment_${Date.now()}`,
@@ -440,34 +380,19 @@ export function MemberManagement({
         plan_id: selectedPlan?.id,
       };
 
-      const { error: paymentError } = await supabase
-        .from("payments")
-        .insert([payment]);
-
-      if (paymentError) throw paymentError;
+      await createMemberWithInitialPayment({
+        member,
+        payment,
+        contractTable,
+        installments,
+        planId: selectedPlan?.id,
+      });
 
       // Actualizar estados locales
       setMembers([...members, member]);
       setPayments([...payments, payment]);
 
-      setNewMember({
-        name: "",
-        email: "",
-        referralSource: "",
-        phone: "",
-        cedula: "",
-        plan: "",
-        planPrice: 0,
-        planStartDate: new Date().toISOString().split("T")[0],
-        paymentDate: new Date().toISOString().split("T")[0],
-        installments: 1,
-        paymentAmount: 0,
-        paymentMethod: "Efectivo",
-        cardBrand: "",
-        cardInstallments: 1,
-        description: "",
-        nextInstallmentDue: new Date().toISOString().split("T")[0],
-      });
+      setNewMember(createInitialNewMember());
       setIsAddDialogOpen(false);
     } catch (error) {
       console.error("Error agregando miembro:", error);
@@ -498,7 +423,7 @@ export function MemberManagement({
           newInactive = "yellow";
         }
       }
-      const { error } = await updateMemberWithFallback(editingMember.id, {
+      await updateMemberAndRelatedNames(editingMember.id, editingMember.name, {
         name: editingMember.name,
         email: editingMember.email,
         phone: editingMember.phone,
@@ -512,22 +437,6 @@ export function MemberManagement({
         status: newStatus,
         inactive_level: newInactive,
       });
-
-      if (error) throw error;
-
-      const { error: paymentUpdateError } = await supabase
-        .from("payments")
-        .update({ member_name: editingMember.name })
-        .eq("member_id", editingMember.id);
-
-      if (paymentUpdateError) throw paymentUpdateError;
-
-      const { error: customPlansUpdateError } = await supabase
-        .from("custom_plans")
-        .update({ member_name: editingMember.name })
-        .eq("member_id", editingMember.id);
-
-      if (customPlansUpdateError) throw customPlansUpdateError;
 
       const updatedMembers = members.map((m) =>
         m.id === editingMember.id
@@ -566,21 +475,7 @@ export function MemberManagement({
 
   const handleDeleteMember = async (id: string) => {
     try {
-      // Eliminar pagos relacionados
-      const { error: paymentsError } = await supabase
-        .from("payments")
-        .delete()
-        .eq("member_id", id);
-
-      if (paymentsError) throw paymentsError;
-
-      // Eliminar miembro
-      const { error: memberError } = await supabase
-        .from("members")
-        .delete()
-        .eq("id", id);
-
-      if (memberError) throw memberError;
+      await deleteMemberAndPayments(id);
 
       // Actualizar estados locales
       setMembers(members.filter((m) => m.id !== id));
@@ -601,91 +496,10 @@ export function MemberManagement({
     await handleDeleteMember(memberId);
   };
 
-  const getStatusBadge = (
-    status: "active" | "expired" | "inactive",
-    level?: "green" | "yellow" | "red"
-  ) => {
-    switch (status) {
-      case "active":
-        return <Badge variant="default">Activo</Badge>;
-      case "expired":
-        return <Badge variant="destructive">Vencido</Badge>;
-      case "inactive":
-        const color =
-          level === "green"
-            ? "bg-green-500"
-            : level === "yellow"
-            ? "bg-yellow-500"
-            : "bg-red-500";
-        return <Badge className={`${color} text-white`}>Inactivo</Badge>;
-    }
-  };
-
-  const getDaysUntilExpiration = (nextPayment: string) => {
-    const today = new Date();
-    const expiration = toLocalDate(nextPayment); // 👈 evita desfase
-    const diffDays = Math.ceil(
-      (expiration.getTime() - today.getTime()) / 86400000
-    );
-    return diffDays;
-  };
-
-  const getExpiringMembers = () => {
-    const today = new Date();
-    return members.filter((member) => {
-      const nextPayment = toLocalDate(member.next_payment);
-      const diffDays = Math.ceil(
-        (nextPayment.getTime() - today.getTime()) / 86400000
-      );
-      return (
-        diffDays <= 10 &&
-        diffDays >= 0 &&
-        getRealStatus(member) === "active" &&
-        !member.expiring_soon_contacted
-      );
-    });
-  };
-
-  const getExpiringSoonContactedMembers = () => {
-    const today = new Date();
-    return members.filter((member) => {
-      const nextPayment = toLocalDate(member.next_payment);
-      const diffDays = Math.ceil(
-        (nextPayment.getTime() - today.getTime()) / 86400000
-      );
-      return (
-        diffDays <= 10 &&
-        diffDays >= 0 &&
-        getRealStatus(member) === "active" &&
-        !!member.expiring_soon_contacted
-      );
-    });
-  };
-
-  const getExpiredMembers = () =>
-    members.filter((member) => getRealStatus(member) === "expired");
-
-  const getMembersWithBalanceDue = () =>
-    members.filter((member) => (member.balance_due || 0) > 0);
-
-  function hasOverduePartialInstallment(member: Member) {
-    if ((member.balance_due ?? 0) <= 0) return false;
-    if (!member.next_installment_due) return false;
-    const dueDate = toLocalDate(member.next_installment_due);
-    if (Number.isNaN(dueDate.getTime())) return false;
-    const todayMidnight = new Date();
-    todayMidnight.setHours(0, 0, 0, 0);
-    return dueDate.getTime() <= todayMidnight.getTime();
-  }
-
   //Función para marcar como contactado
   const handleMarkAsFollowedUp = async (memberId: string) => {
     try {
-      const { error } = await updateMemberWithFallback(memberId, {
-        followed_up: true,
-      });
-
-      if (error) throw error;
+      await updateMemberFlag(memberId, "followed_up");
 
       const updatedMembers = members.map((m) =>
         m.id === memberId ? { ...m, followed_up: true } : m
@@ -717,11 +531,7 @@ export function MemberManagement({
 
   const handleMarkExpiringSoonContacted = async (memberId: string) => {
     try {
-      const { error } = await updateMemberWithFallback(memberId, {
-        expiring_soon_contacted: true,
-      });
-
-      if (error) throw error;
+      await updateMemberFlag(memberId, "expiring_soon_contacted");
 
       setMembers(
         members.map((m) =>
@@ -735,10 +545,10 @@ export function MemberManagement({
     }
   };
 
-  const expiringMembers = getExpiringMembers();
-  const expiringSoonContactedMembers = getExpiringSoonContactedMembers();
-  const expiredMembers = getExpiredMembers();
-  const membersWithBalanceDue = getMembersWithBalanceDue();
+  const expiringMembers = getExpiringMembers(members, false);
+  const expiringSoonContactedMembers = getExpiringMembers(members, true);
+  const expiredMembers = getExpiredMembers(members);
+  const membersWithBalanceDue = getMembersWithBalanceDue(members);
   const todayMidnight = new Date();
   todayMidnight.setHours(0, 0, 0, 0);
   const membersWithPartialDueSoon = membersWithBalanceDue.filter((member) => {
@@ -1088,7 +898,7 @@ export function MemberManagement({
                       <SelectValue placeholder="Selecciona método de pago" />
                     </SelectTrigger>
                     <SelectContent>
-                      {paymentMethods.map((method) => (
+                      {PAYMENT_METHODS.map((method) => (
                         <SelectItem key={method} value={method}>
                           {method}
                         </SelectItem>
@@ -1109,7 +919,7 @@ export function MemberManagement({
                         <SelectValue placeholder="Selecciona tarjeta" />
                       </SelectTrigger>
                       <SelectContent>
-                        {cardBrands.map((brand) => (
+                        {CARD_BRANDS.map((brand) => (
                           <SelectItem key={brand} value={brand}>
                             {brand}
                           </SelectItem>
@@ -1530,10 +1340,10 @@ export function MemberManagement({
                         : "-"}
                     </TableCell>
                     <TableCell className="px-2">
-                      {getStatusBadge(
-                        getRealStatus(member),
-                        member.inactive_level
-                      )}
+                      <MemberStatusBadge
+                        status={getRealStatus(member)}
+                        inactiveLevel={member.inactive_level}
+                      />
                     </TableCell>
                     <TableCell className="px-2">
                       {planStartDate

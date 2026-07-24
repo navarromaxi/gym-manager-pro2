@@ -46,6 +46,10 @@ import type { Prospect, Member, Payment, Plan } from "@/lib/supabase";
 import { mapProspectStatusToDb } from "@/lib/prospect-status";
 import { detectContractTable } from "@/lib/contract-table";
 import type { ContractTableName } from "@/lib/contract-table";
+import {
+  calculatePlanEndDate,
+  PROSPECTS_PER_BATCH,
+} from "@/features/prospects/prospect-utils";
 
 interface ProspectManagementProps {
   prospects: Prospect[];
@@ -81,28 +85,6 @@ interface ConversionData {
   referralSource: string;
   nextInstallmentDue: string;
 }
-
-const calculatePlanEndDate = (startDate: string, plan?: Plan | null) => {
-  if (!startDate) return "";
-  const baseDate = new Date(`${startDate}T00:00:00`);
-  if (Number.isNaN(baseDate.getTime())) {
-    return startDate;
-  }
-
-  if (plan) {
-    if (plan.duration_type === "days") {
-      baseDate.setDate(baseDate.getDate() + plan.duration);
-    } else if (plan.duration_type === "months") {
-      baseDate.setMonth(baseDate.getMonth() + plan.duration);
-    } else if (plan.duration_type === "years") {
-      baseDate.setFullYear(baseDate.getFullYear() + plan.duration);
-    }
-  }
-
-  return baseDate.toISOString().split("T")[0];
-};
-
-const PROSPECTS_PER_BATCH = 10;
 
 type ParsedDateParts = {
   day: number;
