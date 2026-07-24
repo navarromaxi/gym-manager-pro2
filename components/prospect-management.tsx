@@ -48,8 +48,16 @@ import { detectContractTable } from "@/lib/contract-table";
 import type { ContractTableName } from "@/lib/contract-table";
 import {
   calculatePlanEndDate,
+  createInitialConversionData,
+  formatScheduledDateTime,
+  parseScheduledDate,
   PROSPECTS_PER_BATCH,
+  type ConversionData,
 } from "@/features/prospects/prospect-utils";
+import {
+  filterProspects,
+  sortProspectsByContactDate,
+} from "@/features/prospects/prospect-filters";
 
 interface ProspectManagementProps {
   prospects: Prospect[];
@@ -69,21 +77,6 @@ interface ProspectManagementProps {
   onProspectRemoved?: () => void;
   externalStatusFilter?: Prospect["status"] | "all" | null;
   onExternalStatusFilterApplied?: () => void;
-}
-
-interface ConversionData {
-  plan: string;
-  planPrice: number;
-  planStartDate: string;
-  paymentDate: string;
-  installments: number;
-  paymentAmount: number;
-  paymentMethod: string;
-  cardBrand: string;
-  cardInstallments: number;
-  description: string;
-  referralSource: string;
-  nextInstallmentDue: string;
 }
 
 type ParsedDateParts = {
@@ -404,25 +397,8 @@ export function ProspectManagement({
     setStatusFilter(externalStatusFilter);
     onExternalStatusFilterApplied?.();
   }, [externalStatusFilter, onExternalStatusFilterApplied]);
-  const getInitialConversionData = (): ConversionData => {
-    const today = new Date().toISOString().split("T")[0];
-    return {
-      plan: "",
-      planPrice: 0,
-      planStartDate: today,
-      paymentDate: today,
-      installments: 1,
-      paymentAmount: 0,
-      paymentMethod: "Efectivo",
-      cardBrand: "",
-      cardInstallments: 1,
-      description: "",
-      referralSource: "",
-      nextInstallmentDue: today,
-    };
-  };
   const [conversionData, setConversionData] = useState<ConversionData>(
-    getInitialConversionData
+    createInitialConversionData
   );
   const [contractTable, setContractTable] = useState<ContractTableName | null>(
     null
@@ -463,50 +439,6 @@ export function ProspectManagement({
   const formatDate = (date?: string | null) => {
     if (!date) return null;
     return new Date(`${date}T00:00:00`).toLocaleDateString();
-  };
-
-  const parseScheduledDate = (value?: string | null) => {
-    if (!value) return null;
-    const trimmedValue = value.trim();
-    if (!trimmedValue) return null;
-
-    const normalizedValue = trimmedValue.includes("T")
-      ? trimmedValue
-      : trimmedValue.includes(" ")
-      ? trimmedValue.replace(" ", "T")
-      : `${trimmedValue}T00:00:00`;
-
-    let parsedDate = new Date(normalizedValue);
-
-    if (Number.isNaN(parsedDate.getTime())) {
-      const slashDateMatch = trimmedValue.match(
-        /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}:\d{2}))?$/
-      );
-
-      if (slashDateMatch) {
-        const [, day, month, year, time] = slashDateMatch;
-        const isoDate = `${year}-${month.padStart(2, "0")}-${day.padStart(
-          2,
-          "0"
-        )}${time ? `T${time}` : "T00:00"}:00`;
-        parsedDate = new Date(isoDate);
-      }
-    }
-
-    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
-  };
-
-  const formatScheduledDateTime = (value?: string | null) => {
-    if (!value) return null;
-    const parsed = parseScheduledDate(value);
-    if (!parsed) return null;
-
-    const hasTime = value.includes(":");
-    const formatterOptions: Intl.DateTimeFormatOptions = hasTime
-      ? { dateStyle: "short", timeStyle: "short" }
-      : { dateStyle: "short" };
-
-    return parsed.toLocaleString(undefined, formatterOptions);
   };
 
    const getScheduledReminderKey = (prospect: Prospect) =>
@@ -618,44 +550,16 @@ export function ProspectManagement({
     });
   })();
 
-  const filteredProspects = prospects.filter((prospect) => {
-    const normalizedSearch = searchTerm.toLowerCase();
-    const matchesSearch = [
-      prospect.name ?? "",
-      prospect.email ?? "",
-      prospect.notes ?? "",
-      prospect.phone ?? "",
-    ].some((field) => field.toLowerCase().includes(normalizedSearch));
-    const matchesStatus =
-      statusFilter === "all" || prospect.status === statusFilter;
-    const matchesPriority =
-      priorityFilter === "all" || prospect.priority_level === priorityFilter; // Nuevo filtro
-    const matchesContactDate = areDatesEquivalent(
-      prospect.contact_date,
-      contactDateFilter
-    );
-    const matchesContactDateRange = isWithinContactDateRange(
-      prospect.contact_date,
-      contactDateRangeFilter
-    );
-    const matchesScheduledDate = areDatesEquivalent(
-      prospect.scheduled_date,
-      scheduledDateFilter
-    );
-
-    const matchesNextContactDate = areDatesEquivalent(
-      prospect.next_contact_date,
-      nextContactDateFilter
-    );
-    return (
-      matchesSearch &&
-      matchesStatus &&
-      matchesPriority &&
-      matchesScheduledDate &&
-      matchesNextContactDate &&
-      matchesContactDate &&
-      matchesContactDateRange
-    );
+  const filteredProspects = filterProspects(prospects, {
+    search: searchTerm,
+    status: statusFilter,
+    priority: priorityFilter,
+    scheduledDate: scheduledDateFilter,
+    nextContactDate: nextContactDateFilter,
+    contactDate: contactDateFilter,
+    contactDateRange: contactDateRangeFilter,
+    datesMatch: areDatesEquivalent,
+    isWithinContactDateRange,
   });
 
   useEffect(() => {
@@ -695,11 +599,7 @@ export function ProspectManagement({
     prospects.length,
   ]);
 
-  const sortedProspects = [...filteredProspects].sort((a, b) => {
-    const dateA = new Date(`${a.contact_date}T00:00:00`).getTime();
-    const dateB = new Date(`${b.contact_date}T00:00:00`).getTime();
-    return dateB - dateA;
-  });
+  const sortedProspects = sortProspectsByContactDate(filteredProspects);
 
   const totalFiltered = sortedProspects.length;
   const currentVisibleCount = serverPaging
@@ -867,13 +767,13 @@ export function ProspectManagement({
     setIsConvertDialogOpen(open);
     if (!open) {
       setConvertingProspect(null);
-      setConversionData(getInitialConversionData());
+      setConversionData(createInitialConversionData());
     }
   };
 
   const startConversion = (prospect: Prospect) => {
     setConvertingProspect(prospect);
-    setConversionData(getInitialConversionData());
+    setConversionData(createInitialConversionData());
     setIsConvertDialogOpen(true);
   };
 
