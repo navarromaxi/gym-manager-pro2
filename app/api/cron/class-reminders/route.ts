@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase-server";
 
+export const dynamic = "force-dynamic";
+
 type Occurrence = { id: string; gym_id: string; title: string; starts_at: string; ends_at: string };
 type Reservation = { occurrence_id: string; member_id: string };
 type MemberEmail = { id: string; name: string | null; email: string | null };
@@ -82,5 +84,6 @@ export async function GET(request: NextRequest) {
     if (reminderError) console.error("Reminder email sent but could not be recorded", reminderError);
     else sent += 1;
   }
+  console.info("Class reminders completed", { sent, skipped });
   return NextResponse.json({ sent, skipped });
 }
