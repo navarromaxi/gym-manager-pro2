@@ -38,7 +38,7 @@ export function calculateLast6MonthsIncome(payments: DatedAmount[], currentDate:
       month: monthDate.toLocaleDateString("es-ES", { month: "short", year: "numeric" }),
       income,
     };
-  }).reverse();
+  });
 }
 
 /** Calculates renewals independently from the report UI. */

@@ -116,6 +116,11 @@ const ClassRegistrationManagement = dynamic(
   { ssr: false }
 );
 
+const ClassManagement = dynamic(
+  () => import("@/components/class-management").then((m) => m.ClassManagement),
+  { ssr: false }
+);
+
 const InactiveManagement = dynamic(
   () =>
     import("@/components/inactive-management").then(
@@ -1186,6 +1191,7 @@ export default function GymManagementSystem() {
               { id: "plans", label: "Planes" },
               { id: "custom_plans", label: "Plan complemento", compact: true },
               { id: "one_time_payments", label: "Pagos únicos", compact: true },
+              { id: "classes", label: "Clases" },
               { id: "class_registrations", label: "Eventos", title: "Eventos" },
               { id: "activities", label: "Actividades", compact: true },
               { id: "routines", label: "Rutinas" },
@@ -1288,6 +1294,7 @@ export default function GymManagementSystem() {
             customPlans={customPlans}
             oneTimePayments={oneTimePayments}
             gymName={gymData?.name || ""}
+            gymId={gymData?.id || ""}
           />
         )}
         {activeTab === "income_access" && (
@@ -1345,6 +1352,9 @@ export default function GymManagementSystem() {
             setRegistrations={setClassRegistrations}
             onReload={reloadClassData}
           />
+        )}
+        {activeTab === "classes" && gymData?.id && (
+          <ClassManagement gymId={gymData.id} />
         )}
         {activeTab === "routines" && gymData?.id && (
           <RoutineManagement gymId={gymData.id} />

@@ -50,7 +50,7 @@ import { PaymentDistributionCards } from "@/features/reports/components/payment-
 import { LeadConversionCards } from "@/features/reports/components/lead-conversion-cards";
 import { AdditionalIncomeCards } from "@/features/reports/components/additional-income-cards";
 import { ReportsToolbar } from "@/features/reports/components/reports-toolbar";
-import { UpcomingExpirationsCard } from "@/features/reports/components/upcoming-expirations-card";
+import { ClassReservationsReport } from "@/features/reports/components/class-reservations-report";
 import { calculateAverageActiveMembersByMonth } from "@/features/reports/average-active-members-calculation";
 import { calculateFinancialSummary, calculateLast6MonthsIncome, calculateRenewalStats } from "@/features/reports/report-calculations";
 import { getReportPeriodBounds, isDateWithinReportPeriod } from "@/features/reports/report-period";
@@ -215,6 +215,7 @@ interface ReportsSectionProps {
   customPlans: CustomPlan[];
   oneTimePayments: OneTimePaymentRecord[];
   gymName: string;
+  gymId: string;
 }
 
 const PROSPECT_CONVERSION_REFERRAL = "prospect_conversion";
@@ -241,6 +242,7 @@ export function ReportsSection({
   customPlans,
   oneTimePayments,
   gymName,
+  gymId,
 }: ReportsSectionProps) {
   const [timeFilter, setTimeFilter] = useState<TimeFilterOption>("current_month");
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
@@ -1174,7 +1176,6 @@ const overdueMembers = membersWithDerived.filter((m) => m.derivedStatus === "exp
         Renovaron: renewalStats.renewedCount,
         NoRenovaron: renewalStats.notRenewedCount,
         TasaRenovacion: `${renewalStats.renewalRate}%`,
-        ProximosVencimientos: upcomingExpirations.length,
         Morosos: overdueMembers.length,
       },
     ];
@@ -1456,7 +1457,6 @@ const overdueMembers = membersWithDerived.filter((m) => m.derivedStatus === "exp
       pagos,
       gastos,
       socios,
-      proximos,
       interesados,
       planesPersonalizados,
     };
@@ -1483,7 +1483,6 @@ const overdueMembers = membersWithDerived.filter((m) => m.derivedStatus === "exp
       pagos,
       gastos,
       socios,
-      proximos,
       interesados,
       planesPersonalizados,
     } = buildSheets();
@@ -1493,7 +1492,6 @@ const overdueMembers = membersWithDerived.filter((m) => m.derivedStatus === "exp
       { name: "Pagos", rows: pagos },
       { name: "Gastos", rows: gastos },
       { name: "Socios", rows: socios },
-      { name: "ProximosVencimientos", rows: proximos },
       { name: "Interesados", rows: interesados },
       { name: "PlanesPersonalizados", rows: planesPersonalizados },
     ];
@@ -1575,16 +1573,7 @@ const overdueMembers = membersWithDerived.filter((m) => m.derivedStatus === "exp
         last6MonthsIncome={last6MonthsIncome}
       />
 
-      {/* Upcoming Expirations Detail */}
-      <UpcomingExpirationsCard
-        today={todayMid}
-        entries={upcomingExpirations.map((member) => ({
-          id: member.id,
-          name: member.name,
-          plan: member.plan,
-          nextPayment: member._next ?? parseDateSafe(member.next_payment)!,
-        }))}
-      />
+      <ClassReservationsReport gymId={gymId} periodStart={periodStart} periodEnd={periodEnd} />
 
     </div>
   );

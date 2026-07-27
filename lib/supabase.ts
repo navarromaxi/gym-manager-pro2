@@ -413,6 +413,33 @@ export interface ClassRegistration {
   receipt_storage_path?: string | null
 }
 
+export interface ClassTemplate {
+  id: string
+  gym_id: string
+  title: string
+  weekday: number
+  start_time: string
+  duration_minutes: number
+  capacity: number
+  notes?: string | null
+  timezone: string
+  is_active: boolean
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface ClassOccurrence {
+  id: string
+  template_id: string
+  gym_id: string
+  title: string
+  starts_at: string
+  ends_at: string
+  capacity: number
+  notes?: string | null
+  created_at?: string | null
+}
+
 export interface MemberAccessLog {
   id: string
   gym_id: string
