@@ -105,3 +105,53 @@
   background-color: hsl(var(--warning));
   color: hsl(var(--warning-foreground));
 }
+
+/* Rutinas: estos bloques mezclan superficies claras dentro del panel oscuro.
+   Se fijan colores explícitos para no heredar el texto claro del modo oscuro. */
+div.rounded-2xl.border.border-blue-200.bg-white.p-4.shadow-sm > p:first-child {
+  color: #0f172a !important;
+}
+
+div.rounded-2xl.border.border-blue-200.bg-white.p-4.shadow-sm > p:nth-child(2) {
+  color: #1e40af !important;
+}
+
+div.absolute.z-20.mt-1.w-full.overflow-hidden.rounded-xl.border.bg-background.shadow-lg > button:hover {
+  background-color: #1e3a8a !important;
+}
+
+div.absolute.z-20.mt-1.w-full.overflow-hidden.rounded-xl.border.bg-background.shadow-lg > button:hover p {
+  color: #ffffff !important;
+}
+
+/* Modo sala: tonos pastel sutiles para distinguir las rutinas abiertas. */
+.routine-room-tabs > div > button:nth-child(4n + 1) {
+  background: #254f9e !important;
+  border-color: #6f9eef !important;
+  color: #eff6ff !important;
+}
+.routine-room-tabs > div > button:nth-child(4n + 2) {
+  background: #6250a3 !important;
+  border-color: #aa9ce5 !important;
+  color: #f5f3ff !important;
+}
+.routine-room-tabs > div > button:nth-child(4n + 3) {
+  background: #18776f !important;
+  border-color: #71c9bf !important;
+  color: #ecfdf5 !important;
+}
+.routine-room-tabs > div > button:nth-child(4n + 4) {
+  background: #a35b40 !important;
+  border-color: #edaf8b !important;
+  color: #fff7ed !important;
+}
+.routine-room-tabs > div > button[aria-current="true"] {
+  box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* El menú nativo de ciclos debe conservar contraste al desplegarse. */
+section.overflow-hidden.rounded-2xl.border select option,
+.routine-cycle-select option {
+  background: #ffffff;
+  color: #0f172a;
+}
