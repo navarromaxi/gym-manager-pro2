@@ -155,3 +155,117 @@ section.overflow-hidden.rounded-2xl.border select option,
   background: #ffffff;
   color: #0f172a;
 }
+
+/* La lista de rutinas se mantiene legible sin scroll lateral. */
+@media (min-width: 768px) {
+  .routine-list-card th:nth-child(3),
+  .routine-list-card td:nth-child(3),
+  .routine-list-card th:nth-child(4),
+  .routine-list-card td:nth-child(4),
+  .routine-list-card th:nth-child(5),
+  .routine-list-card td:nth-child(5),
+  .routine-list-card th:nth-child(7),
+  .routine-list-card td:nth-child(7) {
+    display: none;
+  }
+
+  .routine-list-card td:last-child .flex {
+    justify-content: flex-end;
+    gap: 0.35rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .routine-list-card .relative.w-full.overflow-auto {
+    overflow: visible;
+  }
+
+  .routine-list-card table,
+  .routine-list-card tbody,
+  .routine-list-card tr,
+  .routine-list-card td {
+    display: block;
+    width: 100%;
+  }
+
+  .routine-list-card thead {
+    display: none;
+  }
+
+  .routine-list-card tr {
+    margin-bottom: 0.75rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.8rem;
+    padding: 0.4rem 0;
+  }
+
+  .routine-list-card td {
+    border: 0;
+    padding: 0.45rem 0.8rem;
+  }
+
+  .routine-list-card td:not(:first-child)::before {
+    display: inline-block;
+    width: 6.4rem;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .routine-list-card td:nth-child(2)::before { content: "Dirigido a"; }
+  .routine-list-card td:nth-child(3)::before { content: "Dificultad"; }
+  .routine-list-card td:nth-child(4)::before { content: "Duración"; }
+  .routine-list-card td:nth-child(5)::before { content: "Ejercicios"; }
+  .routine-list-card td:nth-child(6)::before { content: "Estado"; }
+  .routine-list-card td:nth-child(7)::before { content: "Creada"; }
+  .routine-list-card td:nth-child(8)::before { content: "Acciones"; }
+
+  .routine-list-card td:last-child .flex {
+    margin-top: 0.45rem;
+    justify-content: flex-start;
+  }
+
+  /* Enlace público: cada ejercicio se lee como una ficha en celular. */
+  .public-routine-card table,
+  .public-routine-card tbody,
+  .public-routine-card tr,
+  .public-routine-card td {
+    display: block;
+    width: 100%;
+  }
+
+  .public-routine-card table {
+    min-width: 0;
+  }
+
+  .public-routine-card thead {
+    display: none;
+  }
+
+  .public-routine-card tr {
+    border-top: 1px solid #e2e8f0;
+    padding: 0.4rem 0;
+  }
+
+  .public-routine-card td {
+    padding: 0.28rem 1rem;
+  }
+
+  .public-routine-card td::before {
+    display: inline-block;
+    width: 6.7rem;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .public-routine-card td:nth-child(1)::before { content: "Ejercicio"; }
+  .public-routine-card td:nth-child(2)::before { content: "Nombre"; }
+  .public-routine-card td:nth-child(3)::before { content: "Series"; }
+  .public-routine-card td:nth-child(4)::before { content: "Repeticiones"; }
+  .public-routine-card td:nth-child(5)::before { content: "Peso"; }
+  .public-routine-card td:nth-child(6)::before { content: "Tiempo"; }
+  .public-routine-card td:nth-child(7)::before { content: "Notas"; }
+}

@@ -726,8 +726,8 @@ export function RoutineManagement({ gymId }: RoutineManagementProps) {
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
-            <div className="flex-1">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <div className="min-w-0 flex-1">
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -768,7 +768,7 @@ export function RoutineManagement({ gymId }: RoutineManagementProps) {
       </Card>
 
       {/* Routines Table */}
-      <Card>
+      <Card className="routine-list-card">
         <CardHeader>
           <CardTitle>Lista de Rutinas ({filteredRoutines.length})</CardTitle>
         </CardHeader>
@@ -822,7 +822,7 @@ export function RoutineManagement({ gymId }: RoutineManagementProps) {
                     {new Date(routine.createdDate).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap gap-2">
                       <Button
                         variant="outline"
                         size="sm"
