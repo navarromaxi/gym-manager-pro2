@@ -1,0 +1,65 @@
+import { NextRequest, NextResponse } from "next/server";
+
+import { createClient } from "@/lib/supabase-server";
+
+export const dynamic = "force-dynamic";
+
+const DAYS = new Set([1, 3, 4]); // lunes, miércoles y jueves
+const HOURS = [18, 18.5, 19, 19.5];
+
+function montevideoDate(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Montevideo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function availableStarts(now: Date) {
+  const starts: Date[] = [];
+  const startDate = new Date(`${montevideoDate(now)}T12:00:00-03:00`);
+  for (let dayOffset = 0; dayOffset < 35; dayOffset += 1) {
+    const day = new Date(startDate.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+    if (!DAYS.has(day.getDay())) continue;
+    const date = montevideoDate(day);
+    for (const hour of HOURS) {
+      const hourPart = String(Math.floor(hour)).padStart(2, "0");
+      const minutePart = hour % 1 ? "30" : "00";
+      const start = new Date(`${date}T${hourPart}:${minutePart}:00-03:00`);
+      if (start > now) starts.push(start);
+    }
+  }
+  return starts;
+}
+
+async function activeClient(gymId: string, cedula: string) {
+  const supabase = createClient();
+  const { data } = await supabase.from("online_training_clients").select("id, full_name, status").eq("gym_id", gymId).eq("cedula", cedula.trim()).maybeSingle();
+  return data && ["active", "payment_due"].includes(data.status) ? data : null;
+}
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ gymId: string }> }) {
+  const { gymId } = await params;
+  const cedula = request.nextUrl.searchParams.get("cedula") || "";
+  const client = await activeClient(gymId, cedula);
+  if (!client) return NextResponse.json({ error: "Necesitás una suscripción activa para agendar tu llamada." }, { status: 403 });
+  const now = new Date();
+  const starts = availableStarts(now);
+  const supabase = createClient();
+  const { data: appointments } = await supabase.from("online_training_appointments").select("starts_at, client_id, status").eq("gym_id", gymId).gte("starts_at", now.toISOString()).eq("status", "confirmed");
+  const taken = new Set((appointments || []).filter((appointment) => appointment.client_id !== client.id).map((appointment) => appointment.starts_at));
+  const own = (appointments || []).filter((appointment) => appointment.client_id === client.id).map((appointment) => appointment.starts_at);
+  return NextResponse.json({ clientName: client.full_name, slots: starts.filter((start) => !taken.has(start.toISOString())).map((start) => start.toISOString()), appointments: own });
+}
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ gymId: string }> }) {
+  const { gymId } = await params;
+  const body = await request.json().catch(() => ({})) as { cedula?: string; startsAt?: string };
+  const client = await activeClient(gymId, body.cedula || "");
+  const start = body.startsAt ? new Date(body.startsAt) : null;
+  if (!client || !start || Number.isNaN(start.getTime()) || !availableStarts(new Date()).some((slot) => slot.toISOString() === start.toISOString())) return NextResponse.json({ error: "El turno no está disponible." }, { status: 400 });
+  const end = new Date(start.getTime() + 30 * 60 * 1000);
+  const supabase = createClient();
+  const { error } = await supabase.from("online_training_appointments").insert({ gym_id: gymId, client_id: client.id, starts_at: start.toISOString(), ends_at: end.toISOString() });
+  if (error?.code === "23505") return NextResponse.json({ error: "Ese turno acaba de ser reservado. Elegí otro." }, { status: 409 });
+  if (error) return NextResponse.json({ error: "No pudimos guardar el turno." }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

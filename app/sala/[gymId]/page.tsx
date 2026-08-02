@@ -5,7 +5,7 @@ import { ArrowLeft, Dumbbell, Search, UserRound } from "lucide-react";
 import { useParams } from "next/navigation";
 import { WEEK_DAYS, getDayExercises, type WeeklyPlan } from "@/features/routines/routine-plan";
 
-type Exercise = { name: string; sets: number; reps: string; weight: string; rest: string; notes: string };
+type Exercise = { name: string; sets: number; reps: string; weight: string; rest: string; notes: string; videoUrl?: string };
 type PublicRoutine = { id: string; name: string; description: string; duration: number; exercises: Exercise[]; weeklyPlan: WeeklyPlan };
 type SearchResult = { member: { id: string; name: string }; routine: PublicRoutine };
 type Gym = { name?: string | null; logoUrl?: string | null };

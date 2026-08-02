@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/routine-cleanup",
       "schedule": "15 12 * * *"
+    },
+    {
+      "path": "/api/cron/online-training-reminders",
+      "schedule": "30 12 * * *"
     }
   ]
 }

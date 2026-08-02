@@ -1,4 +1,4 @@
-export type RoutineExercise = { name: string; sets: number; reps: string; weight: string; rest: string; notes: string };
+export type RoutineExercise = { name: string; sets: number; reps: string; weight: string; rest: string; notes: string; videoUrl?: string };
 export type RoutineSection = { id: string; title: string; exercises: RoutineExercise[] };
 export type WeeklyDayPlan = RoutineExercise[] | RoutineSection[];
 export type WeeklyPlan = Record<string, WeeklyDayPlan>;

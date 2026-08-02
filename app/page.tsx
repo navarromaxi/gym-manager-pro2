@@ -121,6 +121,14 @@ const ClassManagement = dynamic(
   { ssr: false }
 );
 
+const ExerciseLibraryManagement = dynamic(
+  () =>
+    import("@/components/exercise-library-management").then(
+      (m) => m.ExerciseLibraryManagement
+    ),
+  { ssr: false, loading: () => <div className="p-4 text-sm">Cargando ejercicios…</div> }
+);
+
 const InactiveManagement = dynamic(
   () =>
     import("@/components/inactive-management").then(
@@ -1193,11 +1201,12 @@ export default function GymManagementSystem() {
               { id: "one_time_payments", label: "Pagos únicos", compact: true },
               { id: "classes", label: "Clases" },
               { id: "class_registrations", label: "Eventos", title: "Eventos" },
-              { id: "activities", label: "Actividades", compact: true },
+              { id: "exercises", label: "Ejercicios" },
               { id: "routines", label: "Rutinas" },
-              { id: "expenses", label: "Gastos" },
-              { id: "reports", label: "Reportes" },
               { id: "income_access", label: "Accesos", title: "Ingresos y accesos" },
+              { id: "expenses", label: "Gastos" },
+              { id: "activities", label: "Actividades", compact: true },
+              { id: "reports", label: "Reportes" },
               { id: "invoices", label: "Facturas" },
             ].map((tab) => (
               <button
@@ -1358,6 +1367,9 @@ export default function GymManagementSystem() {
         )}
         {activeTab === "routines" && gymData?.id && (
           <RoutineManagement gymId={gymData.id} />
+        )}
+        {activeTab === "exercises" && gymData?.id && (
+          <ExerciseLibraryManagement gymId={gymData.id} />
         )}
         {activeTab === "inactives" && (
           <InactiveManagement

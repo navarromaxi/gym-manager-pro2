@@ -15,9 +15,13 @@ export async function GET(
   const { gymId } = await params;
   const supabase = createClient();
   const requestedDays = Number(new URL(request.url).searchParams.get("days"));
-  const daysAhead = Number.isFinite(requestedDays) ? Math.min(Math.max(Math.floor(requestedDays), 8), 21) : 8;
+  const daysAhead = Number.isFinite(requestedDays) ? Math.min(Math.max(Math.floor(requestedDays), 8), 42) : 8;
 
-  await supabase.rpc("generate_upcoming_class_occurrences", { days_ahead: daysAhead });
+  const { error: generationError } = await supabase.rpc("generate_upcoming_class_occurrences", { days_ahead: daysAhead });
+  if (generationError) {
+    console.error("Error generating upcoming class occurrences", generationError);
+    return NextResponse.json({ error: "No se pudieron generar las próximas clases." }, { status: 500 });
+  }
 
   const { data: gym, error: gymError } = await supabase
     .from("gyms")
