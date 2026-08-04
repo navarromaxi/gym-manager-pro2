@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { createGoogleCalendarEvent } from "@/lib/google-calendar";
 import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -58,8 +59,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!client || !start || Number.isNaN(start.getTime()) || !availableStarts(new Date()).some((slot) => slot.toISOString() === start.toISOString())) return NextResponse.json({ error: "El turno no está disponible." }, { status: 400 });
   const end = new Date(start.getTime() + 30 * 60 * 1000);
   const supabase = createClient();
-  const { error } = await supabase.from("online_training_appointments").insert({ gym_id: gymId, client_id: client.id, starts_at: start.toISOString(), ends_at: end.toISOString() });
+  const { data: appointment, error } = await supabase
+    .from("online_training_appointments")
+    .insert({ gym_id: gymId, client_id: client.id, starts_at: start.toISOString(), ends_at: end.toISOString() })
+    .select("id")
+    .single();
   if (error?.code === "23505") return NextResponse.json({ error: "Ese turno acaba de ser reservado. Elegí otro." }, { status: 409 });
   if (error) return NextResponse.json({ error: "No pudimos guardar el turno." }, { status: 500 });
+  try {
+    const calendarEventId = await createGoogleCalendarEvent({
+      summary: `Llamada inicial · ${client.full_name}`,
+      description: `Cliente de rutina personalizada\\nCédula: ${body.cedula?.trim() || "No informada"}`,
+      startsAt: start,
+      endsAt: end,
+    });
+    if (calendarEventId) {
+      const { error: updateError } = await supabase
+        .from("online_training_appointments")
+        .update({ google_calendar_event_id: calendarEventId })
+        .eq("id", appointment.id);
+      if (updateError) throw updateError;
+      console.info("Turno online sincronizado con Google Calendar", { appointmentId: appointment.id, calendarEventId });
+    }
+  } catch (calendarError) {
+    console.error("No se pudo sincronizar el turno online con Google Calendar", calendarError);
+    await supabase.from("online_training_appointments").delete().eq("id", appointment.id);
+    return NextResponse.json({ error: "No pudimos registrar tu turno en la agenda. Intentá nuevamente." }, { status: 503 });
+  }
   return NextResponse.json({ ok: true });
 }
