@@ -17,9 +17,9 @@ export type CreatedPersonalizedRoutine = { id: string; name: string; description
 const inputClass = "border-slate-300 bg-white !text-slate-950 placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 const cellClass = "h-9 w-full rounded border border-slate-200 bg-white px-2 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
 
-export function PersonalizedRoutineBuilder({ gymId, members, initialRoutine, onSaved, onCancel }: { gymId: string; members: RoutineMemberSearch[]; initialRoutine?: CreatedPersonalizedRoutine; onSaved: (routine: CreatedPersonalizedRoutine) => void; onCancel: () => void }) {
+export function PersonalizedRoutineBuilder({ gymId, members, initialRoutine, defaultMember, onSaved, onCancel }: { gymId: string; members: RoutineMemberSearch[]; initialRoutine?: CreatedPersonalizedRoutine; defaultMember?: RoutineMemberSearch; onSaved: (routine: CreatedPersonalizedRoutine) => void; onCancel: () => void }) {
   const [memberQuery, setMemberQuery] = useState("");
-  const [member, setMember] = useState<RoutineMemberSearch | null>(() => initialRoutine ? members.find((item) => item.id === initialRoutine.memberId) ?? null : null);
+  const [member, setMember] = useState<RoutineMemberSearch | null>(() => initialRoutine ? members.find((item) => item.id === initialRoutine.memberId) ?? null : defaultMember ?? null);
   const [name, setName] = useState(initialRoutine?.name ?? "");
   const [description, setDescription] = useState(initialRoutine?.description ?? "");
   const [duration, setDuration] = useState(initialRoutine?.duration ?? 60);
