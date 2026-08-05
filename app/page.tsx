@@ -1162,21 +1162,24 @@ export default function GymManagementSystem() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-white">
+          <div className="flex justify-between items-center py-4 sm:py-5">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white shadow-sm sm:h-[4.25rem] sm:w-[4.25rem]">
                 <img
                   src={displayLogo}
                   alt={`Logo de ${gymData?.name ?? "ManagerPro 2.0"}`}
-                  className="h-10 w-10 object-contain"
+                  className="h-12 w-12 object-contain sm:h-14 sm:w-14"
                   draggable={false}
                 />
               </div>
-              <div>
-                <h1 className="text-[1.75rem] font-bold leading-tight text-gray-900">
+              <div className="min-w-0">
+                <p className="mb-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-blue-600 sm:text-xs">
                   ManagerPro 2.0
+                </p>
+                <h1 className="truncate text-2xl font-black leading-tight tracking-tight text-slate-950 sm:text-3xl">
+                  {displayGymName}
                 </h1>
-                <p className="text-base text-gray-500">{displayGymName}</p>
+                <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">Panel de gestión</p>
               </div>
             </div>
             <Button variant="outline" onClick={handleLogout}>

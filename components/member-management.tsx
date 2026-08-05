@@ -122,6 +122,7 @@ export function MemberManagement({
   }, [searchTerm]);
 
   const [statusFilter, setStatusFilter] = useState(initialFilter);
+  const [planFilter, setPlanFilter] = useState("all");
   const [sortOption, setSortOption] = useState<MemberSortOption>(
     "recent_activity_desc"
   );
@@ -143,6 +144,17 @@ export function MemberManagement({
   const planIndexes = useMemo(() => getPlanIndexes(plans), [plans]);
   const planById = planIndexes.byId;
   const planByName = planIndexes.byName;
+  const availablePlanNames = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          plans
+            .map((plan) => plan.name?.trim())
+            .filter((planName): planName is string => Boolean(planName))
+        )
+      ).sort((first, second) => first.localeCompare(second, "es")),
+    [plans]
+  );
 
   const latestCustomPlanByMember = useMemo(
     () => getLatestCustomPlanByMember(customPlans),
@@ -226,7 +238,7 @@ export function MemberManagement({
       statusFilter === "custom_expiring"
         ? new Set(expiringCustomPlans.map((plan) => plan.member_id))
         : null;
-    return filterMembers({
+    const membersByStatusAndSearch = filterMembers({
       members: sortedMembers,
       search: debouncedSearch,
       statusFilter,
@@ -235,6 +247,13 @@ export function MemberManagement({
       expiringCustomPlanMemberIds,
       hasOverduePartialInstallment,
     });
+    if (planFilter === "all") return membersByStatusAndSearch;
+    if (planFilter === "without_plan") {
+      return membersByStatusAndSearch.filter((member) => !member.plan?.trim());
+    }
+    return membersByStatusAndSearch.filter(
+      (member) => member.plan?.trim() === planFilter
+    );
   }, [
     sortedMembers,
     debouncedSearch,
@@ -242,11 +261,12 @@ export function MemberManagement({
     expiringCustomPlans,
     longTermFollowUpMemberIds,
     followUpMemberIds,
+    planFilter,
   ]);
 
   useEffect(() => {
     setVisibleCount(MEMBERS_PER_BATCH);
-  }, [debouncedSearch, sortOption, statusFilter]);
+  }, [debouncedSearch, sortOption, statusFilter, planFilter]);
 
   const hasActiveSearch = debouncedSearch.length > 0;
   const totalFiltered = filteredMembers.length;
@@ -1008,7 +1028,7 @@ export function MemberManagement({
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
+          <div className="flex flex-col gap-4 xl:flex-row">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1080,6 +1100,20 @@ export function MemberManagement({
                 <SelectItem value="long_plan_follow_up">
                   Seguimiento cuota semestral (120 días)
                 </SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={planFilter} onValueChange={setPlanFilter}>
+              <SelectTrigger className="w-full xl:w-[210px]">
+                <SelectValue placeholder="Tipo de plan" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los planes</SelectItem>
+                <SelectItem value="without_plan">Sin plan asignado</SelectItem>
+                {availablePlanNames.map((planName) => (
+                  <SelectItem key={planName} value={planName}>
+                    {planName}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
