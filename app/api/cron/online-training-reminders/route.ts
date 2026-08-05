@@ -5,10 +5,26 @@ import { createClient } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 
 type Client = { id: string; full_name: string; email: string; status: string; current_period_ends_at: string | null; grace_ends_at: string | null };
+type Appointment = { client_id: string; starts_at: string };
 
 async function email(apiKey: string, from: string, to: string, subject: string, html: string) {
   const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ from, to: [to], subject, html }) });
   return response.ok;
+}
+
+function emailLayout(title: string, content: string) {
+  return `<main style="font-family:Arial,sans-serif;background:#f1f5f9;padding:32px 16px;color:#0f172a"><section style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:24px;padding:32px"><p style="margin:0 0 10px;color:#2563eb;font-size:12px;font-weight:700;letter-spacing:1.8px">RUTINA PERSONALIZADA</p><h1 style="margin:0 0 18px;font-size:26px">${title}</h1>${content}<p style="margin:26px 0 0;color:#64748b;font-size:13px">PyMesSistemas · Entrenamiento online</p></section></main>`;
+}
+
+function formatAppointment(value: string) {
+  return new Intl.DateTimeFormat("es-UY", {
+    timeZone: "America/Montevideo",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 export async function GET(request: NextRequest) {
@@ -21,10 +37,18 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase.from("online_training_clients").select("id, full_name, email, status, current_period_ends_at, grace_ends_at").in("status", ["active", "payment_due", "grace"]);
   if (error) return NextResponse.json({ error: "Unable to load clients" }, { status: 500 });
   const clients = (data || []) as Client[];
-  const { data: notices } = await supabase.from("online_training_notifications").select("client_id, notification_type, period_ends_at").in("client_id", clients.map((client) => client.id));
+  if (clients.length === 0) return NextResponse.json({ processed: 0, emails: 0 });
+
+  const clientIds = clients.map((client) => client.id);
+  const [{ data: notices }, { data: appointments, error: appointmentsError }] = await Promise.all([
+    supabase.from("online_training_notifications").select("client_id, notification_type, period_ends_at").in("client_id", clientIds),
+    supabase.from("online_training_appointments").select("client_id, starts_at").in("client_id", clientIds).eq("status", "confirmed").gte("starts_at", new Date().toISOString()),
+  ]);
+  if (appointmentsError) return NextResponse.json({ error: "Unable to load appointments" }, { status: 500 });
   const sent = new Set((notices || []).map((item) => `${item.client_id}:${item.notification_type}:${item.period_ends_at || ""}`));
   const now = new Date();
   const fiveDays = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+  const appointmentReminderLimit = new Date(now.getTime() + 36 * 60 * 60 * 1000);
   let emails = 0;
 
   for (const client of clients) {
@@ -55,5 +79,27 @@ export async function GET(request: NextRequest) {
       }
     }
   }
+
+  const clientsById = new Map(clients.map((client) => [client.id, client]));
+  for (const appointment of (appointments || []) as Appointment[]) {
+    const client = clientsById.get(appointment.client_id);
+    const startsAt = new Date(appointment.starts_at);
+    const key = `${appointment.client_id}:appointment_reminder:${startsAt.toISOString()}`;
+    if (!client || startsAt <= now || startsAt > appointmentReminderLimit || sent.has(key)) continue;
+    if (await email(
+      apiKey,
+      from,
+      client.email,
+      "Recordatorio de tu llamada con el profesor",
+      emailLayout(
+        `Hola ${client.full_name}`,
+        `<p>Te recordamos que tenés una llamada de control o entrevista con el profesor el <strong>${formatAppointment(appointment.starts_at)}</strong>.</p><p>Si necesitás reprogramarla, respondé este correo con anticipación.</p>`,
+      ),
+    )) {
+      await supabase.from("online_training_notifications").insert({ client_id: client.id, notification_type: "appointment_reminder", period_ends_at: startsAt.toISOString() });
+      emails += 1;
+    }
+  }
+
   return NextResponse.json({ processed: clients.length, emails });
 }

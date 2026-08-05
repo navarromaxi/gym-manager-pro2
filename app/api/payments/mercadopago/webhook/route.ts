@@ -9,6 +9,19 @@ type Notice = { type?: string; topic?: string; data?: { id?: string | number } }
 type Subscription = { id?: string; external_reference?: string; status?: string; payer_id?: string | number; next_payment_date?: string | null };
 type AuthorizedPayment = { status?: string; preapproval_id?: string };
 
+async function email(apiKey: string, from: string, to: string, subject: string, html: string) {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [to], subject, html }),
+  });
+  return response.ok;
+}
+
+function paymentEmail(name: string) {
+  return `<main style="font-family:Arial,sans-serif;background:#f1f5f9;padding:32px 16px;color:#0f172a"><section style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:24px;padding:32px"><p style="margin:0 0 10px;color:#2563eb;font-size:12px;font-weight:700;letter-spacing:1.8px">RUTINA PERSONALIZADA</p><h1 style="margin:0 0 18px;font-size:26px">Pago confirmado</h1><p>Hola ${name}, recibimos tu pago mensual correctamente.</p><p>Tu servicio continúa activo. La próxima rutina se preparará dentro de las próximas 48 horas cuando corresponda.</p><p style="margin:26px 0 0;color:#64748b;font-size:13px">PyMesSistemas · Entrenamiento online</p></section></main>`;
+}
+
 function signatureIsValid(request: NextRequest, notice: Notice) {
   const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
   const signature = request.headers.get("x-signature") || "";
@@ -54,8 +67,20 @@ export async function POST(request: NextRequest) {
     status: "active", subscription_started_at: now.toISOString(), current_period_ends_at: nextPeriod.toISOString(), grace_ends_at: null,
     mercado_pago_subscription_id: subscription.id || null, mercado_pago_payer_id: subscription.payer_id ? String(subscription.payer_id) : null, last_payment_at: now.toISOString(),
   } : cancelled ? { status: "cancelled" } : { mercado_pago_subscription_id: subscription.id || null, mercado_pago_payer_id: subscription.payer_id ? String(subscription.payer_id) : null };
-  const { data: client, error } = await supabase.from("online_training_clients").update(update).eq("id", subscription.external_reference).select("id").maybeSingle();
+  const { data: client, error } = await supabase.from("online_training_clients").update(update).eq("id", subscription.external_reference).select("id, full_name, email").maybeSingle();
   if (error) { console.error("Unable to update online training client", error); return NextResponse.json({ error: "Update failed" }, { status: 500 }); }
-  if (paymentApproved && client) await supabase.from("online_training_notifications").upsert({ client_id: client.id, notification_type: "payment_confirmed" }, { onConflict: "client_id,notification_type", ignoreDuplicates: true });
+  if (paymentApproved && client) {
+    const notificationPeriod = nextPeriod.toISOString();
+    const { error: noticeError } = await supabase
+      .from("online_training_notifications")
+      .insert({ client_id: client.id, notification_type: "payment_confirmed", period_ends_at: notificationPeriod });
+    if (!noticeError) {
+      const apiKey = process.env.RESEND_API_KEY;
+      const from = process.env.EMAIL_FROM;
+      if (apiKey && from) await email(apiKey, from, client.email, "Confirmamos tu pago mensual", paymentEmail(client.full_name));
+    } else if (noticeError.code !== "23505") {
+      console.error("Unable to record online training payment notification", noticeError);
+    }
+  }
   return NextResponse.json({ ok: true });
 }

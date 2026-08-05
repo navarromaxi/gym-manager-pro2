@@ -31,6 +31,7 @@ type ExerciseDraft = {
 };
 
 const CATEGORY_OPTIONS = ["General", "Movilidad", "Fuerza", "Cardio", "Zona media", "Técnica", "Estiramiento"];
+const EXERCISES_PER_PAGE = 9;
 const emptyDraft = (): ExerciseDraft => ({ name: "", category: "General", instructions: "", video_url: "" });
 const inputClass = "mt-1 border-slate-300 bg-white !text-slate-950 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-100";
 
@@ -50,6 +51,7 @@ export function ExerciseLibraryManagement({ gymId }: { gymId: string }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"active" | "all" | "archived">("active");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [visibleExerciseCount, setVisibleExerciseCount] = useState(EXERCISES_PER_PAGE);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ExerciseLibraryItem | null>(null);
   const [deleting, setDeleting] = useState<ExerciseLibraryItem | null>(null);
@@ -81,7 +83,7 @@ export function ExerciseLibraryManagement({ gymId }: { gymId: string }) {
   useEffect(() => { void load(); }, [gymId]);
 
   const categories = useMemo(() => Array.from(new Set([...CATEGORY_OPTIONS, ...items.map((item) => item.category).filter(Boolean)])).sort(), [items]);
-  const filteredItems = useMemo(() => {
+  const allFilteredItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return items.filter((item) => {
       const textMatch = !normalized || [item.name, item.category, item.instructions].filter(Boolean).join(" ").toLowerCase().includes(normalized);
@@ -90,6 +92,12 @@ export function ExerciseLibraryManagement({ gymId }: { gymId: string }) {
       return textMatch && statusMatch && categoryMatch;
     });
   }, [items, query, statusFilter, categoryFilter]);
+
+  const filteredItems = allFilteredItems.slice(0, visibleExerciseCount);
+
+  useEffect(() => {
+    setVisibleExerciseCount(EXERCISES_PER_PAGE);
+  }, [query, statusFilter, categoryFilter, gymId]);
 
   const activeCount = items.filter((item) => item.is_active).length;
   const videoCount = items.filter((item) => item.is_active && item.video_url).length;
@@ -171,6 +179,7 @@ export function ExerciseLibraryManagement({ gymId }: { gymId: string }) {
 
     {message ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">{message}</p> : null}
     {error ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-900">{error}</p> : null}
+    {!loading && !error && allFilteredItems.length > EXERCISES_PER_PAGE ? <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row"><p className="text-sm font-medium text-slate-600">Mostrando {filteredItems.length} de {allFilteredItems.length} ejercicios</p><div className="flex flex-wrap justify-center gap-2"><Button variant="outline" disabled={visibleExerciseCount <= EXERCISES_PER_PAGE} onClick={() => setVisibleExerciseCount((count) => Math.max(EXERCISES_PER_PAGE, count - EXERCISES_PER_PAGE))}>Ver 9 menos</Button>{visibleExerciseCount < allFilteredItems.length ? <Button className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setVisibleExerciseCount((count) => count + EXERCISES_PER_PAGE)}>Ver 9 más</Button> : null}</div></div> : null}
     {loading ? <Card><CardContent className="p-8 text-center text-slate-500">Cargando biblioteca…</CardContent></Card> : null}
     {!loading && !error && filteredItems.length === 0 ? <Card className="border-dashed"><CardContent className="p-10 text-center"><Dumbbell className="mx-auto h-9 w-9 text-slate-300" /><h3 className="mt-3 font-bold text-slate-900">Todavía no hay ejercicios para mostrar</h3><p className="mt-1 text-sm text-slate-500">Empezá cargando los ejercicios que el profe usa más seguido.</p><Button className="mt-4" onClick={openCreate}>Agregar primer ejercicio</Button></CardContent></Card> : null}
     {!loading && !error && filteredItems.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{filteredItems.map((item) => <Card key={item.id} className={!item.is_active ? "border-slate-200 bg-slate-50 opacity-75" : "border-slate-200 bg-white"}><CardHeader className="space-y-3 pb-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><CardTitle className="truncate text-xl text-slate-950">{item.name}</CardTitle><p className="mt-1 text-sm text-slate-500">Ejercicio reutilizable para tus rutinas</p></div><Badge className={item.is_active ? "bg-blue-100 text-blue-800 hover:bg-blue-100" : "bg-slate-200 text-slate-700 hover:bg-slate-200"}>{item.is_active ? item.category : "Archivado"}</Badge></div>{item.instructions ? <p className="line-clamp-2 text-sm text-slate-600">{item.instructions}</p> : <p className="text-sm italic text-slate-400">Sin indicaciones todavía.</p>}</CardHeader><CardContent><div className="flex flex-wrap gap-2 border-t pt-3">{item.video_url ? <Button asChild size="sm" variant="outline"><a href={item.video_url} target="_blank" rel="noreferrer"><Film className="mr-1.5 h-4 w-4" />Ver video<ExternalLink className="ml-1.5 h-3.5 w-3.5" /></a></Button> : null}<Button size="sm" variant="outline" onClick={() => openEdit(item)}><Pencil className="mr-1.5 h-4 w-4" />Editar</Button><Button size="sm" variant="ghost" className="text-slate-600 hover:bg-slate-100 hover:text-slate-950" onClick={() => void toggleArchive(item)}><Archive className="mr-1.5 h-4 w-4" />{item.is_active ? "Archivar" : "Restaurar"}</Button><Button size="sm" variant="ghost" className="text-rose-700 hover:bg-rose-50 hover:text-rose-800" onClick={() => setDeleting(item)}><Trash2 className="mr-1.5 h-4 w-4" />Eliminar</Button></div></CardContent></Card>)}</div> : null}

@@ -8,6 +8,31 @@ export const dynamic = "force-dynamic";
 const DAYS = new Set([1, 3, 4]); // lunes, miércoles y jueves
 const HOURS = [18, 18.5, 19, 19.5];
 
+async function sendAppointmentConfirmation(name: string, email: string, startsAt: Date) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM;
+  if (!apiKey || !from) return false;
+  const date = new Intl.DateTimeFormat("es-UY", {
+    timeZone: "America/Montevideo",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(startsAt);
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from,
+      to: [email],
+      subject: "Tu llamada con el profesor quedó agendada",
+      html: `<main style="font-family:Arial,sans-serif;background:#f1f5f9;padding:32px 16px;color:#0f172a"><section style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:24px;padding:32px"><p style="margin:0 0 10px;color:#2563eb;font-size:12px;font-weight:700;letter-spacing:1.8px">RUTINA PERSONALIZADA</p><h1 style="margin:0 0 18px;font-size:26px">Tu llamada quedó agendada</h1><p>Hola ${name}, reservamos tu turno para el <strong>${date}</strong>.</p><p>Te enviaremos un recordatorio antes de la llamada.</p><p style="margin:26px 0 0;color:#64748b;font-size:13px">PyMesSistemas · Entrenamiento online</p></section></main>`,
+    }),
+  });
+  return response.ok;
+}
+
 function montevideoDate(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Montevideo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
   const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
@@ -37,7 +62,7 @@ function overlaps(start: Date, end: Date, busy: Array<{ start: string; end: stri
 
 async function activeClient(gymId: string, cedula: string) {
   const supabase = createClient();
-  const { data } = await supabase.from("online_training_clients").select("id, full_name, status").eq("gym_id", gymId).eq("cedula", cedula.trim()).maybeSingle();
+  const { data } = await supabase.from("online_training_clients").select("id, full_name, email, status").eq("gym_id", gymId).eq("cedula", cedula.trim()).maybeSingle();
   return data && ["active", "payment_due"].includes(data.status) ? data : null;
 }
 
@@ -110,6 +135,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     console.error("No se pudo sincronizar el turno online con Google Calendar", calendarError);
     await supabase.from("online_training_appointments").delete().eq("id", appointment.id);
     return NextResponse.json({ error: "No pudimos registrar tu turno en la agenda. Intentá nuevamente." }, { status: 503 });
+  }
+  try {
+    const sent = await sendAppointmentConfirmation(client.full_name, client.email, start);
+    if (sent) {
+      await supabase.from("online_training_notifications").insert({
+        client_id: client.id,
+        notification_type: "appointment_confirmed",
+        period_ends_at: start.toISOString(),
+      });
+    }
+  } catch (emailError) {
+    console.error("No se pudo enviar la confirmación de turno online", emailError);
   }
   return NextResponse.json({ ok: true });
 }
