@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { FusionarAccessPanel } from "@/components/fusionar-access-panel";
 import {
   Table,
   TableBody,
@@ -341,6 +342,8 @@ export function IncomeManagement({
           </div>
         </CardContent>
       </Card>
+
+      <FusionarAccessPanel gymId={gymId} />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <Card>

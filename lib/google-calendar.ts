@@ -2,6 +2,7 @@ import { createSign } from "node:crypto";
 
 type ServiceAccount = { client_email?: string; private_key?: string; token_uri?: string };
 type CalendarEventInput = { summary: string; description: string; startsAt: Date; endsAt: Date };
+type BusyInterval = { start: string; end: string };
 
 const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
 const MONTEVIDEO_TIME_ZONE = "America/Montevideo";
@@ -63,4 +64,33 @@ export async function createGoogleCalendarEvent(input: CalendarEventInput) {
   const event = await response.json().catch(() => ({})) as { id?: string; error?: { message?: string } };
   if (!response.ok || !event.id) throw new Error(event.error?.message || "No se pudo crear el evento en Google Calendar.");
   return event.id;
+}
+
+/**
+ * Obtiene los bloques ya ocupados del calendario compartido.
+ * Devuelve null cuando el calendario no está configurado, para no impedir
+ * el trabajo local de desarrollo.
+ */
+export async function getGoogleCalendarBusyIntervals(timeMin: Date, timeMax: Date): Promise<BusyInterval[] | null> {
+  const calendarId = process.env.GOOGLE_CALENDAR_ID;
+  const account = serviceAccount();
+  if (!calendarId || !account) return null;
+  const token = await accessToken(account);
+  const response = await fetch("https://www.googleapis.com/calendar/v3/freeBusy", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      timeMin: timeMin.toISOString(),
+      timeMax: timeMax.toISOString(),
+      timeZone: MONTEVIDEO_TIME_ZONE,
+      items: [{ id: calendarId }],
+    }),
+  });
+  const payload = await response.json().catch(() => ({})) as {
+    calendars?: Record<string, { busy?: BusyInterval[]; errors?: Array<{ reason?: string }> }>;
+    error?: { message?: string };
+  };
+  const calendar = payload.calendars?.[calendarId];
+  if (!response.ok || calendar?.errors?.length) throw new Error(payload.error?.message || "No se pudo consultar la disponibilidad del calendario.");
+  return calendar?.busy ?? [];
 }

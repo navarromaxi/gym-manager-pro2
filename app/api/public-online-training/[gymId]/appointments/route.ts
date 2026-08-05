@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { createGoogleCalendarEvent } from "@/lib/google-calendar";
+import { createGoogleCalendarEvent, getGoogleCalendarBusyIntervals } from "@/lib/google-calendar";
 import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +31,10 @@ function availableStarts(now: Date) {
   return starts;
 }
 
+function overlaps(start: Date, end: Date, busy: Array<{ start: string; end: string }>) {
+  return busy.some((interval) => start < new Date(interval.end) && end > new Date(interval.start));
+}
+
 async function activeClient(gymId: string, cedula: string) {
   const supabase = createClient();
   const { data } = await supabase.from("online_training_clients").select("id, full_name, status").eq("gym_id", gymId).eq("cedula", cedula.trim()).maybeSingle();
@@ -44,11 +48,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!client) return NextResponse.json({ error: "Necesitás una suscripción activa para agendar tu llamada." }, { status: 403 });
   const now = new Date();
   const starts = availableStarts(now);
+  let googleBusy: Array<{ start: string; end: string }> = [];
+  try {
+    googleBusy = (await getGoogleCalendarBusyIntervals(now, new Date(now.getTime() + 36 * 24 * 60 * 60 * 1000))) ?? [];
+  } catch (calendarError) {
+    console.error("No se pudo consultar Google Calendar para la agenda online", calendarError);
+    return NextResponse.json({ error: "No pudimos consultar la disponibilidad del profesor. Intentá nuevamente." }, { status: 503 });
+  }
   const supabase = createClient();
   const { data: appointments } = await supabase.from("online_training_appointments").select("starts_at, client_id, status").eq("gym_id", gymId).gte("starts_at", now.toISOString()).eq("status", "confirmed");
   const taken = new Set((appointments || []).filter((appointment) => appointment.client_id !== client.id).map((appointment) => appointment.starts_at));
   const own = (appointments || []).filter((appointment) => appointment.client_id === client.id).map((appointment) => appointment.starts_at);
-  return NextResponse.json({ clientName: client.full_name, slots: starts.filter((start) => !taken.has(start.toISOString())).map((start) => start.toISOString()), appointments: own });
+  return NextResponse.json({
+    clientName: client.full_name,
+    slots: starts
+      .filter((start) => !taken.has(start.toISOString()))
+      .filter((start) => !overlaps(start, new Date(start.getTime() + 30 * 60 * 1000), googleBusy))
+      .map((start) => start.toISOString()),
+    appointments: own,
+  });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ gymId: string }> }) {
@@ -58,6 +76,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const start = body.startsAt ? new Date(body.startsAt) : null;
   if (!client || !start || Number.isNaN(start.getTime()) || !availableStarts(new Date()).some((slot) => slot.toISOString() === start.toISOString())) return NextResponse.json({ error: "El turno no está disponible." }, { status: 400 });
   const end = new Date(start.getTime() + 30 * 60 * 1000);
+  try {
+    const busy = await getGoogleCalendarBusyIntervals(start, end);
+    if (busy && overlaps(start, end, busy)) return NextResponse.json({ error: "Ese turno ya no está disponible. Elegí otro." }, { status: 409 });
+  } catch (calendarError) {
+    console.error("No se pudo validar Google Calendar antes de reservar", calendarError);
+    return NextResponse.json({ error: "No pudimos validar el horario del profesor. Intentá nuevamente." }, { status: 503 });
+  }
   const supabase = createClient();
   const { data: appointment, error } = await supabase
     .from("online_training_appointments")
