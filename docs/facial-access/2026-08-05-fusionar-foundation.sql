@@ -81,6 +81,11 @@ alter table public.fusionar_sync_runs enable row level security;
 -- EJEMPLO PARA HABILITAR EL CLIENTE REAL (reemplazar CLIENTE_GYM_ID):
 -- update public.gyms set uses_facial_access = true where id = 'CLIENTE_GYM_ID';
 -- insert into public.fusionar_integration_configs (gym_id, is_enabled, api_base_url, access_id)
--- values ('CLIENTE_GYM_ID', true, 'https://HOST_PRODUCCION_CONFIRMADO_POR_FUSIONAR', null)
+-- values (
+--   'CLIENTE_GYM_ID',
+--   true,
+--   'https://HOST_PRODUCCION_CONFIRMADO_POR_FUSIONAR',
+--   'ID_DEL_MOLINETE_CONFIRMADO_POR_FUSIONAR'
+-- )
 -- on conflict (gym_id) do update set is_enabled = excluded.is_enabled,
 --   api_base_url = excluded.api_base_url, updated_at = now();

@@ -7,13 +7,18 @@ siguen usando el acceso habitual y nunca ven el panel de Fusionar.
 
 Antes de activar el cliente real, confirmar con su soporte:
 
-1. La URL **HTTPS de producción** de su API.
-2. `apiKey` y `secretKey` del gimnasio.
+1. La URL **HTTPS de producción** de su API. La URL publicada en la
+   documentación actual no resuelve desde Internet, por lo que este dato sigue
+   siendo imprescindible.
+2. La cuenta API y el ID del acceso ya fueron recibidos por canal privado. Se
+   deben cargar como secreto de Vercel, nunca en este repositorio.
 3. Que el alta presencial de rostro en el terminal RF-2002F4 queda vinculada al
    funcionario creado por API mediante la cédula (`Documento`) o mediante el
    `IdFuncionario` retornado por la API.
-4. Si `/marcas` devuelve las marcas de ese terminal para el usuario de API y
-   cuál es el identificador del acceso cuando hay más de un molinete.
+4. Que `/marcas` devuelve, para cada marca, el identificador del acceso
+   (`IdAcceso`, o indicar el nombre exacto del campo) y cuál corresponde al
+   molinete contratado. Sin este dato el sistema bloquea la importación para
+   no mezclar registros de otros accesos.
 
 ## Configuración privada en Vercel
 
@@ -50,8 +55,8 @@ insert into public.fusionar_integration_configs (
 values (
   'ID_DEL_GIMNASIO',
   true,
-  'https://api-produccion-confirmada-por-fusionar',
-  null
+   'https://api-produccion-confirmada-por-fusionar',
+   'ID_DEL_MOLINETE_CONFIRMADO_POR_FUSIONAR'
 )
 on conflict (gym_id) do update set
   is_enabled = excluded.is_enabled,

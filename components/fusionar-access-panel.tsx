@@ -12,6 +12,7 @@ type FusionarStatus = {
   setupRequired?: boolean;
   configured?: boolean;
   accessConfigured?: boolean;
+  credentialsConfigured?: boolean;
   linkedMembers?: number;
   lastMemberSyncAt?: string | null;
   lastAccessSyncAt?: string | null;
@@ -119,6 +120,10 @@ export function FusionarAccessPanel({ gymId }: { gymId: string }) {
 
   if (loading || !status?.enabled) return null;
 
+  const ready = Boolean(
+    status.configured && status.accessConfigured && status.credentialsConfigured
+  );
+
   return (
     <Card className="border-blue-200 bg-[linear-gradient(135deg,#eff6ff,#ffffff)] shadow-sm">
       <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
@@ -131,8 +136,8 @@ export function FusionarAccessPanel({ gymId }: { gymId: string }) {
             Integración privada con Fusionar. La cédula sigue siendo el vínculo entre cada socio y su registro facial.
           </p>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
-          <BadgeCheck className="h-4 w-4" /> Habilitado
+          <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${ready ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>
+          <BadgeCheck className="h-4 w-4" /> {ready ? "Listo para probar" : "Configuración pendiente"}
         </span>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -151,6 +156,12 @@ export function FusionarAccessPanel({ gymId }: { gymId: string }) {
           </div>
         </div>
 
+        {!ready ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            Para la primera prueba faltan: {!status.configured ? "URL de producción" : ""}{!status.configured && (!status.accessConfigured || !status.credentialsConfigured) ? ", " : ""}{!status.accessConfigured ? "ID del molinete" : ""}{!status.accessConfigured && !status.credentialsConfigured ? " y " : ""}{!status.credentialsConfigured ? "credenciales privadas en Vercel" : ""}.
+          </p>
+        ) : null}
+
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-white/90 p-3">
           <div className="flex items-start gap-2 text-sm text-slate-700">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
@@ -159,15 +170,15 @@ export function FusionarAccessPanel({ gymId }: { gymId: string }) {
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={checkConnection} disabled={checking || syncingMembers || syncingAccesses}>
+            <Button type="button" variant="outline" onClick={checkConnection} disabled={!ready || checking || syncingMembers || syncingAccesses}>
               <RefreshCcw className={`mr-2 h-4 w-4 ${checking ? "animate-spin" : ""}`} />
               {checking ? "Comprobando..." : "Probar conexión"}
             </Button>
-            <Button type="button" onClick={syncMembers} disabled={checking || syncingMembers || syncingAccesses}>
+            <Button type="button" onClick={syncMembers} disabled={!ready || checking || syncingMembers || syncingAccesses}>
               <Fingerprint className={`mr-2 h-4 w-4 ${syncingMembers ? "animate-pulse" : ""}`} />
               {syncingMembers ? "Sincronizando..." : "Sincronizar socios"}
             </Button>
-            <Button type="button" variant="outline" onClick={syncAccesses} disabled={checking || syncingMembers || syncingAccesses}>
+            <Button type="button" variant="outline" onClick={syncAccesses} disabled={!ready || checking || syncingMembers || syncingAccesses}>
               <RefreshCcw className={`mr-2 h-4 w-4 ${syncingAccesses ? "animate-spin" : ""}`} />
               {syncingAccesses ? "Importando..." : "Importar accesos"}
             </Button>

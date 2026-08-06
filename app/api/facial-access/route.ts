@@ -42,11 +42,21 @@ type LocalMember = {
 type FusionarMark = {
   IdMarca?: string | number;
   idMarca?: string | number;
+  IdAcceso?: string | number;
+  idAcceso?: string | number;
+  Acceso?: { IdAcceso?: string | number; idAcceso?: string | number };
   IdFuncionario?: string | number;
   idFuncionario?: string | number;
   Funcionario?: { IdFuncionario?: string | number; idFuncionario?: string | number };
   FechaHora?: string;
   fechaHora?: string;
+};
+
+type FusionarAccess = {
+  IdAcceso?: string | number;
+  idAcceso?: string | number;
+  Nombre?: string;
+  nombre?: string;
 };
 
 const normalizeCedula = (value?: string | null) => (value ?? "").replace(/\D+/g, "");
@@ -86,9 +96,32 @@ const markEmployeeIdFrom = (mark: FusionarMark) => {
 
 const markDateFrom = (mark: FusionarMark) => mark.FechaHora ?? mark.fechaHora ?? null;
 
+const markAccessIdFrom = (mark: FusionarMark) => {
+  const id =
+    mark.IdAcceso ??
+    mark.idAcceso ??
+    mark.Acceso?.IdAcceso ??
+    mark.Acceso?.idAcceso ??
+    null;
+  return id === null || id === undefined ? null : String(id);
+};
+
+const accessIdFrom = (access: FusionarAccess | null | undefined) => {
+  const id = access?.IdAcceso ?? access?.idAcceso;
+  return id === null || id === undefined ? null : String(id);
+};
+
+const accessNameFrom = (access: FusionarAccess | null | undefined) =>
+  access?.Nombre ?? access?.nombre ?? null;
+
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
 
-const buildEmployeePayload = (member: LocalMember) => {
+const toFusionarId = (value: string) => {
+  const numeric = Number(value);
+  return Number.isSafeInteger(numeric) ? numeric : value;
+};
+
+const buildEmployeePayload = (member: LocalMember, accessId: string) => {
   const names = splitName(member.name);
   const cedula = normalizeCedula(member.cedula);
   const validUntil = toFusionarDate(member.next_payment);
@@ -111,6 +144,10 @@ const buildEmployeePayload = (member: LocalMember) => {
     IdSector: null,
     IMEI: "",
     NroTarjeta: null,
+    // El acceso es el que vincula al socio con el equipo/molinete de Fusionar.
+    // Sin esta asociación el funcionario puede existir en FSClock pero el
+    // terminal no tendría por qué autorizarle el ingreso.
+    Accesos: [{ IdAcceso: toFusionarId(accessId) }],
     Observacion: "Sincronizado desde GymManagerPro",
     Activo: isActive,
     // Fusionar marca este campo como obligatorio. Un socio sin vencimiento
@@ -171,6 +208,7 @@ export async function GET(request: Request) {
     enabled: Boolean(config?.is_enabled),
     configured: Boolean(config?.api_base_url),
     accessConfigured: Boolean(config?.access_id),
+    credentialsConfigured: Boolean(getFusionarCredentials(parsed.data.gymId)),
     linkedMembers: linkedMembers ?? 0,
     lastMemberSyncAt: config?.last_member_sync_at ?? null,
     lastAccessSyncAt: config?.last_access_sync_at ?? null,
@@ -191,7 +229,7 @@ export async function POST(request: Request) {
   const supabase = createClient();
   const { data: config, error: configError } = await supabase
     .from("fusionar_integration_configs")
-    .select("is_enabled, api_base_url, last_access_sync_at")
+    .select("is_enabled, api_base_url, access_id, last_access_sync_at")
     .eq("gym_id", parsed.data.gymId)
     .maybeSingle();
 
@@ -211,14 +249,44 @@ export async function POST(request: Request) {
     const session = await createFusionarSession(credentials, config.api_base_url);
 
     if (parsed.data.action === "connection_check") {
+      if (!config.access_id) {
+        return NextResponse.json(
+          { error: "Falta configurar el ID de acceso de Fusionar para este gimnasio." },
+          { status: 409 }
+        );
+      }
+
+      const access = await fusionarRequest<FusionarAccess>(
+        session,
+        `/accesos/${encodeURIComponent(String(config.access_id))}`
+      );
+      const receivedAccessId = accessIdFrom(access);
+      if (receivedAccessId && receivedAccessId !== String(config.access_id)) {
+        throw new Error("Fusionar devolvió un acceso diferente al configurado.");
+      }
+
       await supabase
         .from("fusionar_integration_configs")
         .update({ last_error: null, updated_at: new Date().toISOString() })
         .eq("gym_id", parsed.data.gymId);
-      return NextResponse.json({ ok: true, message: "Conexión con Fusionar confirmada." });
+      return NextResponse.json({
+        ok: true,
+        message: "Conexión con Fusionar confirmada.",
+        access: {
+          id: receivedAccessId ?? String(config.access_id),
+          name: accessNameFrom(access) ?? null,
+        },
+      });
     }
 
     if (parsed.data.action === "sync_accesses") {
+      if (!config.access_id) {
+        return NextResponse.json(
+          { error: "Falta configurar el ID de acceso de Fusionar para importar las marcas del molinete." },
+          { status: 409 }
+        );
+      }
+
       const { data: links, error: linksError } = await supabase
         .from("fusionar_member_links")
         .select("member_id, fusionar_employee_id")
@@ -238,9 +306,18 @@ export async function POST(request: Request) {
 
       const marks = await fusionarRequest<{ data?: FusionarMark[] }>(
         session,
-        `/marcas?FechaDesde=${encodeURIComponent(startDate)}&FechaHasta=${encodeURIComponent(endDate)}`
+        `/marcas/acceso?FechaDesde=${encodeURIComponent(startDate)}&FechaHasta=${encodeURIComponent(endDate)}&IdAcceso=${encodeURIComponent(String(config.access_id))}`
       );
       const receivedMarks = Array.isArray(marks?.data) ? marks.data : [];
+      const unscopedMarks = receivedMarks.filter((mark) => !markAccessIdFrom(mark));
+      if (unscopedMarks.length > 0) {
+        throw new Error(
+          "Fusionar devolvió marcas sin identificar el acceso. Confirmá con su soporte el campo o filtro del molinete antes de importarlas."
+        );
+      }
+      const selectedMarks = receivedMarks.filter(
+        (mark) => markAccessIdFrom(mark) === String(config.access_id)
+      );
       const memberIds = [...new Set([...externalToMember.values()])];
       const { data: members, error: membersError } = memberIds.length
         ? await supabase
@@ -258,7 +335,7 @@ export async function POST(request: Request) {
           gym_id: parsed.data.gymId,
           run_type: "accesses",
           status: "started",
-          processed_count: receivedMarks.length,
+          processed_count: selectedMarks.length,
           details: { startDate, endDate },
         })
         .select("id")
@@ -267,7 +344,7 @@ export async function POST(request: Request) {
       let successCount = 0;
       let skippedCount = 0;
       const failures: string[] = [];
-      for (const mark of receivedMarks) {
+      for (const mark of selectedMarks) {
         const externalMarkId = markIdFrom(mark);
         const externalEmployeeId = markEmployeeIdFrom(mark);
         const member = externalEmployeeId ? membersById.get(externalToMember.get(externalEmployeeId) ?? "") : null;
@@ -316,7 +393,13 @@ export async function POST(request: Request) {
             status: runStatus,
             success_count: successCount,
             error_count: failures.length,
-            details: { startDate, endDate, skippedWithoutLink: skippedCount, failures: failures.slice(0, 20) },
+            details: {
+              startDate,
+              endDate,
+              ignoredOtherAccesses: receivedMarks.length - selectedMarks.length,
+              skippedWithoutLink: skippedCount,
+              failures: failures.slice(0, 20),
+            },
             completed_at: new Date().toISOString(),
           })
           .eq("id", run.id);
@@ -332,11 +415,18 @@ export async function POST(request: Request) {
       return NextResponse.json({
         ok: failures.length === 0,
         message: `Importación terminada: ${successCount} acceso(s) agregados${skippedCount ? `; ${skippedCount} sin socio vinculado.` : "."}`,
-        processed: receivedMarks.length,
+        processed: selectedMarks.length,
         successCount,
         skippedCount,
         failures,
       });
+    }
+
+    if (!config.access_id) {
+      return NextResponse.json(
+        { error: "Falta configurar el ID de acceso de Fusionar para sincronizar socios con el molinete." },
+        { status: 409 }
+      );
     }
 
     let memberQuery = supabase
@@ -381,7 +471,7 @@ export async function POST(request: Request) {
         }
 
         const knownExternalId = employeeIdFrom(existing);
-        const payload = buildEmployeePayload(member);
+        const payload = buildEmployeePayload(member, String(config.access_id));
         const saved = knownExternalId
           ? await fusionarRequest<FusionarEmployee>(session, `/funcionarios/${knownExternalId}`, {
               method: "PUT",
