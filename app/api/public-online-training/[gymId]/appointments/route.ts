@@ -39,6 +39,22 @@ function montevideoDate(date: Date) {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+function montevideoMonth(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Montevideo", year: "numeric", month: "2-digit" }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("year")}-${get("month")}`;
+}
+
+function monthBounds(date: Date) {
+  const [year, month] = montevideoMonth(date).split("-").map(Number);
+  const nextYear = month === 12 ? year + 1 : year;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  return {
+    start: new Date(`${year}-${String(month).padStart(2, "0")}-01T00:00:00-03:00`),
+    end: new Date(`${nextYear}-${String(nextMonth).padStart(2, "0")}-01T00:00:00-03:00`),
+  };
+}
+
 function availableStarts(now: Date) {
   const starts: Date[] = [];
   const startDate = new Date(`${montevideoDate(now)}T12:00:00-03:00`);
@@ -86,10 +102,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { data: appointments } = await supabase.from("online_training_appointments").select("starts_at, client_id, status").eq("gym_id", gymId).gte("starts_at", now.toISOString()).eq("status", "confirmed");
   const taken = new Set((appointments || []).filter((appointment) => appointment.client_id !== client.id).map((appointment) => appointment.starts_at));
   const own = (appointments || []).filter((appointment) => appointment.client_id === client.id).map((appointment) => appointment.starts_at);
+  const monthsWithOwnAppointment = new Set(own.map((appointment) => montevideoMonth(new Date(appointment))));
   return NextResponse.json({
     clientName: client.full_name,
     slots: starts
       .filter((start) => !taken.has(start.toISOString()))
+      .filter((start) => !monthsWithOwnAppointment.has(montevideoMonth(start)))
       .filter((start) => !overlaps(start, new Date(start.getTime() + 30 * 60 * 1000), googleBusy))
       .map((start) => start.toISOString()),
     appointments: own,
@@ -103,6 +121,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const start = body.startsAt ? new Date(body.startsAt) : null;
   if (!client || !start || Number.isNaN(start.getTime()) || !availableStarts(new Date()).some((slot) => slot.toISOString() === start.toISOString())) return NextResponse.json({ error: "El turno no está disponible." }, { status: 400 });
   const end = new Date(start.getTime() + 30 * 60 * 1000);
+  const period = monthBounds(start);
+  const supabase = createClient();
+  const { data: existingMonthAppointments, error: existingMonthError } = await supabase
+    .from("online_training_appointments")
+    .select("id")
+    .eq("gym_id", gymId)
+    .eq("client_id", client.id)
+    .eq("status", "confirmed")
+    .gte("starts_at", period.start.toISOString())
+    .lt("starts_at", period.end.toISOString())
+    .limit(1);
+  if (existingMonthError) return NextResponse.json({ error: "No pudimos verificar tus reuniones anteriores." }, { status: 500 });
+  if (existingMonthAppointments?.length) return NextResponse.json({ error: "Ya tenés una reunión agendada para este mes." }, { status: 409 });
   try {
     const busy = await getGoogleCalendarBusyIntervals(start, end);
     if (busy && overlaps(start, end, busy)) return NextResponse.json({ error: "Ese turno ya no está disponible. Elegí otro." }, { status: 409 });
@@ -111,7 +142,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Si Google Calendar no responde, el bloqueo por turnos confirmados en
     // ManagerPro continúa activo y permite conservar el flujo del socio.
   }
-  const supabase = createClient();
   const { data: appointment, error } = await supabase
     .from("online_training_appointments")
     .insert({ gym_id: gymId, client_id: client.id, starts_at: start.toISOString(), ends_at: end.toISOString() })

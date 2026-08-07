@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type Data = { clientName: string; slots: string[]; appointments: string[] };
 
@@ -31,6 +32,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [selectedSlotGroup, setSelectedSlotGroup] = useState(0);
+  const [pendingSlot, setPendingSlot] = useState<string | null>(null);
 
   const groupedSlots = useMemo(() => {
     const grouped = new Map<string, string[]>();
@@ -165,7 +167,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
                 <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-black text-slate-950">Horarios disponibles</h3><span className="text-xs font-semibold text-slate-500">30 min por reunión</span></div>
                 {groupedSlots.length ? <div className="mt-3">
                   <div className="mb-3 flex gap-2 overflow-x-auto pb-1">{groupedSlots.map((slots, index) => <button key={slots[0]} type="button" onClick={() => setSelectedSlotGroup(index)} className={`shrink-0 rounded-xl border px-3 py-2 text-left transition ${selectedSlotGroup === index ? "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/20" : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50"}`}><span className="block text-[11px] font-bold uppercase tracking-wide opacity-75">{index === 0 ? "Próximo" : `Fecha ${index + 1}`}</span><span className="block text-sm font-black capitalize">{label(slots[0], false)}</span></button>)}</div>
-                  <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><button type="button" aria-label="Ver fecha anterior" disabled={selectedSlotGroup === 0} onClick={() => setSelectedSlotGroup((current) => Math.max(0, current - 1))} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35"><ChevronLeft className="h-4 w-4" /></button><p className="capitalize text-center text-sm font-black text-slate-950">{visibleSlots[0] ? label(visibleSlots[0], false) : ""}</p><button type="button" aria-label="Ver fecha siguiente" disabled={selectedSlotGroup === groupedSlots.length - 1} onClick={() => setSelectedSlotGroup((current) => Math.min(groupedSlots.length - 1, current + 1))} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35"><ChevronRight className="h-4 w-4" /></button></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{visibleSlots.map((slot) => <button key={slot} type="button" disabled={loading} onClick={() => void book(slot)} className="rounded-xl border border-blue-100 bg-white px-3 py-3 text-sm font-black text-blue-800 transition hover:-translate-y-0.5 hover:border-blue-500 hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-600/20 disabled:cursor-not-allowed disabled:opacity-50">{timeLabel(slot)}</button>)}</div></section>
+                  <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><button type="button" aria-label="Ver fecha anterior" disabled={selectedSlotGroup === 0} onClick={() => setSelectedSlotGroup((current) => Math.max(0, current - 1))} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35"><ChevronLeft className="h-4 w-4" /></button><p className="capitalize text-center text-sm font-black text-slate-950">{visibleSlots[0] ? label(visibleSlots[0], false) : ""}</p><button type="button" aria-label="Ver fecha siguiente" disabled={selectedSlotGroup === groupedSlots.length - 1} onClick={() => setSelectedSlotGroup((current) => Math.min(groupedSlots.length - 1, current + 1))} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35"><ChevronRight className="h-4 w-4" /></button></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{visibleSlots.map((slot) => <button key={slot} type="button" disabled={loading} onClick={() => setPendingSlot(slot)} className="rounded-xl border border-blue-100 bg-white px-3 py-3 text-sm font-black text-blue-800 transition hover:-translate-y-0.5 hover:border-blue-500 hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-600/20 disabled:cursor-not-allowed disabled:opacity-50">{timeLabel(slot)}</button>)}</div></section>
                 </div> : <div className="mt-3 rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">No hay horarios disponibles por el momento. Volvé a intentar más tarde.</div>}
               </div>
             </div> : <div className="mt-6 flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" /><p className="text-sm leading-6 text-slate-600">Para cuidar tu servicio, verificamos que la suscripción esté activa antes de mostrar los horarios.</p></div>}
@@ -174,6 +176,16 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
 
         <footer className="flex flex-col items-center justify-between gap-3 border-t border-white/10 py-6 text-center text-xs text-slate-400 sm:flex-row sm:text-left"><span>© {new Date().getFullYear()} ManagerPro · Entrenamiento online</span><span>Tu información se utiliza únicamente para gestionar tu seguimiento.</span></footer>
       </div>
+      <Dialog open={Boolean(pendingSlot)} onOpenChange={(open) => { if (!open) setPendingSlot(null); }}>
+        <DialogContent className="rounded-3xl border-slate-200 bg-white p-6 text-slate-950 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">¿Confirmás tu reunión?</DialogTitle>
+            <DialogDescription className="text-slate-600">Vas a reservar tu encuentro individual de 30 minutos con el profesor.</DialogDescription>
+          </DialogHeader>
+          {pendingSlot ? <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4"><p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">Fecha elegida</p><p className="mt-2 capitalize text-lg font-black text-slate-950">{label(pendingSlot)}</p><p className="mt-1 text-sm text-slate-600">Podrás tener una reunión por mes.</p></div> : null}
+          <DialogFooter className="gap-2 sm:gap-2"><button type="button" onClick={() => setPendingSlot(null)} className="h-10 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Cancelar</button><button type="button" disabled={loading || !pendingSlot} onClick={() => { const slot = pendingSlot; setPendingSlot(null); if (slot) void book(slot); }} className="h-10 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-60">{loading ? "Confirmando..." : "Sí, confirmar reunión"}</button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
