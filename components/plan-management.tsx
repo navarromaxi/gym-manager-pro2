@@ -391,7 +391,7 @@ export function PlanManagement({
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label>Actividades Incluidas</Label>
+                <Label>Actividades incluidas (opcional)</Label>
                 {availableActivities.length > 0 ? (
                   <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
                     {availableActivities.map((activity) => (
@@ -430,7 +430,7 @@ export function PlanManagement({
                   <div className="p-4 text-center text-muted-foreground bg-gray-50 rounded-lg">
                     <p>No hay actividades disponibles.</p>
                     <p className="text-sm">
-                      Ve a la sección "Actividades" para crear algunas primero.
+                      Puedes crear este plan igualmente y agregar actividades más adelante si las necesitas.
                     </p>
                   </div>
                 )}
@@ -440,7 +440,6 @@ export function PlanManagement({
               <Button
                 type="submit"
                 onClick={handleAddPlan}
-                disabled={availableActivities.length === 0}
               >
                 Crear Plan
               </Button>
