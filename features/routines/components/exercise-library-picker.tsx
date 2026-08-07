@@ -66,8 +66,12 @@ export function ExerciseLibraryPicker({
             <ChevronDown className="h-4 w-4" />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="z-50 w-[min(380px,calc(100vw-32px))] border-blue-400 p-0" style={{ backgroundColor: "#0f2742", color: "#f8fafc" }}>
-        <div className="border-b border-blue-700 p-3">
+        <PopoverContent
+          align="start"
+          className="z-50 flex w-[min(380px,calc(100vw-32px))] max-h-[calc(100dvh-2rem)] flex-col overflow-hidden border-blue-400 p-0"
+          style={{ backgroundColor: "#0f2742", color: "#f8fafc" }}
+        >
+        <div className="shrink-0 border-b border-blue-700 p-3">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4" style={{ color: "#bfdbfe" }} />
             <Input
@@ -85,7 +89,10 @@ export function ExerciseLibraryPicker({
             ))}
           </div>
         </div>
-        <div className="max-h-72 overflow-y-auto p-1">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1"
+          onWheel={(event) => event.stopPropagation()}
+        >
           {query.trim() && !exercises.some((item) => item.name.trim().toLowerCase() === query.trim().toLowerCase()) ? (
             <button type="button" onClick={() => choose(query.trim())} className="w-full rounded-lg border border-dashed border-sky-300 bg-sky-100 px-3 py-2 text-left text-sm font-semibold text-slate-950 hover:bg-sky-200">
               Usar "{query.trim()}" sin biblioteca
