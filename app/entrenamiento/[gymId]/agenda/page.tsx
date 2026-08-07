@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { ArrowRight, CalendarDays, CheckCircle2, Clock3, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 
 type Data = { clientName: string; slots: string[]; appointments: string[] };
 
@@ -127,9 +127,8 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Tu reunión</p>
                 <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">Agendá tu llamada</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">Lunes, miércoles y jueves · 18:00 a 20:00</p>
               </div>
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/25"><Clock3 className="h-5 w-5" /></span>
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/25"><CalendarDays className="h-5 w-5" /></span>
             </div>
 
             <form onSubmit={load} className="mt-7 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">

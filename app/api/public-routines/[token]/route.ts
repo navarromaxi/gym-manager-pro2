@@ -38,7 +38,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   await supabase.from("routines").update({ last_opened_at: new Date().toISOString() }).eq("id", routine.id);
 
   return NextResponse.json({
-    gym: { name: gym?.name ?? null, logoUrl: gym?.logo_url ?? null },
+    gym: { id: routine.gym_id, name: gym?.name ?? null, logoUrl: gym?.logo_url ?? null },
     routine: {
       name: routine.name, description: routine.description ?? "", duration: routine.duration ?? 0,
       memberName: member?.name ?? null, exercises: Array.isArray(routine.exercises) ? routine.exercises : [],

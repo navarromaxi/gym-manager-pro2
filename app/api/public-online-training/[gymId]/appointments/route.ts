@@ -78,7 +78,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     googleBusy = (await getGoogleCalendarBusyIntervals(now, new Date(now.getTime() + 36 * 24 * 60 * 60 * 1000))) ?? [];
   } catch (calendarError) {
     console.error("No se pudo consultar Google Calendar para la agenda online", calendarError);
-    return NextResponse.json({ error: "No pudimos consultar la disponibilidad del profesor. Intentá nuevamente." }, { status: 503 });
+    // La agenda propia sigue siendo la fuente de reserva: una caída temporal de
+    // Google Calendar no debe impedir que el socio consulte los turnos.
+    googleBusy = [];
   }
   const supabase = createClient();
   const { data: appointments } = await supabase.from("online_training_appointments").select("starts_at, client_id, status").eq("gym_id", gymId).gte("starts_at", now.toISOString()).eq("status", "confirmed");
@@ -106,7 +108,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (busy && overlaps(start, end, busy)) return NextResponse.json({ error: "Ese turno ya no está disponible. Elegí otro." }, { status: 409 });
   } catch (calendarError) {
     console.error("No se pudo validar Google Calendar antes de reservar", calendarError);
-    return NextResponse.json({ error: "No pudimos validar el horario del profesor. Intentá nuevamente." }, { status: 503 });
+    // Si Google Calendar no responde, el bloqueo por turnos confirmados en
+    // ManagerPro continúa activo y permite conservar el flujo del socio.
   }
   const supabase = createClient();
   const { data: appointment, error } = await supabase
@@ -133,8 +136,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   } catch (calendarError) {
     console.error("No se pudo sincronizar el turno online con Google Calendar", calendarError);
-    await supabase.from("online_training_appointments").delete().eq("id", appointment.id);
-    return NextResponse.json({ error: "No pudimos registrar tu turno en la agenda. Intentá nuevamente." }, { status: 503 });
+    // El turno ya quedó reservado en ManagerPro. Lo conservamos para no perder
+    // la reserva del socio aunque la integración externa esté indisponible.
   }
   try {
     const sent = await sendAppointmentConfirmation(client.full_name, client.email, start);
