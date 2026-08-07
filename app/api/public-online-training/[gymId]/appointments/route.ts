@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { createGoogleCalendarEvent, getGoogleCalendarBusyIntervals } from "@/lib/google-calendar";
+import { createGoogleCalendarEvent, deleteGoogleCalendarEvent, getGoogleCalendarBusyIntervals } from "@/lib/google-calendar";
 import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -99,10 +99,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     googleBusy = [];
   }
   const supabase = createClient();
-  const { data: appointments } = await supabase.from("online_training_appointments").select("starts_at, client_id, status").eq("gym_id", gymId).gte("starts_at", now.toISOString()).eq("status", "confirmed");
+  const { data: appointments } = await supabase.from("online_training_appointments").select("id, starts_at, client_id, status").eq("gym_id", gymId).gte("starts_at", now.toISOString()).eq("status", "confirmed");
   const taken = new Set((appointments || []).filter((appointment) => appointment.client_id !== client.id).map((appointment) => appointment.starts_at));
-  const own = (appointments || []).filter((appointment) => appointment.client_id === client.id).map((appointment) => appointment.starts_at);
-  const monthsWithOwnAppointment = new Set(own.map((appointment) => montevideoMonth(new Date(appointment))));
+  const own = (appointments || []).filter((appointment) => appointment.client_id === client.id).map((appointment) => ({ id: appointment.id, startsAt: appointment.starts_at }));
+  const monthsWithOwnAppointment = new Set(own.map((appointment) => montevideoMonth(new Date(appointment.startsAt))));
   return NextResponse.json({
     clientName: client.full_name,
     slots: starts
@@ -181,5 +181,33 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch (emailError) {
     console.error("No se pudo enviar la confirmación de turno online", emailError);
   }
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ gymId: string }> }) {
+  const { gymId } = await params;
+  const body = await request.json().catch(() => ({})) as { cedula?: string; appointmentId?: string };
+  const client = await activeClient(gymId, body.cedula || "");
+  if (!client || !body.appointmentId) return NextResponse.json({ error: "No pudimos identificar tu turno." }, { status: 400 });
+  const supabase = createClient();
+  const { data: appointment, error: appointmentError } = await supabase
+    .from("online_training_appointments")
+    .select("id, starts_at, google_calendar_event_id")
+    .eq("id", body.appointmentId)
+    .eq("gym_id", gymId)
+    .eq("client_id", client.id)
+    .eq("status", "confirmed")
+    .maybeSingle();
+  if (appointmentError || !appointment) return NextResponse.json({ error: "No encontramos ese turno." }, { status: 404 });
+  if (new Date(appointment.starts_at) <= new Date()) return NextResponse.json({ error: "Solo podés cancelar reuniones futuras." }, { status: 400 });
+  if (appointment.google_calendar_event_id) {
+    try {
+      await deleteGoogleCalendarEvent(appointment.google_calendar_event_id);
+    } catch (calendarError) {
+      console.error("No se pudo eliminar el evento de Google Calendar", calendarError);
+    }
+  }
+  const { error } = await supabase.from("online_training_appointments").delete().eq("id", appointment.id).eq("gym_id", gymId).eq("client_id", client.id);
+  if (error) return NextResponse.json({ error: "No pudimos cancelar el turno." }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

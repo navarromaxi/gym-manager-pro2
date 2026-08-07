@@ -4,7 +4,8 @@ import { FormEvent, useMemo, useState } from "react";
 import { ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-type Data = { clientName: string; slots: string[]; appointments: string[] };
+type Appointment = { id: string; startsAt: string };
+type Data = { clientName: string; slots: string[]; appointments: Appointment[] };
 
 function label(value: string, includeTime = true) {
   return new Intl.DateTimeFormat("es-UY", {
@@ -33,6 +34,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
   const [message, setMessage] = useState("");
   const [selectedSlotGroup, setSelectedSlotGroup] = useState(0);
   const [pendingSlot, setPendingSlot] = useState<string | null>(null);
+  const [cancelingAppointmentId, setCancelingAppointmentId] = useState<string | null>(null);
 
   const groupedSlots = useMemo(() => {
     const grouped = new Map<string, string[]>();
@@ -74,8 +76,25 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
     const body = await response.json() as { error?: string };
     setLoading(false);
     if (!response.ok) return setMessage(body.error || "No pudimos confirmar el turno.");
-    setMessage("Tu reunión quedó confirmada. Te enviaremos un recordatorio antes de la llamada.");
     await load({ preventDefault() {} } as FormEvent);
+    setMessage("Tu reunión quedó confirmada. Te enviaremos un recordatorio antes de la llamada.");
+  };
+
+  const cancelAppointment = async (appointment: Appointment) => {
+    if (!window.confirm(`¿Cancelar la reunión del ${label(appointment.startsAt)}?`)) return;
+    setCancelingAppointmentId(appointment.id);
+    setMessage("");
+    const id = gymId || (await params).gymId;
+    const response = await fetch(`/api/public-online-training/${id}/appointments`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cedula, appointmentId: appointment.id }),
+    });
+    const body = await response.json() as { error?: string };
+    setCancelingAppointmentId(null);
+    if (!response.ok) return setMessage(body.error || "No pudimos cancelar el turno.");
+    await load({ preventDefault() {} } as FormEvent);
+    setMessage("Tu reunión fue cancelada. Ya podés elegir otro horario disponible.");
   };
 
   const visibleSlots = groupedSlots[selectedSlotGroup] ?? [];
@@ -161,7 +180,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
                 <div><p className="font-bold text-slate-950">Hola, {data.clientName}</p><p className="text-sm text-slate-600">Elegí el horario que te resulte más cómodo.</p></div>
               </div>
 
-              {data.appointments.length > 0 ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">Tu próxima reunión</p><p className="mt-2 capitalize font-bold text-emerald-950">{data.appointments.map((appointment) => label(appointment)).join(", ")}</p></div> : null}
+              {data.appointments.length > 0 ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">Tus reuniones agendadas</p><div className="mt-3 space-y-2">{data.appointments.map((appointment) => <div key={appointment.id} className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-white/80 p-3 sm:flex-row sm:items-center sm:justify-between"><p className="capitalize font-bold text-emerald-950">{label(appointment.startsAt)}</p><button type="button" disabled={cancelingAppointmentId === appointment.id} onClick={() => void cancelAppointment(appointment)} className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60">{cancelingAppointmentId === appointment.id ? "Cancelando..." : "Cancelar turno"}</button></div>)}</div><p className="mt-3 text-xs text-emerald-800">Tenés una reunión por mes. Si necesitás cambiarla, cancelala y elegí otro horario.</p></div> : null}
 
               <div>
                 <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-black text-slate-950">Horarios disponibles</h3><span className="text-xs font-semibold text-slate-500">30 min por reunión</span></div>

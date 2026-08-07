@@ -66,6 +66,20 @@ export async function createGoogleCalendarEvent(input: CalendarEventInput) {
   return event.id;
 }
 
+/** Elimina un evento creado por la agenda online cuando el socio cancela su turno. */
+export async function deleteGoogleCalendarEvent(eventId: string) {
+  const calendarId = process.env.GOOGLE_CALENDAR_ID;
+  const account = serviceAccount();
+  if (!calendarId || !account) return null;
+  const token = await accessToken(account);
+  const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!response.ok && response.status !== 404) throw new Error("No se pudo eliminar el evento en Google Calendar.");
+  return true;
+}
+
 /**
  * Obtiene los bloques ya ocupados del calendario compartido.
  * Devuelve null cuando el calendario no está configurado, para no impedir
