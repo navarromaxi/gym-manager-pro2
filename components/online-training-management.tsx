@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, CheckCircle2, ClipboardCopy, ClipboardList, Copy, ExternalLink, Loader2, Pencil, RefreshCw, Search, Trash2, Users } from "lucide-react";
+import { CalendarClock, CalendarDays, CheckCircle2, ClipboardCopy, ClipboardList, Copy, ExternalLink, Loader2, Mail, Pencil, Phone, RefreshCw, Search, Trash2, Users } from "lucide-react";
 import { supabase, insertMemberWithFallback } from "@/lib/supabase";
 import { PersonalizedRoutineBuilder, type CreatedPersonalizedRoutine, type RoutineMemberSearch } from "@/features/routines/components/personalized-routine-builder";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,7 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
   const [routineSetupTarget, setRoutineSetupTarget] = useState<{ client: OnlineClient; member: RoutineMemberSearch } | null>(null);
   const [routineSetupMode, setRoutineSetupMode] = useState<"choose" | "copy">("choose");
   const [templateQuery, setTemplateQuery] = useState("");
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [creating, setCreating] = useState<string | null>(null);
   const [deletingRoutineId, setDeletingRoutineId] = useState<string | null>(null);
   const publicUrl = typeof window === "undefined" ? "" : `${window.location.origin}/entrenamiento/${gymId}`;
@@ -194,6 +195,10 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
       .filter((client) => (routinesByClient[client.id] ?? []).length > 0)
       .filter((client) => !normalized || [client.full_name, client.cedula, client.email].some((value) => value.toLowerCase().includes(normalized)));
   }, [clients, routineSetupTarget?.client.id, routinesByClient, templateQuery]);
+  const upcomingSchedule = useMemo(() => appointments
+    .map((appointment) => ({ appointment, client: clients.find((client) => client.id === appointment.client_id) }))
+    .filter((entry): entry is { appointment: Appointment; client: OnlineClient } => Boolean(entry.client))
+    .sort((a, b) => new Date(a.appointment.starts_at).getTime() - new Date(b.appointment.starts_at).getTime()), [appointments, clients]);
 
   return (
     <div className="space-y-6">
@@ -201,7 +206,7 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
         <p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-600">Portal privado</p>
         <h2 className="text-4xl font-bold tracking-tight text-slate-950">Gestión de entrenamiento</h2>
         <p className="text-slate-600">Clientes, entrevistas y rutinas en un solo lugar.</p>
-        <Button onClick={() => void load()} disabled={loading} className="rounded-xl bg-blue-600 text-white hover:bg-blue-700"><RefreshCw className="mr-2 h-4 w-4" />Actualizar</Button>
+        <div className="flex flex-wrap justify-center gap-2"><Button type="button" variant="outline" onClick={() => setIsScheduleOpen(true)} className="rounded-xl border-blue-200 bg-white text-blue-700 hover:bg-blue-50 hover:text-blue-800"><CalendarDays className="mr-2 h-4 w-4" />Agenda de reuniones{upcomingSchedule.length ? ` (${upcomingSchedule.length})` : ""}</Button><Button onClick={() => void load()} disabled={loading} className="rounded-xl bg-blue-600 text-white hover:bg-blue-700"><RefreshCw className="mr-2 h-4 w-4" />Actualizar</Button></div>
       </header>
       <Card className="rounded-3xl border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 text-slate-950 shadow-sm">
         <CardContent className="flex flex-col items-center justify-between gap-4 p-6 text-center sm:flex-row sm:text-left">
@@ -248,6 +253,12 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
         </DialogContent>
       </Dialog>
       <Dialog open={Boolean(routineTarget)} onOpenChange={(open) => !open && setRoutineTarget(null)}><DialogContent className="max-h-[96vh] max-w-7xl overflow-y-auto border-0 bg-transparent p-0 shadow-none"><div className="rounded-3xl bg-slate-950 p-2"><PersonalizedRoutineBuilder key={`${routineTarget?.client.id ?? ""}-${routineTarget?.initialRoutine?.id ?? "new"}-${routineTarget?.createAsNew ? "copy" : "edit"}`} gymId={gymId} members={routineTarget ? [routineTarget.member] : []} initialRoutine={routineTarget?.initialRoutine} createAsNew={routineTarget?.createAsNew} defaultMember={routineTarget?.member} onCancel={() => setRoutineTarget(null)} onSaved={(routine) => void onRoutineSaved(routine)} /></div></DialogContent></Dialog>
+      <Dialog open={isScheduleOpen} onOpenChange={setIsScheduleOpen}>
+        <DialogContent className="max-h-[88vh] overflow-y-auto rounded-3xl border-slate-200 bg-white p-6 text-slate-950 sm:max-w-3xl">
+          <DialogHeader><DialogTitle className="flex items-center gap-2 text-2xl"><CalendarDays className="h-6 w-6 text-blue-600" />Agenda de próximas reuniones</DialogTitle><DialogDescription className="text-slate-600">Vista interna de respaldo. Estas reuniones provienen directamente de ManagerPro.</DialogDescription></DialogHeader>
+          {upcomingSchedule.length ? <div className="mt-3 space-y-3">{upcomingSchedule.map(({ appointment, client }) => <article key={appointment.client_id + appointment.starts_at} className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-600">{dateLabel(appointment.starts_at)} · {new Date(appointment.starts_at).toLocaleTimeString("es-UY", { hour: "2-digit", minute: "2-digit" })}</p><h3 className="mt-1 text-lg font-black text-slate-950">{client.full_name}</h3><p className="mt-1 text-sm text-slate-600">Cédula: {client.cedula}</p></div><span className="w-fit rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">Confirmada</span></div><div className="mt-4 grid gap-2 border-t border-slate-200 pt-3 sm:grid-cols-2">{client.phone ? <a href={`tel:${client.phone}`} className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"><Phone className="h-4 w-4 text-blue-600" />{client.phone}</a> : <span className="rounded-xl bg-white px-3 py-2 text-sm text-slate-500">Sin teléfono registrado</span>}<a href={`mailto:${client.email}`} className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"><Mail className="h-4 w-4 text-blue-600" />{client.email}</a></div></article>)}</div> : <div className="mt-4 rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-600"><CalendarDays className="mx-auto h-7 w-7 text-slate-400" /><p className="mt-3 font-semibold">No hay reuniones futuras agendadas.</p></div>}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
