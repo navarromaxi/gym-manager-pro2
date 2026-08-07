@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { ArrowRight, CalendarDays, CheckCircle2, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 
 type Data = { clientName: string; slots: string[]; appointments: string[] };
 
@@ -30,6 +30,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [selectedSlotGroup, setSelectedSlotGroup] = useState(0);
 
   const groupedSlots = useMemo(() => {
     const grouped = new Map<string, string[]>();
@@ -56,6 +57,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
     setLoading(false);
     if (!response.ok) return setMessage(body.error || "No pudimos cargar la agenda.");
     setData(body);
+    setSelectedSlotGroup(0);
   };
 
   const book = async (startsAt: string) => {
@@ -73,6 +75,8 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
     setMessage("Tu reunión quedó confirmada. Te enviaremos un recordatorio antes de la llamada.");
     await load({ preventDefault() {} } as FormEvent);
   };
+
+  const visibleSlots = groupedSlots[selectedSlotGroup] ?? [];
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#07152b] px-4 py-6 text-slate-950 sm:px-6 sm:py-10">
@@ -159,7 +163,10 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
 
               <div>
                 <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-black text-slate-950">Horarios disponibles</h3><span className="text-xs font-semibold text-slate-500">30 min por reunión</span></div>
-                {groupedSlots.length ? <div className="mt-3 space-y-3">{groupedSlots.map((slots) => <section key={slots[0]} className="rounded-2xl border border-slate-200 p-4"><p className="capitalize text-sm font-bold text-slate-800">{label(slots[0], false)}</p><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{slots.map((slot) => <button key={slot} type="button" disabled={loading} onClick={() => void book(slot)} className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-3 text-sm font-black text-blue-800 transition hover:-translate-y-0.5 hover:border-blue-500 hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-600/20 disabled:cursor-not-allowed disabled:opacity-50">{timeLabel(slot)}</button>)}</div></section>)}</div> : <div className="mt-3 rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">No hay horarios disponibles por el momento. Volvé a intentar más tarde.</div>}
+                {groupedSlots.length ? <div className="mt-3">
+                  <div className="mb-3 flex gap-2 overflow-x-auto pb-1">{groupedSlots.map((slots, index) => <button key={slots[0]} type="button" onClick={() => setSelectedSlotGroup(index)} className={`shrink-0 rounded-xl border px-3 py-2 text-left transition ${selectedSlotGroup === index ? "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/20" : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50"}`}><span className="block text-[11px] font-bold uppercase tracking-wide opacity-75">{index === 0 ? "Próximo" : `Fecha ${index + 1}`}</span><span className="block text-sm font-black capitalize">{label(slots[0], false)}</span></button>)}</div>
+                  <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><button type="button" aria-label="Ver fecha anterior" disabled={selectedSlotGroup === 0} onClick={() => setSelectedSlotGroup((current) => Math.max(0, current - 1))} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35"><ChevronLeft className="h-4 w-4" /></button><p className="capitalize text-center text-sm font-black text-slate-950">{visibleSlots[0] ? label(visibleSlots[0], false) : ""}</p><button type="button" aria-label="Ver fecha siguiente" disabled={selectedSlotGroup === groupedSlots.length - 1} onClick={() => setSelectedSlotGroup((current) => Math.min(groupedSlots.length - 1, current + 1))} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35"><ChevronRight className="h-4 w-4" /></button></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{visibleSlots.map((slot) => <button key={slot} type="button" disabled={loading} onClick={() => void book(slot)} className="rounded-xl border border-blue-100 bg-white px-3 py-3 text-sm font-black text-blue-800 transition hover:-translate-y-0.5 hover:border-blue-500 hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-600/20 disabled:cursor-not-allowed disabled:opacity-50">{timeLabel(slot)}</button>)}</div></section>
+                </div> : <div className="mt-3 rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">No hay horarios disponibles por el momento. Volvé a intentar más tarde.</div>}
               </div>
             </div> : <div className="mt-6 flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" /><p className="text-sm leading-6 text-slate-600">Para cuidar tu servicio, verificamos que la suscripción esté activa antes de mostrar los horarios.</p></div>}
           </div>
