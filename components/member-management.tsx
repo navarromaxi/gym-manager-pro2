@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/table";
 import { Plus, Edit, Trash2, Search, CalendarClock, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
 import { detectContractTable } from "@/lib/contract-table";
 import type { ContractTableName } from "@/lib/contract-table";
@@ -282,6 +283,27 @@ export function MemberManagement({
     );
   };
 
+  const syncMemberWithFusionar = async (memberId: string) => {
+    try {
+      const response = await authenticatedFetch("/api/facial-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gymId, action: "sync_members", memberId }),
+      });
+      if (response.status === 403) return null;
+
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string; failures?: string[] }
+        | null;
+      if (!response.ok || payload?.failures?.length) {
+        return payload?.error ?? payload?.failures?.[0] ?? "No se pudo sincronizar con Fusionar.";
+      }
+      return null;
+    } catch {
+      return "El socio quedó guardado, pero no se pudo sincronizar con Fusionar.";
+    }
+  };
+
   const handleAddMember = async () => {
     try {
       const startDate = new Date(newMember.planStartDate);
@@ -412,6 +434,11 @@ export function MemberManagement({
       setMembers([...members, member]);
       setPayments([...payments, payment]);
 
+      const fusionarError = await syncMemberWithFusionar(member.id);
+      if (fusionarError) {
+        alert(`El socio se creó, pero quedó pendiente de sincronización facial: ${fusionarError}`);
+      }
+
       setNewMember(createInitialNewMember());
       setIsAddDialogOpen(false);
     } catch (error) {
@@ -485,6 +512,10 @@ export function MemberManagement({
       setMembers(updatedMembers);
       setPayments(updatedPayments);
       setCustomPlans(updatedCustomPlans);
+      const fusionarError = await syncMemberWithFusionar(editingMember.id);
+      if (fusionarError) {
+        alert(`Los cambios del socio se guardaron, pero quedaron pendientes de sincronización facial: ${fusionarError}`);
+      }
       setIsEditDialogOpen(false);
       setEditingMember(null);
     } catch (error) {
