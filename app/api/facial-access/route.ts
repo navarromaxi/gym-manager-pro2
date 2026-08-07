@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase-server";
 const querySchema = z.object({ gymId: z.string().min(1) });
 const bodySchema = z.object({
   gymId: z.string().min(1),
-  action: z.enum(["connection_check", "sync_members", "sync_accesses"]),
+  action: z.enum(["connection_check", "sync_members", "sync_pending_members", "sync_accesses"]),
   memberId: z.string().min(1).optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -223,7 +223,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Solicitud facial invalida." }, { status: 400 });
   }
 
-  const authorization = await authorizeGymRequest(request, parsed.data.gymId);
+  const isInternalCron = Boolean(
+    process.env.CRON_SECRET &&
+      request.headers.get("x-fusionar-cron-secret") === process.env.CRON_SECRET
+  );
+  const authorization = isInternalCron
+    ? { gymId: parsed.data.gymId }
+    : await authorizeGymRequest(request, parsed.data.gymId);
   if ("error" in authorization) return authorization.error;
 
   const supabase = createClient();
@@ -440,9 +446,24 @@ export async function POST(request: Request) {
     const { data: members, error: membersError } = await memberQuery;
     if (membersError) throw new Error("No se pudieron leer los socios para sincronizar.");
 
-    const eligibleMembers = ((members ?? []) as LocalMember[]).filter(
+    let eligibleMembers = ((members ?? []) as LocalMember[]).filter(
       (member) => normalizeCedula(member.cedula).length >= 6
     );
+    if (parsed.data.action === "sync_pending_members") {
+      const { data: links, error: linksError } = await supabase
+        .from("fusionar_member_links")
+        .select("member_id, sync_status")
+        .eq("gym_id", parsed.data.gymId);
+      if (linksError) throw new Error("No se pudieron comprobar los socios ya vinculados.");
+
+      const linkedMembers = new Map(
+        (links ?? []).map((link) => [link.member_id, link.sync_status])
+      );
+      eligibleMembers = eligibleMembers.filter((member) => {
+        const syncStatus = linkedMembers.get(member.id);
+        return !syncStatus || syncStatus === "error";
+      });
+    }
     const { data: run } = await supabase
       .from("fusionar_sync_runs")
       .insert({

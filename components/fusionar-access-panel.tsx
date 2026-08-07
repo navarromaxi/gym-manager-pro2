@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BadgeCheck, Fingerprint, RefreshCcw, ShieldCheck } from "lucide-react";
 
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
@@ -33,6 +33,7 @@ export function FusionarAccessPanel({ gymId }: { gymId: string }) {
   const [syncingMembers, setSyncingMembers] = useState(false);
   const [syncingAccesses, setSyncingAccesses] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const pendingSyncAttemptedForGym = useRef<string | null>(null);
 
   const load = async () => {
     if (!gymId) return;
@@ -54,6 +55,36 @@ export function FusionarAccessPanel({ gymId }: { gymId: string }) {
   useEffect(() => {
     load();
   }, [gymId]);
+
+  useEffect(() => {
+    const ready = Boolean(
+      status?.enabled && status.configured && status.accessConfigured && status.credentialsConfigured
+    );
+    if (!ready || pendingSyncAttemptedForGym.current === gymId) return;
+
+    pendingSyncAttemptedForGym.current = gymId;
+    const syncPendingMembers = async () => {
+      setSyncingMembers(true);
+      try {
+        const response = await authenticatedFetch("/api/facial-access", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ gymId, action: "sync_pending_members" }),
+        });
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+          setMessage(payload?.error ?? "No se pudieron sincronizar los socios pendientes automáticamente.");
+        }
+        await load();
+      } catch {
+        setMessage("No se pudieron sincronizar los socios pendientes automáticamente.");
+      } finally {
+        setSyncingMembers(false);
+      }
+    };
+
+    void syncPendingMembers();
+  }, [gymId, status?.enabled, status?.configured, status?.accessConfigured, status?.credentialsConfigured]);
 
   const syncMembers = async () => {
     const confirmed = window.confirm(
