@@ -30,7 +30,6 @@ const formatDate = (value?: string | null) => {
 export function FusionarAccessPanel({ gymId }: { gymId: string }) {
   const [status, setStatus] = useState<FusionarStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [checking, setChecking] = useState(false);
   const [syncingMembers, setSyncingMembers] = useState(false);
   const [syncingAccesses, setSyncingAccesses] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -55,25 +54,6 @@ export function FusionarAccessPanel({ gymId }: { gymId: string }) {
   useEffect(() => {
     load();
   }, [gymId]);
-
-  const checkConnection = async () => {
-    setChecking(true);
-    setMessage(null);
-    try {
-      const response = await authenticatedFetch("/api/facial-access", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gymId, action: "connection_check" }),
-      });
-      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
-      setMessage(payload?.message ?? payload?.error ?? "No se pudo comprobar la conexión.");
-      await load();
-    } catch {
-      setMessage("No se pudo comprobar la conexión.");
-    } finally {
-      setChecking(false);
-    }
-  };
 
   const syncMembers = async () => {
     const confirmed = window.confirm(
@@ -162,27 +142,43 @@ export function FusionarAccessPanel({ gymId }: { gymId: string }) {
           </p>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-white/90 p-3">
-          <div className="flex items-start gap-2 text-sm text-slate-700">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
-            <span>
-              El enrolamiento facial se realiza presencialmente en el equipo de Fusionar. Este panel no almacena fotos biométricas.
-            </span>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+            <div className="flex items-start gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white shadow-sm">
+                <Fingerprint className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-slate-950">Socios sincronizados automáticamente</p>
+                <p className="mt-1 text-sm leading-5 text-slate-600">Las altas, cambios y renovaciones se envían a Fusionar sin pasos extra.</p>
+                <Button type="button" variant="ghost" className="mt-2 h-8 px-0 text-xs font-semibold text-emerald-800 hover:bg-transparent hover:text-emerald-950" onClick={syncMembers} disabled={!ready || syncingMembers || syncingAccesses}>
+                  <RefreshCcw className={`mr-1.5 h-3.5 w-3.5 ${syncingMembers ? "animate-spin" : ""}`} />
+                  {syncingMembers ? "Sincronizando..." : "Sincronizar pendientes"}
+                </Button>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={checkConnection} disabled={!ready || checking || syncingMembers || syncingAccesses}>
-              <RefreshCcw className={`mr-2 h-4 w-4 ${checking ? "animate-spin" : ""}`} />
-              {checking ? "Comprobando..." : "Probar conexión"}
-            </Button>
-            <Button type="button" onClick={syncMembers} disabled={!ready || checking || syncingMembers || syncingAccesses}>
-              <Fingerprint className={`mr-2 h-4 w-4 ${syncingMembers ? "animate-pulse" : ""}`} />
-              {syncingMembers ? "Sincronizando..." : "Sincronizar socios"}
-            </Button>
-            <Button type="button" variant="outline" onClick={syncAccesses} disabled={!ready || checking || syncingMembers || syncingAccesses}>
-              <RefreshCcw className={`mr-2 h-4 w-4 ${syncingAccesses ? "animate-spin" : ""}`} />
-              {syncingAccesses ? "Importando..." : "Importar accesos"}
-            </Button>
+
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+            <div className="flex items-start gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-700 text-white shadow-sm">
+                <RefreshCcw className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-slate-950">Historial de ingresos</p>
+                <p className="mt-1 text-sm leading-5 text-slate-600">Actualiza las pasadas registradas por el molinete en los reportes del gimnasio.</p>
+                <Button type="button" variant="ghost" className="mt-2 h-8 px-0 text-xs font-semibold text-blue-800 hover:bg-transparent hover:text-blue-950" onClick={syncAccesses} disabled={!ready || syncingMembers || syncingAccesses}>
+                  <RefreshCcw className={`mr-1.5 h-3.5 w-3.5 ${syncingAccesses ? "animate-spin" : ""}`} />
+                  {syncingAccesses ? "Actualizando..." : "Actualizar ingresos"}
+                </Button>
+              </div>
+            </div>
           </div>
+        </div>
+
+        <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+          <span>El enrolamiento facial se realiza presencialmente en el equipo de Fusionar. Este panel no almacena fotos biométricas.</span>
         </div>
         {message ? (
           <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-950">{message}</p>
