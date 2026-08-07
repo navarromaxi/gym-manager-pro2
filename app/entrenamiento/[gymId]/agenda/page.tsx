@@ -1,12 +1,27 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { CalendarDays, CheckCircle2, Clock3, Loader2 } from "lucide-react";
+import { FormEvent, useMemo, useState } from "react";
+import { ArrowRight, CalendarDays, CheckCircle2, Clock3, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 
 type Data = { clientName: string; slots: string[]; appointments: string[] };
 
-function label(value: string) {
-  return new Intl.DateTimeFormat("es-UY", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Montevideo" }).format(new Date(value));
+function label(value: string, includeTime = true) {
+  return new Intl.DateTimeFormat("es-UY", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    ...(includeTime ? { hour: "2-digit", minute: "2-digit", hour12: false } : {}),
+    timeZone: "America/Montevideo",
+  }).format(new Date(value));
+}
+
+function timeLabel(value: string) {
+  return new Intl.DateTimeFormat("es-UY", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "America/Montevideo",
+  }).format(new Date(value));
 }
 
 export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{ gymId: string }> }) {
@@ -16,25 +31,143 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
+  const groupedSlots = useMemo(() => {
+    const grouped = new Map<string, string[]>();
+    data?.slots.forEach((slot) => {
+      const key = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Montevideo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date(slot));
+      grouped.set(key, [...(grouped.get(key) ?? []), slot]);
+    });
+    return [...grouped.values()];
+  }, [data]);
+
   const load = async (event: FormEvent) => {
-    event.preventDefault(); setLoading(true); setMessage("");
-    const id = gymId || (await params).gymId; setGymId(id);
+    event.preventDefault();
+    setLoading(true);
+    setMessage("");
+    const id = gymId || (await params).gymId;
+    setGymId(id);
     const response = await fetch(`/api/public-online-training/${id}/appointments?cedula=${encodeURIComponent(cedula)}`);
     const body = await response.json() as Data & { error?: string };
     setLoading(false);
     if (!response.ok) return setMessage(body.error || "No pudimos cargar la agenda.");
     setData(body);
   };
+
   const book = async (startsAt: string) => {
-    setLoading(true); setMessage("");
+    setLoading(true);
+    setMessage("");
     const id = gymId || (await params).gymId;
-    const response = await fetch(`/api/public-online-training/${id}/appointments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cedula, startsAt }) });
+    const response = await fetch(`/api/public-online-training/${id}/appointments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cedula, startsAt }),
+    });
     const body = await response.json() as { error?: string };
     setLoading(false);
     if (!response.ok) return setMessage(body.error || "No pudimos confirmar el turno.");
-    setMessage("Turno confirmado. Guardá este horario; el profesor tendrá registrada tu reserva.");
+    setMessage("Tu reunión quedó confirmada. Te enviaremos un recordatorio antes de la llamada.");
     await load({ preventDefault() {} } as FormEvent);
   };
 
-  return <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe,_#f8fafc_48%,_#e2e8f0)] p-5 sm:p-10"><section className="mx-auto max-w-3xl"><header className="text-center"><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-blue-600 text-white shadow-lg"><CalendarDays className="h-7 w-7" /></span><p className="mt-5 text-sm font-bold uppercase tracking-[0.22em] text-blue-600">Llamada inicial</p><h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">Elegí tu horario</h1><p className="mx-auto mt-3 max-w-xl text-slate-600">Las llamadas son de 30 minutos, lunes, miércoles y jueves de 18:00 a 20:00.</p></header><form onSubmit={load} className="mx-auto mt-8 max-w-xl rounded-3xl border border-blue-100 bg-white p-5 shadow-xl"><label className="block text-sm font-bold text-slate-800">Ingresá tu cédula</label><div className="mt-2 flex gap-2"><input value={cedula} onChange={(event) => setCedula(event.target.value)} required placeholder="Sin puntos ni guiones" className="h-12 min-w-0 flex-1 rounded-xl border-2 border-blue-200 bg-white px-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /><button disabled={loading} className="rounded-xl bg-blue-600 px-5 font-bold text-white hover:bg-blue-700 disabled:bg-blue-300">{loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Ver horarios"}</button></div></form>{message && <p className="mx-auto mt-5 max-w-xl rounded-xl border border-blue-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700">{message}</p>}{data && <section className="mt-7 rounded-3xl border border-slate-200 bg-white p-5 shadow-xl sm:p-7"><div className="flex items-center gap-3"><CheckCircle2 className="h-6 w-6 text-emerald-500" /><div><h2 className="font-bold text-slate-950">Hola, {data.clientName}</h2><p className="text-sm text-slate-600">Seleccioná el turno que te quede mejor.</p></div></div>{data.appointments.length > 0 && <div className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900"><strong>Ya tenés agendado:</strong> {data.appointments.map(label).join(", ")}</div>}<div className="mt-5 grid gap-3 sm:grid-cols-2">{data.slots.map((slot) => <button key={slot} disabled={loading} onClick={() => void book(slot)} className="flex items-center justify-between rounded-xl border-2 border-blue-100 bg-white p-4 text-left transition hover:border-blue-500 hover:bg-blue-50"><span className="capitalize font-semibold text-slate-950">{label(slot)}</span><Clock3 className="h-5 w-5 text-blue-600" /></button>)}</div></section>}</section></main>;
+  return (
+    <main className="relative min-h-screen overflow-hidden bg-[#07152b] px-4 py-6 text-slate-950 sm:px-6 sm:py-10">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-32 -top-28 h-96 w-96 rounded-full bg-blue-500/25 blur-3xl" />
+        <div className="absolute -bottom-36 right-[-8rem] h-[30rem] w-[30rem] rounded-full bg-cyan-400/15 blur-3xl" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.05)_1px,transparent_1px)] bg-[size:32px_32px]" />
+      </div>
+
+      <div className="relative mx-auto max-w-6xl">
+        <header className="flex items-center justify-between py-3 text-white sm:py-5">
+          <div className="flex items-center gap-3">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-white/10 shadow-lg shadow-blue-950/30 backdrop-blur">
+              <Sparkles className="h-5 w-5 text-cyan-200" />
+            </span>
+            <div>
+              <p className="text-sm font-black tracking-tight">ManagerPro</p>
+              <p className="text-xs text-blue-200">Entrenamiento personalizado</p>
+            </div>
+          </div>
+          <span className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-xs font-bold text-emerald-100 sm:inline-flex">Seguimiento mensual</span>
+        </header>
+
+        <section className="grid items-start gap-8 py-8 lg:grid-cols-[0.86fr_1.14fr] lg:py-16">
+          <div className="pt-2 text-white lg:pt-12">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200/20 bg-cyan-200/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.18em] text-cyan-100">
+              <CalendarDays className="h-3.5 w-3.5" /> Tu espacio de seguimiento
+            </div>
+            <h1 className="mt-6 max-w-xl text-4xl font-black leading-[1.02] tracking-tight sm:text-5xl">
+              Elegí el momento para avanzar.
+            </h1>
+            <p className="mt-5 max-w-lg text-base leading-7 text-slate-300 sm:text-lg">
+              Reservá tu encuentro individual de 30 minutos con el profesor y llevá tu plan al siguiente nivel.
+            </p>
+            <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              {[
+                ["01", "Ingresá tu cédula", "Identificamos tu suscripción."],
+                ["02", "Elegí un horario", "Mostramos espacios disponibles."],
+                ["03", "Confirmá tu lugar", "Recibís el recordatorio."],
+              ].map(([number, title, description]) => (
+                <div key={number} className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
+                  <span className="text-xs font-black text-cyan-200">{number}</span>
+                  <p className="mt-3 text-sm font-bold text-white">{title}</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-300">{description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/70 bg-white p-5 shadow-[0_28px_80px_rgba(2,12,27,0.42)] sm:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Tu reunión</p>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">Agendá tu llamada</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">Lunes, miércoles y jueves · 18:00 a 20:00</p>
+              </div>
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/25"><Clock3 className="h-5 w-5" /></span>
+            </div>
+
+            <form onSubmit={load} className="mt-7 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+              <label className="text-sm font-bold text-slate-800">Tu cédula</label>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={cedula}
+                  onChange={(event) => setCedula(event.target.value)}
+                  required
+                  placeholder="Sin puntos ni guiones"
+                  className="h-12 min-w-0 flex-1 rounded-xl border-2 border-slate-200 bg-white px-4 text-base font-semibold text-slate-950 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                />
+                <button disabled={loading} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300">
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Ver horarios <ArrowRight className="h-4 w-4" /></>}
+                </button>
+              </div>
+            </form>
+
+            {message ? <p className={`mt-4 rounded-xl border px-4 py-3 text-sm font-medium ${message.startsWith("Tu reunión") ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>{message}</p> : null}
+
+            {data ? <div className="mt-6 space-y-5">
+              <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><CheckCircle2 className="h-5 w-5" /></span>
+                <div><p className="font-bold text-slate-950">Hola, {data.clientName}</p><p className="text-sm text-slate-600">Elegí el horario que te resulte más cómodo.</p></div>
+              </div>
+
+              {data.appointments.length > 0 ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">Tu próxima reunión</p><p className="mt-2 capitalize font-bold text-emerald-950">{data.appointments.map((appointment) => label(appointment)).join(", ")}</p></div> : null}
+
+              <div>
+                <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-black text-slate-950">Horarios disponibles</h3><span className="text-xs font-semibold text-slate-500">30 min por reunión</span></div>
+                {groupedSlots.length ? <div className="mt-3 space-y-3">{groupedSlots.map((slots) => <section key={slots[0]} className="rounded-2xl border border-slate-200 p-4"><p className="capitalize text-sm font-bold text-slate-800">{label(slots[0], false)}</p><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{slots.map((slot) => <button key={slot} type="button" disabled={loading} onClick={() => void book(slot)} className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-3 text-sm font-black text-blue-800 transition hover:-translate-y-0.5 hover:border-blue-500 hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-600/20 disabled:cursor-not-allowed disabled:opacity-50">{timeLabel(slot)}</button>)}</div></section>)}</div> : <div className="mt-3 rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">No hay horarios disponibles por el momento. Volvé a intentar más tarde.</div>}
+              </div>
+            </div> : <div className="mt-6 flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" /><p className="text-sm leading-6 text-slate-600">Para cuidar tu servicio, verificamos que la suscripción esté activa antes de mostrar los horarios.</p></div>}
+          </div>
+        </section>
+
+        <footer className="flex flex-col items-center justify-between gap-3 border-t border-white/10 py-6 text-center text-xs text-slate-400 sm:flex-row sm:text-left"><span>© {new Date().getFullYear()} ManagerPro · Entrenamiento online</span><span>Tu información se utiliza únicamente para gestionar tu seguimiento.</span></footer>
+      </div>
+    </main>
+  );
 }
