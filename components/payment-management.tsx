@@ -789,6 +789,25 @@ export function PaymentManagement({
   >([]);
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [invoiceSuccess, setInvoiceSuccess] = useState<string | null>(null);
+  const syncMemberWithFusionar = async (memberId: string) => {
+    try {
+      const response = await authenticatedFetch("/api/facial-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gymId, action: "sync_members", memberId }),
+      });
+      if (response.status === 403) return null;
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string; failures?: string[] }
+        | null;
+      if (!response.ok || payload?.failures?.length) {
+        return payload?.error ?? payload?.failures?.[0] ?? "No se pudo sincronizar con Fusionar.";
+      }
+      return null;
+    } catch {
+      return "El pago se registró, pero no se pudo sincronizar con Fusionar.";
+    }
+  };
   const appendClientDebugStep = useCallback(
     (step: string, data?: unknown) => {
       setInvoiceDebugSteps((previous) => [
@@ -2204,6 +2223,13 @@ export function PaymentManagement({
         if (paymentError) throw paymentError;
 
         setPayments([...payments, payment]);
+      }
+
+      if (selectedMember && ["new_plan", "existing_plan"].includes(newPayment.type)) {
+        const fusionarError = await syncMemberWithFusionar(selectedMember.id);
+        if (fusionarError) {
+          alert(`El pago se registró, pero el socio quedó pendiente de sincronización facial: ${fusionarError}`);
+        }
       }
 
       // Limpiar formulario

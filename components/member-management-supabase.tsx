@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/table";
 import { Plus, Edit, Trash2, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import type { Member, Payment, Plan } from "@/lib/supabase";
 import { TableVirtuoso } from "react-virtuoso";
 
@@ -88,6 +89,32 @@ export function MemberManagement({
     cardInstallments: 1,
     description: "",
   });
+
+  // La integración es opcional por gimnasio. Cuando está habilitada, el socio
+  // se replica inmediatamente después de guardar el cambio local; un fallo
+  // externo nunca revierte el alta o edición ya confirmada en GymManagerPro.
+  const syncMemberWithFusionar = async (memberId: string) => {
+    try {
+      const response = await authenticatedFetch("/api/facial-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gymId, action: "sync_members", memberId }),
+      });
+
+      // La mayoría de los gimnasios no usan acceso facial: no es un error.
+      if (response.status === 403) return null;
+
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string; failures?: string[] }
+        | null;
+      if (!response.ok || payload?.failures?.length) {
+        return payload?.error ?? payload?.failures?.[0] ?? "No se pudo sincronizar con Fusionar.";
+      }
+      return null;
+    } catch {
+      return "El socio quedó guardado, pero no se pudo sincronizar con Fusionar.";
+    }
+  };
 
   // Estados de paginación (solo se usan si serverPaging=true)
   const [page, setPage] = useState(1);
@@ -416,6 +443,11 @@ export function MemberManagement({
         setTotalRows((prev) => prev + 1);
       }
 
+      const fusionarError = await syncMemberWithFusionar(member.id);
+      if (fusionarError) {
+        alert(`El socio se creó, pero quedó pendiente de sincronización facial: ${fusionarError}`);
+      }
+
       setNewMember({
         name: "",
         email: "",
@@ -484,6 +516,10 @@ export function MemberManagement({
         setPagedMembers((prev) =>
           prev.map((m) => (m.id === editingMember.id ? updatedMember : m))
         );
+      }
+      const fusionarError = await syncMemberWithFusionar(updatedMember.id);
+      if (fusionarError) {
+        alert(`Los cambios del socio se guardaron, pero quedaron pendientes de sincronización facial: ${fusionarError}`);
       }
       setIsEditDialogOpen(false);
       setEditingMember(null);
