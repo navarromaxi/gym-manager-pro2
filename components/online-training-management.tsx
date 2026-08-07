@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, CheckCircle2, ClipboardCopy, ClipboardList, ExternalLink, Loader2, RefreshCw, Users } from "lucide-react";
+import { CalendarClock, CheckCircle2, ClipboardCopy, ClipboardList, ExternalLink, Loader2, Pencil, RefreshCw, Users } from "lucide-react";
 import { supabase, insertMemberWithFallback } from "@/lib/supabase";
 import { PersonalizedRoutineBuilder, type CreatedPersonalizedRoutine, type RoutineMemberSearch } from "@/features/routines/components/personalized-routine-builder";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ type OnlineClient = {
   linked_member_id: string | null; linked_routine_id: string | null;
 };
 type Appointment = { client_id: string; starts_at: string; status: string };
-type RoutineInfo = { id: string; name: string; valid_from: string | null; valid_until: string | null; public_share_token: string | null; public_link_enabled: boolean | null };
+type RoutineInfo = { id: string; name: string; valid_from: string | null; valid_until: string | null; public_share_token: string | null; public_link_enabled: boolean | null; [key: string]: unknown };
 
 const statusLabel: Record<string, string> = { pending_payment: "Pendiente de pago", active: "Activo", payment_due: "Pago próximo", grace: "En espera de pago", expired: "Vencido", cancelled: "Cancelado" };
 const statusClass: Record<string, string> = { pending_payment: "bg-amber-100 text-amber-900", active: "bg-emerald-100 text-emerald-900", payment_due: "bg-blue-100 text-blue-900", grace: "bg-orange-100 text-orange-900", expired: "bg-rose-100 text-rose-900", cancelled: "bg-slate-200 text-slate-800" };
@@ -32,7 +32,7 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
-  const [routineTarget, setRoutineTarget] = useState<{ client: OnlineClient; member: RoutineMemberSearch } | null>(null);
+  const [routineTarget, setRoutineTarget] = useState<{ client: OnlineClient; member: RoutineMemberSearch; initialRoutine?: CreatedPersonalizedRoutine } | null>(null);
   const [creating, setCreating] = useState<string | null>(null);
   const publicUrl = typeof window === "undefined" ? "" : `${window.location.origin}/entrenamiento/${gymId}`;
 
@@ -51,7 +51,7 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
     const routineIds = loadedClients.map((client) => client.linked_routine_id).filter(Boolean) as string[];
     let routineMap: Record<string, RoutineInfo> = {};
     if (routineIds.length) {
-      const { data } = await supabase.from("routines").select("id, name, valid_from, valid_until, public_share_token, public_link_enabled").in("id", routineIds);
+      const { data } = await supabase.from("routines").select("*").in("id", routineIds);
       routineMap = Object.fromEntries(((data ?? []) as RoutineInfo[]).map((routine) => [routine.id, routine]));
     }
     setPrice(configResult.data?.monthly_price ?? 549);
@@ -95,6 +95,37 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
     setRoutineTarget({ client, member });
     setCreating(null);
   };
+  const editRoutine = (client: OnlineClient, routine: RoutineInfo) => {
+    const raw = routine as Record<string, any>;
+    const member: RoutineMemberSearch = {
+      id: String(raw.member_id ?? client.linked_member_id ?? client.id),
+      name: client.full_name,
+      cedula: client.cedula,
+      email: client.email,
+      phone: client.phone,
+    };
+    const initialRoutine: CreatedPersonalizedRoutine = {
+      id: routine.id,
+      name: routine.name,
+      description: String(raw.description ?? ""),
+      targetAudience: String(raw.target_audience ?? "Rutina personalizada"),
+      difficulty: raw.difficulty === "Principiante" || raw.difficulty === "Avanzado" ? raw.difficulty : "Intermedio",
+      duration: Number(raw.duration ?? 60),
+      exercises: Array.isArray(raw.exercises) ? raw.exercises : [],
+      createdDate: String(raw.created_date ?? new Date().toISOString().slice(0, 10)),
+      createdBy: String(raw.created_by ?? "Usuario Actual"),
+      memberId: member.id,
+      weeklyPlan: raw.weekly_plan ?? {},
+      validFrom: raw.valid_from ?? null,
+      validUntil: raw.valid_until ?? null,
+      dayIntensities: raw.day_intensities ?? {},
+      planCycle: raw.plan_cycle === "monthly" || raw.plan_cycle === "biweekly" ? raw.plan_cycle : "weekly",
+      cyclePlan: raw.cycle_plan ?? {},
+      publicShareToken: raw.public_share_token ?? null,
+      publicLinkEnabled: raw.public_link_enabled ?? true,
+    };
+    setRoutineTarget({ client, member, initialRoutine });
+  };
   const onRoutineSaved = async (routine: CreatedPersonalizedRoutine) => {
     if (!routineTarget) return;
     const { error } = await supabase.from("online_training_clients").update({ linked_member_id: routine.memberId, linked_routine_id: routine.id }).eq("id", routineTarget.client.id).eq("gym_id", gymId);
@@ -123,13 +154,13 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
           const appointment = nextAppointment(client.id); const routine = client.linked_routine_id ? routines[client.linked_routine_id] : null;
           const routineLink = routine?.public_share_token && routine.public_link_enabled ? `${window.location.origin}/rutina/${routine.public_share_token}` : null;
           return <article key={client.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex flex-col justify-between gap-4 lg:flex-row"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-bold text-slate-950">{client.full_name}</h3><Badge className={statusClass[client.status] ?? "bg-slate-200 text-slate-800"}>{statusLabel[client.status] ?? client.status}</Badge>{routine && <Badge className="bg-emerald-100 text-emerald-900"><CheckCircle2 className="mr-1 h-3 w-3" />Rutina entregada</Badge>}</div><p className="mt-1 text-sm text-slate-600">{client.cedula} · {client.email}{client.phone ? ` · ${client.phone}` : ""}</p>{appointment ? <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-blue-800"><CalendarClock className="h-4 w-4" />Próxima entrevista: {dateLabel(appointment.starts_at)} · {new Date(appointment.starts_at).toLocaleTimeString("es-UY", { hour: "2-digit", minute: "2-digit" })}</p> : <p className="mt-2 text-sm text-slate-500">Sin entrevista futura agendada.</p>}{routine && <p className="mt-2 text-sm text-slate-700"><strong>{routine.name}</strong>{routine.valid_from ? ` · desde ${dateLabel(routine.valid_from)}` : ""}{routine.valid_until ? ` hasta ${dateLabel(routine.valid_until)}` : ""}</p>}</div><div className="flex flex-wrap items-center gap-2"><Select value={client.status} onValueChange={(status) => void updateClient(client, { status })}><SelectTrigger className="w-44 rounded-xl border-slate-300 bg-white text-slate-950"><SelectValue /></SelectTrigger><SelectContent className="bg-white text-slate-950">{Object.entries(statusLabel).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select><Button onClick={() => void startRoutine(client)} disabled={creating === client.id} className="rounded-xl bg-blue-600 text-white hover:bg-blue-700">{creating === client.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ClipboardList className="mr-2 h-4 w-4" />}{routine ? "Nueva rutina" : "Crear rutina"}</Button>{routineLink && <Button variant="outline" onClick={() => void copy(routineLink, "Link de rutina copiado.")} className="rounded-xl border-blue-200 bg-white text-blue-700 hover:bg-blue-50"><ExternalLink className="mr-2 h-4 w-4" />Copiar rutina</Button>}</div></div>
+            <div className="flex flex-col justify-between gap-4 lg:flex-row"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-bold text-slate-950">{client.full_name}</h3><Badge className={statusClass[client.status] ?? "bg-slate-200 text-slate-800"}>{statusLabel[client.status] ?? client.status}</Badge>{routine && <Badge className="bg-emerald-100 text-emerald-900"><CheckCircle2 className="mr-1 h-3 w-3" />Rutina entregada</Badge>}</div><p className="mt-1 text-sm text-slate-600">{client.cedula} · {client.email}{client.phone ? ` · ${client.phone}` : ""}</p>{appointment ? <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-blue-800"><CalendarClock className="h-4 w-4" />Próxima entrevista: {dateLabel(appointment.starts_at)} · {new Date(appointment.starts_at).toLocaleTimeString("es-UY", { hour: "2-digit", minute: "2-digit" })}</p> : <p className="mt-2 text-sm text-slate-500">Sin entrevista futura agendada.</p>}{routine && <p className="mt-2 text-sm text-slate-700"><strong>{routine.name}</strong>{routine.valid_from ? ` · desde ${dateLabel(routine.valid_from)}` : ""}{routine.valid_until ? ` hasta ${dateLabel(routine.valid_until)}` : ""}</p>}</div><div className="flex flex-wrap items-center gap-2"><Select value={client.status} onValueChange={(status) => void updateClient(client, { status })}><SelectTrigger className="w-44 rounded-xl border-slate-300 bg-white text-slate-950"><SelectValue /></SelectTrigger><SelectContent className="bg-white text-slate-950">{Object.entries(statusLabel).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select>{routine && <Button variant="outline" onClick={() => editRoutine(client, routine)} className="rounded-xl border-blue-200 bg-white text-blue-700 hover:bg-blue-50"><Pencil className="mr-2 h-4 w-4" />Editar rutina</Button>}<Button onClick={() => void startRoutine(client)} disabled={creating === client.id} className="rounded-xl bg-blue-600 text-white hover:bg-blue-700">{creating === client.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ClipboardList className="mr-2 h-4 w-4" />}{routine ? "Nueva rutina" : "Crear rutina"}</Button>{routineLink && <Button variant="outline" onClick={() => void copy(routineLink, "Link de rutina copiado.")} className="rounded-xl border-blue-200 bg-white text-blue-700 hover:bg-blue-50"><ExternalLink className="mr-2 h-4 w-4" />Copiar rutina</Button>}</div></div>
             <Textarea value={client.internal_notes ?? ""} onChange={(event) => setClients((current) => current.map((item) => item.id === client.id ? { ...item, internal_notes: event.target.value } : item))} onBlur={(event) => void updateClient(client, { internal_notes: event.target.value })} placeholder="Notas internas para el profesor" className="mt-4 min-h-16 rounded-xl border-slate-300 bg-white text-slate-950 placeholder:text-slate-400" />
             {Object.keys(client.intake ?? {}).length > 0 && <details className="mt-3 text-sm"><summary className="cursor-pointer font-semibold text-blue-700">Ver cuestionario inicial</summary><pre className="mt-2 overflow-x-auto rounded-xl bg-white p-3 text-xs text-slate-700">{JSON.stringify(client.intake, null, 2)}</pre></details>}
           </article>;
         })}</div>}</CardContent>
       </Card>
-      <Dialog open={Boolean(routineTarget)} onOpenChange={(open) => !open && setRoutineTarget(null)}><DialogContent className="max-h-[96vh] max-w-7xl overflow-y-auto border-0 bg-transparent p-0 shadow-none"><div className="rounded-3xl bg-slate-950 p-2"><PersonalizedRoutineBuilder gymId={gymId} members={routineTarget ? [routineTarget.member] : []} defaultMember={routineTarget?.member} onCancel={() => setRoutineTarget(null)} onSaved={(routine) => void onRoutineSaved(routine)} /></div></DialogContent></Dialog>
+      <Dialog open={Boolean(routineTarget)} onOpenChange={(open) => !open && setRoutineTarget(null)}><DialogContent className="max-h-[96vh] max-w-7xl overflow-y-auto border-0 bg-transparent p-0 shadow-none"><div className="rounded-3xl bg-slate-950 p-2"><PersonalizedRoutineBuilder gymId={gymId} members={routineTarget ? [routineTarget.member] : []} initialRoutine={routineTarget?.initialRoutine} defaultMember={routineTarget?.member} onCancel={() => setRoutineTarget(null)} onSaved={(routine) => void onRoutineSaved(routine)} /></div></DialogContent></Dialog>
     </div>
   );
 }
