@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, CheckCircle2, ClipboardCopy, ClipboardList, ExternalLink, Loader2, Pencil, RefreshCw, Trash2, Users } from "lucide-react";
+import { CalendarClock, CheckCircle2, ClipboardCopy, ClipboardList, Copy, ExternalLink, Loader2, Pencil, RefreshCw, Search, Trash2, Users } from "lucide-react";
 import { supabase, insertMemberWithFallback } from "@/lib/supabase";
 import { PersonalizedRoutineBuilder, type CreatedPersonalizedRoutine, type RoutineMemberSearch } from "@/features/routines/components/personalized-routine-builder";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,7 +32,10 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
-  const [routineTarget, setRoutineTarget] = useState<{ client: OnlineClient; member: RoutineMemberSearch; initialRoutine?: CreatedPersonalizedRoutine } | null>(null);
+  const [routineTarget, setRoutineTarget] = useState<{ client: OnlineClient; member: RoutineMemberSearch; initialRoutine?: CreatedPersonalizedRoutine; createAsNew?: boolean } | null>(null);
+  const [routineSetupTarget, setRoutineSetupTarget] = useState<{ client: OnlineClient; member: RoutineMemberSearch } | null>(null);
+  const [routineSetupMode, setRoutineSetupMode] = useState<"choose" | "copy">("choose");
+  const [templateQuery, setTemplateQuery] = useState("");
   const [creating, setCreating] = useState<string | null>(null);
   const [deletingRoutineId, setDeletingRoutineId] = useState<string | null>(null);
   const publicUrl = typeof window === "undefined" ? "" : `${window.location.origin}/entrenamiento/${gymId}`;
@@ -110,19 +113,14 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
       if (error) { setCreating(null); setMessage("No pudimos preparar el perfil del cliente para crear la rutina."); return; }
       await updateClient(client, { linked_member_id: member.id });
     }
-    setRoutineTarget({ client, member });
+    setRoutineSetupMode("choose");
+    setTemplateQuery("");
+    setRoutineSetupTarget({ client, member });
     setCreating(null);
   };
-  const editRoutine = (client: OnlineClient, routine: RoutineInfo) => {
+  const routineToBuilderInitial = (routine: RoutineInfo, member: RoutineMemberSearch): CreatedPersonalizedRoutine => {
     const raw = routine as Record<string, any>;
-    const member: RoutineMemberSearch = {
-      id: String(raw.member_id ?? client.linked_member_id ?? client.id),
-      name: client.full_name,
-      cedula: client.cedula,
-      email: client.email,
-      phone: client.phone,
-    };
-    const initialRoutine: CreatedPersonalizedRoutine = {
+    return {
       id: routine.id,
       name: routine.name,
       description: String(raw.description ?? ""),
@@ -142,7 +140,31 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
       publicShareToken: raw.public_share_token ?? null,
       publicLinkEnabled: raw.public_link_enabled ?? true,
     };
-    setRoutineTarget({ client, member, initialRoutine });
+  };
+  const editRoutine = (client: OnlineClient, routine: RoutineInfo) => {
+    const member: RoutineMemberSearch = {
+      id: String((routine as Record<string, any>).member_id ?? client.linked_member_id ?? client.id),
+      name: client.full_name,
+      cedula: client.cedula,
+      email: client.email,
+      phone: client.phone,
+    };
+    setRoutineTarget({ client, member, initialRoutine: routineToBuilderInitial(routine, member) });
+  };
+  const startBlankRoutine = () => {
+    if (!routineSetupTarget) return;
+    setRoutineTarget(routineSetupTarget);
+    setRoutineSetupTarget(null);
+  };
+  const useRoutineAsTemplate = (sourceRoutine: RoutineInfo) => {
+    if (!routineSetupTarget) return;
+    const initialRoutine = routineToBuilderInitial(sourceRoutine, routineSetupTarget.member);
+    initialRoutine.name = `${sourceRoutine.name} · ${routineSetupTarget.client.full_name}`;
+    initialRoutine.validFrom = null;
+    initialRoutine.validUntil = null;
+    initialRoutine.publicShareToken = null;
+    setRoutineTarget({ ...routineSetupTarget, initialRoutine, createAsNew: true });
+    setRoutineSetupTarget(null);
   };
   const deleteRoutine = async (client: OnlineClient, routine: RoutineInfo) => {
     if (!window.confirm(`¿Eliminar la rutina "${routine.name}"? Esta acción no se puede deshacer.`)) return;
@@ -166,6 +188,12 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
     if (error) { setMessage("La rutina se guardó, pero no pudimos vincularla al cliente."); return; }
     setRoutineTarget(null); setMessage("Rutina entregada y vinculada al cliente."); await load();
   };
+  const templateSources = useMemo(() => {
+    const normalized = templateQuery.trim().toLowerCase();
+    return clients
+      .filter((client) => client.id !== routineSetupTarget?.client.id && (routinesByClient[client.id] ?? []).length > 0)
+      .filter((client) => !normalized || [client.full_name, client.cedula, client.email].some((value) => value.toLowerCase().includes(normalized)));
+  }, [clients, routineSetupTarget?.client.id, routinesByClient, templateQuery]);
 
   return (
     <div className="space-y-6">
@@ -195,7 +223,31 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
           </article>;
         })}</div>}</CardContent>
       </Card>
-      <Dialog open={Boolean(routineTarget)} onOpenChange={(open) => !open && setRoutineTarget(null)}><DialogContent className="max-h-[96vh] max-w-7xl overflow-y-auto border-0 bg-transparent p-0 shadow-none"><div className="rounded-3xl bg-slate-950 p-2"><PersonalizedRoutineBuilder gymId={gymId} members={routineTarget ? [routineTarget.member] : []} initialRoutine={routineTarget?.initialRoutine} defaultMember={routineTarget?.member} onCancel={() => setRoutineTarget(null)} onSaved={(routine) => void onRoutineSaved(routine)} /></div></DialogContent></Dialog>
+      <Dialog open={Boolean(routineSetupTarget)} onOpenChange={(open) => { if (!open) { setRoutineSetupTarget(null); setRoutineSetupMode("choose"); setTemplateQuery(""); } }}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-3xl border-slate-200 bg-white p-6 text-slate-950 sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Preparar rutina para {routineSetupTarget?.client.full_name}</DialogTitle>
+            <DialogDescription className="text-slate-600">Elegí cómo querés comenzar. Después podrás revisar y ajustar todo antes de guardar.</DialogDescription>
+          </DialogHeader>
+          {routineSetupMode === "choose" ? <div className="grid gap-4 pt-3 sm:grid-cols-2">
+            <button type="button" onClick={startBlankRoutine} className="group rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white p-5 text-left transition hover:-translate-y-0.5 hover:border-blue-500 hover:shadow-lg">
+              <span className="mb-4 inline-flex rounded-xl bg-blue-600 p-3 text-white"><ClipboardList className="h-6 w-6" /></span>
+              <p className="text-lg font-bold">Crear rutina nueva</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Empezá desde cero y armá una planificación completamente personalizada.</p>
+            </button>
+            <button type="button" onClick={() => setRoutineSetupMode("copy")} className="group rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 text-left transition hover:-translate-y-0.5 hover:border-violet-500 hover:shadow-lg">
+              <span className="mb-4 inline-flex rounded-xl bg-violet-600 p-3 text-white"><Copy className="h-6 w-6" /></span>
+              <p className="text-lg font-bold">Copiar rutina de otro socio</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Usá una rutina ya creada como base y adaptala para este cliente.</p>
+            </button>
+          </div> : <div className="space-y-4 pt-3">
+            <div className="flex items-center justify-between gap-3"><div><p className="font-bold">Elegí una rutina para duplicar</p><p className="text-sm text-slate-600">La original no se modifica.</p></div><Button type="button" variant="outline" onClick={() => setRoutineSetupMode("choose")}>Volver</Button></div>
+            <div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><Input autoFocus value={templateQuery} onChange={(event) => setTemplateQuery(event.target.value)} placeholder="Buscar socio por nombre, cédula o email" className="h-11 rounded-xl border-slate-300 pl-9" /></div>
+            <div className="max-h-80 space-y-3 overflow-y-auto pr-1">{templateSources.length ? templateSources.map((sourceClient) => <div key={sourceClient.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><p className="font-bold text-slate-950">{sourceClient.full_name}</p><p className="mb-3 text-xs text-slate-600">{sourceClient.cedula} · {sourceClient.email}</p><div className="space-y-2">{(routinesByClient[sourceClient.id] ?? []).map((sourceRoutine) => <button type="button" key={sourceRoutine.id} onClick={() => useRoutineAsTemplate(sourceRoutine)} className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-3 text-left transition hover:border-violet-400 hover:bg-violet-50"><span><span className="block font-semibold text-slate-950">{sourceRoutine.name}</span><span className="text-xs text-slate-600">{sourceRoutine.valid_from ? `Desde ${dateLabel(sourceRoutine.valid_from)}` : "Sin fecha de inicio"}</span></span><Copy className="h-4 w-4 text-violet-600" /></button>)}</div></div>) : <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">No hay otras rutinas disponibles para copiar.</p>}</div>
+          </div>}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(routineTarget)} onOpenChange={(open) => !open && setRoutineTarget(null)}><DialogContent className="max-h-[96vh] max-w-7xl overflow-y-auto border-0 bg-transparent p-0 shadow-none"><div className="rounded-3xl bg-slate-950 p-2"><PersonalizedRoutineBuilder key={`${routineTarget?.client.id ?? ""}-${routineTarget?.initialRoutine?.id ?? "new"}-${routineTarget?.createAsNew ? "copy" : "edit"}`} gymId={gymId} members={routineTarget ? [routineTarget.member] : []} initialRoutine={routineTarget?.initialRoutine} createAsNew={routineTarget?.createAsNew} defaultMember={routineTarget?.member} onCancel={() => setRoutineTarget(null)} onSaved={(routine) => void onRoutineSaved(routine)} /></div></DialogContent></Dialog>
     </div>
   );
 }
