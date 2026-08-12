@@ -1,12 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createGoogleCalendarEvent, deleteGoogleCalendarEvent, getGoogleCalendarBusyIntervals } from "@/lib/google-calendar";
+import { ONLINE_TRAINING_MANAGEMENT_URL } from "@/lib/online-training-links";
 import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
 const DAYS = new Set([1, 3, 4]); // lunes, miércoles y jueves
 const HOURS = [18, 18.5, 19, 19.5];
+const publicCorsHeaders = {
+  "Access-Control-Allow-Origin": "https://www.pymessistemas.com",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  Vary: "Origin",
+};
+
+function publicJson(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, {
+    ...init,
+    headers: { ...publicCorsHeaders, ...init?.headers },
+  });
+}
+
+export function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: publicCorsHeaders });
+}
 
 async function sendAppointmentConfirmation(name: string, email: string, startsAt: Date) {
   const apiKey = process.env.RESEND_API_KEY;
@@ -27,7 +45,7 @@ async function sendAppointmentConfirmation(name: string, email: string, startsAt
       from,
       to: [email],
       subject: "Tu llamada con el profesor quedó agendada",
-      html: `<main style="font-family:Arial,sans-serif;background:#f1f5f9;padding:32px 16px;color:#0f172a"><section style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:24px;padding:32px"><p style="margin:0 0 10px;color:#2563eb;font-size:12px;font-weight:700;letter-spacing:1.8px">RUTINA PERSONALIZADA</p><h1 style="margin:0 0 18px;font-size:26px">Tu llamada quedó agendada</h1><p>Hola ${name}, reservamos tu turno para el <strong>${date}</strong>.</p><p>Te enviaremos un recordatorio antes de la llamada.</p><p style="margin:26px 0 0;color:#64748b;font-size:13px">PyMesSistemas · Entrenamiento online</p></section></main>`,
+      html: `<main style="font-family:Arial,sans-serif;background:#f1f5f9;padding:32px 16px;color:#0f172a"><section style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:24px;padding:32px"><p style="margin:0 0 10px;color:#2563eb;font-size:12px;font-weight:700;letter-spacing:1.8px">RUTINA PERSONALIZADA</p><h1 style="margin:0 0 18px;font-size:26px">Tu llamada quedó agendada</h1><p>Hola ${name}, reservamos tu turno para el <strong>${date}</strong>.</p><p>Te enviaremos un recordatorio antes de la llamada.</p><p style="margin:24px 0"><a href="${ONLINE_TRAINING_MANAGEMENT_URL}" style="display:inline-block;background:#2563eb;border-radius:10px;color:#ffffff;font-weight:700;padding:12px 18px;text-decoration:none">Gestionar mi reunión</a></p><p style="margin:0;color:#475569;font-size:14px">Si necesitás cambiar el horario, ingresá con tu cédula y elegí otro turno disponible.</p><p style="margin:26px 0 0;color:#64748b;font-size:13px">PyMesSistemas · Entrenamiento online</p></section></main>`,
     }),
   });
   return response.ok;
@@ -86,7 +104,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { gymId } = await params;
   const cedula = request.nextUrl.searchParams.get("cedula") || "";
   const client = await activeClient(gymId, cedula);
-  if (!client) return NextResponse.json({ error: "Necesitás una suscripción activa para agendar tu llamada." }, { status: 403 });
+  if (!client) return publicJson({ error: "Necesitás una suscripción activa para agendar tu llamada." }, { status: 403 });
   const now = new Date();
   const starts = availableStarts(now);
   let googleBusy: Array<{ start: string; end: string }> = [];
@@ -103,7 +121,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const taken = new Set((appointments || []).filter((appointment) => appointment.client_id !== client.id).map((appointment) => appointment.starts_at));
   const own = (appointments || []).filter((appointment) => appointment.client_id === client.id).map((appointment) => ({ id: appointment.id, startsAt: appointment.starts_at }));
   const monthsWithOwnAppointment = new Set(own.map((appointment) => montevideoMonth(new Date(appointment.startsAt))));
-  return NextResponse.json({
+  return publicJson({
     clientName: client.full_name,
     slots: starts
       .filter((start) => !taken.has(start.toISOString()))
@@ -119,7 +137,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const body = await request.json().catch(() => ({})) as { cedula?: string; startsAt?: string };
   const client = await activeClient(gymId, body.cedula || "");
   const start = body.startsAt ? new Date(body.startsAt) : null;
-  if (!client || !start || Number.isNaN(start.getTime()) || !availableStarts(new Date()).some((slot) => slot.toISOString() === start.toISOString())) return NextResponse.json({ error: "El turno no está disponible." }, { status: 400 });
+  if (!client || !start || Number.isNaN(start.getTime()) || !availableStarts(new Date()).some((slot) => slot.toISOString() === start.toISOString())) return publicJson({ error: "El turno no está disponible." }, { status: 400 });
   const end = new Date(start.getTime() + 30 * 60 * 1000);
   const period = monthBounds(start);
   const supabase = createClient();
@@ -132,11 +150,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .gte("starts_at", period.start.toISOString())
     .lt("starts_at", period.end.toISOString())
     .limit(1);
-  if (existingMonthError) return NextResponse.json({ error: "No pudimos verificar tus reuniones anteriores." }, { status: 500 });
-  if (existingMonthAppointments?.length) return NextResponse.json({ error: "Ya tenés una reunión agendada para este mes." }, { status: 409 });
+  if (existingMonthError) return publicJson({ error: "No pudimos verificar tus reuniones anteriores." }, { status: 500 });
+  if (existingMonthAppointments?.length) return publicJson({ error: "Ya tenés una reunión agendada para este mes." }, { status: 409 });
   try {
     const busy = await getGoogleCalendarBusyIntervals(start, end);
-    if (busy && overlaps(start, end, busy)) return NextResponse.json({ error: "Ese turno ya no está disponible. Elegí otro." }, { status: 409 });
+    if (busy && overlaps(start, end, busy)) return publicJson({ error: "Ese turno ya no está disponible. Elegí otro." }, { status: 409 });
   } catch (calendarError) {
     console.error("No se pudo validar Google Calendar antes de reservar", calendarError);
     // Si Google Calendar no responde, el bloqueo por turnos confirmados en
@@ -147,8 +165,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .insert({ gym_id: gymId, client_id: client.id, starts_at: start.toISOString(), ends_at: end.toISOString() })
     .select("id")
     .single();
-  if (error?.code === "23505") return NextResponse.json({ error: "Ese turno acaba de ser reservado. Elegí otro." }, { status: 409 });
-  if (error) return NextResponse.json({ error: "No pudimos guardar el turno." }, { status: 500 });
+  if (error?.code === "23505") return publicJson({ error: "Ese turno acaba de ser reservado. Elegí otro." }, { status: 409 });
+  if (error) return publicJson({ error: "No pudimos guardar el turno." }, { status: 500 });
   try {
     const calendarEventId = await createGoogleCalendarEvent({
       summary: `Llamada inicial · ${client.full_name}`,
@@ -181,14 +199,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch (emailError) {
     console.error("No se pudo enviar la confirmación de turno online", emailError);
   }
-  return NextResponse.json({ ok: true });
+  return publicJson({ ok: true });
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ gymId: string }> }) {
   const { gymId } = await params;
   const body = await request.json().catch(() => ({})) as { cedula?: string; appointmentId?: string };
   const client = await activeClient(gymId, body.cedula || "");
-  if (!client || !body.appointmentId) return NextResponse.json({ error: "No pudimos identificar tu turno." }, { status: 400 });
+  if (!client || !body.appointmentId) return publicJson({ error: "No pudimos identificar tu turno." }, { status: 400 });
   const supabase = createClient();
   const { data: appointment, error: appointmentError } = await supabase
     .from("online_training_appointments")
@@ -198,8 +216,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     .eq("client_id", client.id)
     .eq("status", "confirmed")
     .maybeSingle();
-  if (appointmentError || !appointment) return NextResponse.json({ error: "No encontramos ese turno." }, { status: 404 });
-  if (new Date(appointment.starts_at) <= new Date()) return NextResponse.json({ error: "Solo podés cancelar reuniones futuras." }, { status: 400 });
+  if (appointmentError || !appointment) return publicJson({ error: "No encontramos ese turno." }, { status: 404 });
+  if (new Date(appointment.starts_at) <= new Date()) return publicJson({ error: "Solo podés cancelar reuniones futuras." }, { status: 400 });
   if (appointment.google_calendar_event_id) {
     try {
       await deleteGoogleCalendarEvent(appointment.google_calendar_event_id);
@@ -208,6 +226,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
   }
   const { error } = await supabase.from("online_training_appointments").delete().eq("id", appointment.id).eq("gym_id", gymId).eq("client_id", client.id);
-  if (error) return NextResponse.json({ error: "No pudimos cancelar el turno." }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  if (error) return publicJson({ error: "No pudimos cancelar el turno." }, { status: 500 });
+  return publicJson({ ok: true });
 }

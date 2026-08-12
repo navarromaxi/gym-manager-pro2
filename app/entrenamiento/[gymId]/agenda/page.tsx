@@ -100,7 +100,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
   const visibleSlots = groupedSlots[selectedSlotGroup] ?? [];
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#07152b] px-4 py-6 text-slate-950 sm:px-6 sm:py-10">
+    <main id="gestionar-reunion" className="relative min-h-screen overflow-hidden bg-[#07152b] px-4 py-6 text-slate-950 sm:px-6 sm:py-10">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-32 -top-28 h-96 w-96 rounded-full bg-blue-500/25 blur-3xl" />
         <div className="absolute -bottom-36 right-[-8rem] h-[30rem] w-[30rem] rounded-full bg-cyan-400/15 blur-3xl" />

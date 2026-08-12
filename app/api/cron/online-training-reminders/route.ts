@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase-server";
+import { ONLINE_TRAINING_MANAGEMENT_URL } from "@/lib/online-training-links";
 
 export const dynamic = "force-dynamic";
 
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
       "Recordatorio de tu llamada con el profesor",
       emailLayout(
         `Hola ${client.full_name}`,
-        `<p>Te recordamos que tenés una llamada de control o entrevista con el profesor el <strong>${formatAppointment(appointment.starts_at)}</strong>.</p><p>Si necesitás reprogramarla, respondé este correo con anticipación.</p>`,
+        `<p>Te recordamos que tenés una llamada de control o entrevista con el profesor el <strong>${formatAppointment(appointment.starts_at)}</strong>.</p><p style="margin:24px 0"><a href="${ONLINE_TRAINING_MANAGEMENT_URL}" style="display:inline-block;background:#2563eb;border-radius:10px;color:#ffffff;font-weight:700;padding:12px 18px;text-decoration:none">Gestionar mi reunión</a></p><p>Si necesitás cambiar el horario, ingresá con tu cédula y elegí otro turno disponible.</p>`,
       ),
     )) {
       await supabase.from("online_training_notifications").insert({ client_id: client.id, notification_type: "appointment_reminder", period_ends_at: startsAt.toISOString() });
