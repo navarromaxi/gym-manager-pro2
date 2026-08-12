@@ -5,4 +5,4 @@
  * recorrido comercial y de autogestión vive bajo el dominio de PyMes Sistemas.
  */
 export const ONLINE_TRAINING_MANAGEMENT_URL =
-  "https://www.pymessistemas.com/rutina-personalizada.html#gestionar-reunion";
+  "https://www.pymessistemas.com/gestionar-reunion.html";
