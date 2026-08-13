@@ -102,7 +102,7 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
     const digits = (client.phone ?? "").replace(/\D/g, "");
     const phone = digits.startsWith("0") ? `598${digits.slice(1)}` : digits;
     if (!phone) return setMessage("Este cliente no tiene un teléfono registrado.");
-    const text = `Hola ${client.full_name}, ya tenés disponible tu rutina personalizada. Podés abrirla desde este enlace: ${routineLink}`;
+    const text = `Hola ${client.full_name}, ya tenés disponible tu rutina personalizada. Podés abrirla desde este enlace: ${routineLink}\n\nAl final de tu rutina vas a encontrar el acceso para gestionar tu próxima reunión de seguimiento. Tu suscripción activa incluye una reunión por mes.`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   };
   const startRoutine = async (client: OnlineClient) => {

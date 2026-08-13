@@ -130,12 +130,12 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
               Elegí el momento para avanzar.
             </h1>
             <p className="mt-5 max-w-lg text-base leading-7 text-slate-300 sm:text-lg">
-              Reservá tu encuentro individual de 30 minutos con el profesor y llevá tu plan al siguiente nivel.
+              Con tu suscripción activa tenés una reunión individual de 30 minutos por mes calendario para revisar tu progreso.
             </p>
             <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
               {[
                 ["01", "Ingresá tu cédula", "Identificamos tu suscripción."],
-                ["02", "Elegí un horario", "Mostramos espacios disponibles."],
+                ["02", "Elegí un horario", "Una reunión incluida por mes."],
                 ["03", "Confirmá tu lugar", "Recibís el recordatorio."],
               ].map(([number, title, description]) => (
                 <div key={number} className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
@@ -180,7 +180,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
                 <div><p className="font-bold text-slate-950">Hola, {data.clientName}</p><p className="text-sm text-slate-600">Elegí el horario que te resulte más cómodo.</p></div>
               </div>
 
-              {data.appointments.length > 0 ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">Tus reuniones agendadas</p><div className="mt-3 space-y-2">{data.appointments.map((appointment) => <div key={appointment.id} className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-white/80 p-3 sm:flex-row sm:items-center sm:justify-between"><p className="capitalize font-bold text-emerald-950">{label(appointment.startsAt)}</p><button type="button" disabled={cancelingAppointmentId === appointment.id} onClick={() => void cancelAppointment(appointment)} className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60">{cancelingAppointmentId === appointment.id ? "Cancelando..." : "Cancelar turno"}</button></div>)}</div><p className="mt-3 text-xs text-emerald-800">Tenés una reunión por mes. Si necesitás cambiarla, cancelala y elegí otro horario.</p></div> : null}
+              {data.appointments.length > 0 ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">Tus reuniones agendadas</p><div className="mt-3 space-y-2">{data.appointments.map((appointment) => <div key={appointment.id} className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-white/80 p-3 sm:flex-row sm:items-center sm:justify-between"><p className="capitalize font-bold text-emerald-950">{label(appointment.startsAt)}</p><button type="button" disabled={cancelingAppointmentId === appointment.id} onClick={() => void cancelAppointment(appointment)} className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60">{cancelingAppointmentId === appointment.id ? "Cancelando..." : "Cancelar turno"}</button></div>)}</div><p className="mt-3 text-xs text-emerald-800">Tu suscripción activa incluye una reunión por mes calendario. Si necesitás cambiarla, cancelala y elegí otro horario disponible.</p></div> : null}
 
               <div>
                 <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-black text-slate-950">Horarios disponibles</h3><span className="text-xs font-semibold text-slate-500">30 min por reunión</span></div>
@@ -189,7 +189,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
                   <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><button type="button" aria-label="Ver fecha anterior" disabled={selectedSlotGroup === 0} onClick={() => setSelectedSlotGroup((current) => Math.max(0, current - 1))} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35"><ChevronLeft className="h-4 w-4" /></button><p className="capitalize text-center text-sm font-black text-slate-950">{visibleSlots[0] ? label(visibleSlots[0], false) : ""}</p><button type="button" aria-label="Ver fecha siguiente" disabled={selectedSlotGroup === groupedSlots.length - 1} onClick={() => setSelectedSlotGroup((current) => Math.min(groupedSlots.length - 1, current + 1))} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35"><ChevronRight className="h-4 w-4" /></button></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{visibleSlots.map((slot) => <button key={slot} type="button" disabled={loading} onClick={() => setPendingSlot(slot)} className="rounded-xl border border-blue-100 bg-white px-3 py-3 text-sm font-black text-blue-800 transition hover:-translate-y-0.5 hover:border-blue-500 hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-600/20 disabled:cursor-not-allowed disabled:opacity-50">{timeLabel(slot)}</button>)}</div></section>
                 </div> : <div className="mt-3 rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">No hay horarios disponibles por el momento. Volvé a intentar más tarde.</div>}
               </div>
-            </div> : <div className="mt-6 flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" /><p className="text-sm leading-6 text-slate-600">Para cuidar tu servicio, verificamos que la suscripción esté activa antes de mostrar los horarios.</p></div>}
+            </div> : <div className="mt-6 flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" /><p className="text-sm leading-6 text-slate-600">Para cuidar tu servicio, verificamos que la suscripción esté activa antes de mostrar los horarios. Incluye una reunión por mes calendario.</p></div>}
           </div>
         </section>
 
@@ -199,9 +199,9 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
         <DialogContent className="rounded-3xl border-slate-200 bg-white p-6 text-slate-950 sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-2xl">¿Confirmás tu reunión?</DialogTitle>
-            <DialogDescription className="text-slate-600">Vas a reservar tu encuentro individual de 30 minutos con el profesor.</DialogDescription>
+            <DialogDescription className="text-slate-600">Vas a reservar tu encuentro individual de 30 minutos con el profesor. La suscripción activa incluye una reunión por mes calendario.</DialogDescription>
           </DialogHeader>
-          {pendingSlot ? <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4"><p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">Fecha elegida</p><p className="mt-2 capitalize text-lg font-black text-slate-950">{label(pendingSlot)}</p><p className="mt-1 text-sm text-slate-600">Podrás tener una reunión por mes.</p></div> : null}
+          {pendingSlot ? <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4"><p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">Fecha elegida</p><p className="mt-2 capitalize text-lg font-black text-slate-950">{label(pendingSlot)}</p><p className="mt-1 text-sm text-slate-600">Tu suscripción activa incluye una reunión por mes calendario.</p></div> : null}
           <DialogFooter className="gap-2 sm:gap-2"><button type="button" onClick={() => setPendingSlot(null)} className="h-10 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Cancelar</button><button type="button" disabled={loading || !pendingSlot} onClick={() => { const slot = pendingSlot; setPendingSlot(null); if (slot) void book(slot); }} className="h-10 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-60">{loading ? "Confirmando..." : "Sí, confirmar reunión"}</button></DialogFooter>
         </DialogContent>
       </Dialog>
