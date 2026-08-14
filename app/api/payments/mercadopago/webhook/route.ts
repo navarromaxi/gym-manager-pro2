@@ -27,7 +27,9 @@ function signatureIsValid(request: NextRequest, notice: Notice) {
   const signature = request.headers.get("x-signature") || "";
   const requestId = request.headers.get("x-request-id") || "";
   const values = Object.fromEntries(signature.split(",").map((part) => part.trim().split("=")).filter((part) => part.length === 2));
-  const id = String(notice.data?.id || "").toLowerCase();
+  // Mercado Pago may send data.id in the query string or in the JSON body.
+  // The value used for the HMAC must be exactly the one used in its manifest.
+  const id = String(request.nextUrl.searchParams.get("data.id") || notice.data?.id || "").toLowerCase();
   if (!secret || !id || !values.ts || !values.v1) return false;
   const manifest = `id:${id};request-id:${requestId};ts:${values.ts};`;
   const expected = crypto.createHmac("sha256", secret).update(manifest).digest("hex");
@@ -62,14 +64,19 @@ export async function POST(request: NextRequest) {
   const supabase = createClient();
   const now = new Date();
   const nextPeriod = subscription.next_payment_date ? new Date(subscription.next_payment_date) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const subscriptionAuthorized = String(subscription.status).toLowerCase() === "authorized";
   const cancelled = ["cancelled", "canceled"].includes(String(subscription.status).toLowerCase());
-  const update = paymentApproved ? {
+  // A preapproval becomes `authorized` as soon as the customer completes the
+  // subscription checkout. Waiting solely for the authorized-payment notice
+  // leaves a valid subscriber blocked when that asynchronous notice is delayed.
+  const activate = paymentApproved || subscriptionAuthorized;
+  const update = activate ? {
     status: "active", subscription_started_at: now.toISOString(), current_period_ends_at: nextPeriod.toISOString(), grace_ends_at: null,
     mercado_pago_subscription_id: subscription.id || null, mercado_pago_payer_id: subscription.payer_id ? String(subscription.payer_id) : null, last_payment_at: now.toISOString(),
   } : cancelled ? { status: "cancelled" } : { mercado_pago_subscription_id: subscription.id || null, mercado_pago_payer_id: subscription.payer_id ? String(subscription.payer_id) : null };
   const { data: client, error } = await supabase.from("online_training_clients").update(update).eq("id", subscription.external_reference).select("id, full_name, email").maybeSingle();
   if (error) { console.error("Unable to update online training client", error); return NextResponse.json({ error: "Update failed" }, { status: 500 }); }
-  if (paymentApproved && client) {
+  if (activate && client) {
     const notificationPeriod = nextPeriod.toISOString();
     const { error: noticeError } = await supabase
       .from("online_training_notifications")

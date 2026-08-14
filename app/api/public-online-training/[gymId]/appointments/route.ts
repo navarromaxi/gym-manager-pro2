@@ -96,8 +96,42 @@ function overlaps(start: Date, end: Date, busy: Array<{ start: string; end: stri
 
 async function activeClient(gymId: string, cedula: string) {
   const supabase = createClient();
-  const { data } = await supabase.from("online_training_clients").select("id, full_name, email, status").eq("gym_id", gymId).eq("cedula", cedula.trim()).maybeSingle();
-  return data && ["active", "payment_due"].includes(data.status) ? data : null;
+  const { data } = await supabase
+    .from("online_training_clients")
+    .select("id, full_name, email, status, mercado_pago_subscription_id")
+    .eq("gym_id", gymId)
+    .eq("cedula", cedula.trim())
+    .maybeSingle();
+  if (!data) return null;
+  if (["active", "payment_due"].includes(data.status)) return data;
+
+  // Webhooks are the normal path. This small, server-side reconciliation makes
+  // the return-to-agenda path resilient to a delayed or retried webhook.
+  const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!token || !data.mercado_pago_subscription_id) return null;
+  try {
+    const response = await fetch(`https://api.mercadopago.com/preapproval/${encodeURIComponent(data.mercado_pago_subscription_id)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    const subscription = response.ok ? await response.json() as { status?: string; next_payment_date?: string | null; payer_id?: string | number } : null;
+    if (subscription?.status !== "authorized") return null;
+    const now = new Date();
+    const nextPayment = subscription.next_payment_date ? new Date(subscription.next_payment_date) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const { error } = await supabase.from("online_training_clients").update({
+      status: "active",
+      subscription_started_at: now.toISOString(),
+      current_period_ends_at: nextPayment.toISOString(),
+      grace_ends_at: null,
+      mercado_pago_payer_id: subscription.payer_id ? String(subscription.payer_id) : null,
+      last_payment_at: now.toISOString(),
+    }).eq("id", data.id);
+    if (!error) return { ...data, status: "active" };
+    console.error("No se pudo conciliar la suscripciÃ³n antes de mostrar la agenda", error);
+  } catch (error) {
+    console.error("No se pudo consultar Mercado Pago antes de mostrar la agenda", error);
+  }
+  return null;
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ gymId: string }> }) {

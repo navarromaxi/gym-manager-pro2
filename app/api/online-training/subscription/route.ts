@@ -32,6 +32,9 @@ export async function POST(request: NextRequest) {
       payer_email: client.email,
       auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: config.monthly_price, currency_id: "UYU" },
       back_url: `${request.nextUrl.origin}/entrenamiento/${body.gymId}/agenda`,
+      // Subscriptions cannot rely on the application-level webhook setup.
+      // Mercado Pago requires this URL directly on the preapproval request.
+      notification_url: `${request.nextUrl.origin}/api/payments/mercadopago/webhook`,
       status: "pending",
     }),
   });
