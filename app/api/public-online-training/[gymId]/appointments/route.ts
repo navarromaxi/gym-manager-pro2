@@ -51,6 +51,31 @@ async function sendAppointmentConfirmation(name: string, email: string, startsAt
   return response.ok;
 }
 
+async function sendAppointmentCancellation(name: string, email: string, startsAt: Date) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM;
+  if (!apiKey || !from) return false;
+  const date = new Intl.DateTimeFormat("es-UY", {
+    timeZone: "America/Montevideo",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(startsAt);
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from,
+      to: [email],
+      subject: "Tu llamada con el profesor fue cancelada",
+      html: `<main style="font-family:Arial,sans-serif;background:#f1f5f9;padding:32px 16px;color:#0f172a"><section style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:24px;padding:32px"><p style="margin:0 0 10px;color:#2563eb;font-size:12px;font-weight:700;letter-spacing:1.8px">RUTINA PERSONALIZADA</p><h1 style="margin:0 0 18px;font-size:26px">Tu llamada fue cancelada</h1><p>Hola ${name}, cancelamos tu turno del <strong>${date}</strong>.</p><p>Tu suscripción sigue activa y podés elegir otro horario cuando quieras.</p><p style="margin:24px 0"><a href="${ONLINE_TRAINING_MANAGEMENT_URL}" style="display:inline-block;background:#2563eb;border-radius:10px;color:#ffffff;font-weight:700;padding:12px 18px;text-decoration:none">Elegir otro horario</a></p><p style="margin:0;color:#475569;font-size:14px">Si no solicitaste esta cancelación, escribinos para ayudarte.</p><p style="margin:26px 0 0;color:#64748b;font-size:13px">PyMesSistemas · Entrenamiento online</p></section></main>`,
+    }),
+  });
+  return response.ok;
+}
+
 function montevideoDate(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Montevideo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
   const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
@@ -261,5 +286,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   }
   const { error } = await supabase.from("online_training_appointments").delete().eq("id", appointment.id).eq("gym_id", gymId).eq("client_id", client.id);
   if (error) return publicJson({ error: "No pudimos cancelar el turno." }, { status: 500 });
+  try {
+    await sendAppointmentCancellation(client.full_name, client.email, new Date(appointment.starts_at));
+  } catch (emailError) {
+    // The booking is already cancelled; an email outage must not reverse that.
+    console.error("No se pudo enviar el correo de cancelación de turno online", emailError);
+  }
   return publicJson({ ok: true });
 }
