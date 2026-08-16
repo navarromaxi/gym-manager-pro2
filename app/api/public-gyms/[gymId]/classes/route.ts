@@ -73,6 +73,7 @@ export async function GET(
     .from("class_occurrences")
     .select("id, title, starts_at, ends_at, capacity, notes")
     .eq("gym_id", gymId)
+    .eq("is_cancelled", false)
     .gt("starts_at", new Date().toISOString())
     .lt("starts_at", new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString())
     .order("starts_at", { ascending: true });
