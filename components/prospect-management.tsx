@@ -1204,16 +1204,16 @@ export function ProspectManagement({
         </Dialog>
       </div>
       {/* Filters */}
-      <Card className="overflow-hidden border-border/70 shadow-sm">
-        <CardHeader className="border-b bg-muted/30 px-5 py-4">
+      <Card className="overflow-hidden border-0 bg-slate-950 shadow-xl shadow-indigo-950/20">
+        <CardHeader className="border-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-5 py-4 text-white">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-white ring-1 ring-white/20">
                 <Filter className="h-4 w-4" />
               </div>
               <div>
-                <CardTitle className="text-base">Filtrar interesados</CardTitle>
-                <p className="text-sm text-muted-foreground">
+                <CardTitle className="text-base text-white">Filtrar interesados</CardTitle>
+                <p className="text-sm text-white/80">
                   Combiná criterios para encontrar el seguimiento que necesitás.
                 </p>
               </div>
@@ -1221,8 +1221,8 @@ export function ProspectManagement({
             <Button
               type="button"
               size="sm"
-              variant="ghost"
-              className="self-start text-muted-foreground sm:self-auto"
+              variant="outline"
+              className="self-start border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:self-auto"
               onClick={() => {
                 setSearchTerm("");
                 setStatusFilter("all");
@@ -1238,9 +1238,9 @@ export function ProspectManagement({
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="p-5">
+        <CardContent className="bg-gradient-to-br from-slate-950 via-slate-950 to-indigo-950/70 p-5">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="space-y-2 xl:col-span-2">
+            <div className="space-y-2 rounded-xl border border-blue-400/20 bg-blue-500/10 p-3 xl:col-span-2">
               <Label
                 htmlFor="prospect-search"
                 className="text-sm font-medium text-muted-foreground"
@@ -1254,11 +1254,11 @@ export function ProspectManagement({
                   placeholder="Buscar por nombre, cel, email o notas..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="h-11 bg-background pl-9"
+                  className="h-11 border-white/10 bg-black/30 pl-9"
                 />
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-xl border border-violet-400/20 bg-violet-500/10 p-3">
               <Label
                 htmlFor="status-filter"
                 className="text-sm font-medium text-muted-foreground"
@@ -1271,7 +1271,7 @@ export function ProspectManagement({
                   setStatusFilter(value as Prospect["status"] | "all")
                 }
               >
-                <SelectTrigger id="status-filter" className="h-11 w-full bg-background">
+                <SelectTrigger id="status-filter" className="h-11 w-full border-white/10 bg-black/30">
                   <SelectValue placeholder="Todos los estados" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1288,7 +1288,7 @@ export function ProspectManagement({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/10 p-3">
               <Label
                 htmlFor="priority-filter"
                 className="text-sm font-medium text-muted-foreground"
@@ -1296,7 +1296,7 @@ export function ProspectManagement({
                 Prioridad
               </Label>
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger id="priority-filter" className="h-11 w-full bg-background">
+                <SelectTrigger id="priority-filter" className="h-11 w-full border-white/10 bg-black/30">
                   <SelectValue placeholder="Tipo prioridad" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1307,7 +1307,7 @@ export function ProspectManagement({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 p-3">
               <Label
                 htmlFor="scheduled-date-filter"
                 className="text-sm font-medium text-muted-foreground"
@@ -1319,6 +1319,7 @@ export function ProspectManagement({
                 type="date"
                 value={scheduledDateFilter}
                 onChange={(event) => setScheduledDateFilter(event.target.value)}
+                className="border-white/10 bg-black/30"
               />
               <div className="flex gap-2">
                 <Button
@@ -1345,7 +1346,7 @@ export function ProspectManagement({
                 </Button>
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 p-3">
               <Label
                 htmlFor="next-contact-date-filter"
                 className="text-sm font-medium text-muted-foreground"
@@ -1359,6 +1360,7 @@ export function ProspectManagement({
                 onChange={(event) =>
                   setNextContactDateFilter(event.target.value)
                 }
+                className="border-white/10 bg-black/30"
               />
               <div className="flex gap-2">
                 <Button
@@ -1385,7 +1387,7 @@ export function ProspectManagement({
                 </Button>
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-xl border border-amber-400/20 bg-amber-500/10 p-3">
               <Label
                 htmlFor="contact-date-filter"
                 className="text-sm font-medium text-muted-foreground"
@@ -1397,6 +1399,7 @@ export function ProspectManagement({
                 type="date"
                 value={contactDateFilter}
                 onChange={(event) => setContactDateFilter(event.target.value)}
+                className="border-white/10 bg-black/30"
               />
               <div className="flex gap-2">
                 <Button
@@ -1421,7 +1424,7 @@ export function ProspectManagement({
                 </Button>
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-xl border border-pink-400/20 bg-pink-500/10 p-3">
               <Label
                 htmlFor="contact-date-range-filter"
                 className="text-sm font-medium text-muted-foreground"
@@ -1434,7 +1437,7 @@ export function ProspectManagement({
               >
                 <SelectTrigger
                   id="contact-date-range-filter"
-                  className="w-full"
+                  className="h-11 w-full border-white/10 bg-black/30"
                 >
                   <SelectValue placeholder="Rango temporal" />
                 </SelectTrigger>

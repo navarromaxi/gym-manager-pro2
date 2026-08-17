@@ -40,7 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Search, CalendarClock, X } from "lucide-react";
+import { Plus, Edit, Trash2, Search, CalendarClock, Filter, RotateCcw, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import type { Member, Payment, Plan, CustomPlan } from "@/lib/supabase";
@@ -1054,99 +1054,94 @@ export function MemberManagement({
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
+      <Card className="overflow-hidden border-0 bg-slate-950 shadow-xl shadow-emerald-950/20">
+        <CardHeader className="border-0 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 px-5 py-4 text-white">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/20">
+                <Filter className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base text-white">Encontrá socios rápidamente</CardTitle>
+                <p className="text-sm text-white/80">Buscá, ordená y segmentá la lista en un solo lugar.</p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="self-start border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:self-auto"
+              onClick={() => {
+                setSearchTerm("");
+                setSortOption("recent_activity_desc");
+                setStatusFilter("all");
+                setPlanFilter("all");
+              }}
+            >
+              <RotateCcw className="mr-2 h-3.5 w-3.5" />
+              Restablecer
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-4 xl:flex-row">
-            <div className="flex-1">
+        <CardContent className="bg-gradient-to-br from-slate-950 via-slate-950 to-emerald-950/70 p-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.7fr_1fr_1fr_1fr]">
+            <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 p-3">
+              <Label htmlFor="member-search" className="mb-2 block text-sm font-medium text-emerald-100">Buscar socio</Label>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
+                  id="member-search"
                   placeholder="Buscar por nombre, email o telefono..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
+                  className="h-11 border-white/10 bg-black/30 pl-8"
                 />
               </div>
             </div>
-            <Select
-              value={sortOption}
-              onValueChange={(value) =>
-                setSortOption(value as MemberSortOption)
-              }
-            >
-              <SelectTrigger className="w-[230px]">
-                <SelectValue placeholder="Ordenar por" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recent_activity_desc">
-                  Orden actual (mas recientes primero)
-                </SelectItem>
-                <SelectItem value="plan_end_asc">
-                  Fin del plan ascendente
-                </SelectItem>
-                <SelectItem value="plan_end_desc">
-                  Fin del plan descendente
-                </SelectItem>
-                <SelectItem value="installment_due_asc">
-                  Proxima cuota ascendente
-                </SelectItem>
-                <SelectItem value="installment_due_desc">
-                  Proxima cuota descendente
-                </SelectItem>
-                <SelectItem value="days_remaining_asc">
-                  Dias restantes ascendente
-                </SelectItem>
-                <SelectItem value="days_remaining_desc">
-                  Dias restantes descendente
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="active">Activos</SelectItem>
-                <SelectItem value="expired">
-                  Vencidos (hasta 30 días)
-                </SelectItem>
-                <SelectItem value="inactive">Inactivos (+30 días)</SelectItem>
-                <SelectItem value="expiring_soon">
-                  Próximo a vencerse (10 días)
-                </SelectItem>
-                <SelectItem value="expiring_soon_contacted">
-                  Próximo a vencerse - contactados
-                </SelectItem>
-                <SelectItem value="custom_expiring">
-                  Personalizados por vencer (10 días)
-                </SelectItem>
-                <SelectItem value="balance_due">
-                  Cuota parcial vencida
-                </SelectItem>
-                <SelectItem value="follow_up">Seguimiento pendiente</SelectItem>
-                <SelectItem value="long_plan_follow_up">
-                  Seguimiento cuota semestral (120 días)
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={planFilter} onValueChange={setPlanFilter}>
-              <SelectTrigger className="w-full xl:w-[210px]">
-                <SelectValue placeholder="Tipo de plan" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los planes</SelectItem>
-                <SelectItem value="without_plan">Sin plan asignado</SelectItem>
-                {availablePlanNames.map((planName) => (
-                  <SelectItem key={planName} value={planName}>
-                    {planName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 p-3">
+              <Label htmlFor="member-sort" className="mb-2 block text-sm font-medium text-cyan-100">Ordenar por</Label>
+              <Select value={sortOption} onValueChange={(value) => setSortOption(value as MemberSortOption)}>
+                <SelectTrigger id="member-sort" className="h-11 w-full border-white/10 bg-black/30"><SelectValue placeholder="Ordenar por" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recent_activity_desc">Orden actual (mas recientes primero)</SelectItem>
+                  <SelectItem value="plan_end_asc">Fin del plan ascendente</SelectItem>
+                  <SelectItem value="plan_end_desc">Fin del plan descendente</SelectItem>
+                  <SelectItem value="installment_due_asc">Proxima cuota ascendente</SelectItem>
+                  <SelectItem value="installment_due_desc">Proxima cuota descendente</SelectItem>
+                  <SelectItem value="days_remaining_asc">Dias restantes ascendente</SelectItem>
+                  <SelectItem value="days_remaining_desc">Dias restantes descendente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="rounded-xl border border-violet-400/20 bg-violet-500/10 p-3">
+              <Label htmlFor="member-status" className="mb-2 block text-sm font-medium text-violet-100">Estado</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger id="member-status" className="h-11 w-full border-white/10 bg-black/30"><SelectValue placeholder="Estado" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="active">Activos</SelectItem>
+                  <SelectItem value="expired">Vencidos (hasta 30 días)</SelectItem>
+                  <SelectItem value="inactive">Inactivos (+30 días)</SelectItem>
+                  <SelectItem value="expiring_soon">Próximo a vencerse (10 días)</SelectItem>
+                  <SelectItem value="expiring_soon_contacted">Próximo a vencerse - contactados</SelectItem>
+                  <SelectItem value="custom_expiring">Personalizados por vencer (10 días)</SelectItem>
+                  <SelectItem value="balance_due">Cuota parcial vencida</SelectItem>
+                  <SelectItem value="follow_up">Seguimiento pendiente</SelectItem>
+                  <SelectItem value="long_plan_follow_up">Seguimiento cuota semestral (120 días)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/10 p-3">
+              <Label htmlFor="member-plan" className="mb-2 block text-sm font-medium text-fuchsia-100">Plan</Label>
+              <Select value={planFilter} onValueChange={setPlanFilter}>
+                <SelectTrigger id="member-plan" className="h-11 w-full border-white/10 bg-black/30"><SelectValue placeholder="Tipo de plan" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los planes</SelectItem>
+                  <SelectItem value="without_plan">Sin plan asignado</SelectItem>
+                  {availablePlanNames.map((planName) => <SelectItem key={planName} value={planName}>{planName}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
