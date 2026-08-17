@@ -36,6 +36,8 @@ import {
   Edit,
   Trash2,
   Search,
+  Filter,
+  RotateCcw,
   UserPlus,
   AlertTriangle,
   Check,
@@ -1202,13 +1204,43 @@ export function ProspectManagement({
         </Dialog>
       </div>
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
+      <Card className="overflow-hidden border-border/70 shadow-sm">
+        <CardHeader className="border-b bg-muted/30 px-5 py-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Filter className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Filtrar interesados</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Combiná criterios para encontrar el seguimiento que necesitás.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="self-start text-muted-foreground sm:self-auto"
+              onClick={() => {
+                setSearchTerm("");
+                setStatusFilter("all");
+                setPriorityFilter("all");
+                setScheduledDateFilter("");
+                setNextContactDateFilter("");
+                setContactDateFilter("");
+                setContactDateRangeFilter("all-history");
+              }}
+            >
+              <RotateCcw className="mr-2 h-3.5 w-3.5" />
+              Restablecer
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex w-full flex-wrap items-end gap-4">
-            <div className="space-y-2 md:col-span-2 xl:col-span-2">
+        <CardContent className="p-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-2 xl:col-span-2">
               <Label
                 htmlFor="prospect-search"
                 className="text-sm font-medium text-muted-foreground"
@@ -1222,7 +1254,7 @@ export function ProspectManagement({
                   placeholder="Buscar por nombre, cel, email o notas..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
+                  className="h-11 bg-background pl-9"
                 />
               </div>
             </div>
@@ -1239,7 +1271,7 @@ export function ProspectManagement({
                   setStatusFilter(value as Prospect["status"] | "all")
                 }
               >
-                <SelectTrigger id="status-filter" className="w-full">
+                <SelectTrigger id="status-filter" className="h-11 w-full bg-background">
                   <SelectValue placeholder="Todos los estados" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1264,7 +1296,7 @@ export function ProspectManagement({
                 Prioridad
               </Label>
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger id="priority-filter" className="w-full">
+                <SelectTrigger id="priority-filter" className="h-11 w-full bg-background">
                   <SelectValue placeholder="Tipo prioridad" />
                 </SelectTrigger>
                 <SelectContent>
