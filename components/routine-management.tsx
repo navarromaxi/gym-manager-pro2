@@ -32,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Trash2, Search, Download, Dumbbell, MonitorUp, Copy, Link2, Link2Off } from "lucide-react";
+import { Plus, Trash2, Search, Download, Dumbbell, MonitorUp, Copy, Link2, Link2Off, Filter, RotateCcw } from "lucide-react";
 import { RoutineRoomMode, type RoomRoutine } from "@/features/routines/components/routine-room-mode";
 import { PersonalizedRoutineBuilder, type CreatedPersonalizedRoutine } from "@/features/routines/components/personalized-routine-builder";
 import { WEEK_DAYS, getDaySections, type WeeklyPlan } from "@/features/routines/routine-plan";
@@ -721,20 +721,20 @@ export function RoutineManagement({ gymId }: RoutineManagementProps) {
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
+      <Card className="overflow-hidden border-0 bg-slate-950 shadow-xl shadow-sky-950/20">
+        <CardHeader className="bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 p-5 text-white">
+          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="rounded-xl bg-white/15 p-2.5 ring-1 ring-white/20"><Filter className="h-4 w-4" /></div><div><CardTitle className="text-base text-white">Encontrá la rutina ideal</CardTitle><p className="text-sm text-white/80">Filtrá por nombre, dificultad o vigencia.</p></div></div><Button type="button" size="sm" variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => { setSearchTerm(""); setDifficultyFilter("all"); setRoutineStatusFilter("all"); }}><RotateCcw className="mr-2 h-3.5 w-3.5" />Restablecer</Button></div>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <div className="min-w-0 flex-1">
+        <CardContent className="bg-gradient-to-br from-slate-950 via-slate-950 to-blue-950/70 p-5">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="min-w-0 rounded-xl border border-sky-400/20 bg-sky-500/10 p-3">
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por nombre o público objetivo..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
+                  className="h-11 border-white/10 bg-black/30 pl-8"
                 />
               </div>
             </div>

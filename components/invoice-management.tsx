@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RefreshCcw, Download } from "lucide-react";
+import { RefreshCcw, Download, Filter, RotateCcw } from "lucide-react";
 
 import type { Invoice } from "@/lib/supabase";
 import { supabase } from "@/lib/supabase";
@@ -214,36 +214,37 @@ export function InvoiceManagement({
         </p>
       </div>
 
-      <Card>
-        <CardHeader className="space-y-4">
+      <Card className="overflow-hidden border-0 bg-slate-950 shadow-xl shadow-amber-950/20">
+        <CardHeader className="space-y-4 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-5 text-white">
+          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="rounded-xl bg-white/15 p-2.5 ring-1 ring-white/20"><Filter className="h-4 w-4" /></div><div><p className="font-semibold">Filtrar facturas</p><p className="text-sm text-white/80">Buscá por cliente o acotá el período.</p></div></div><Button type="button" size="sm" variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => { setSearchTerm(""); setStartDate(""); setEndDate(""); }}><RotateCcw className="mr-2 h-3.5 w-3.5" />Restablecer</Button></div>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4 w-full">
-              <div className="grid gap-1">
+              <div className="grid gap-1 rounded-xl border border-amber-300/20 bg-white/10 p-3">
                 <Label htmlFor="invoice-search">Buscar</Label>
                 <Input
                   id="invoice-search"
                   placeholder="Socio, número o estado"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
-                />
+                  className="border-white/10 bg-black/25" />
               </div>
-              <div className="grid gap-1">
+              <div className="grid gap-1 rounded-xl border border-orange-300/20 bg-white/10 p-3">
                 <Label htmlFor="invoice-start-date">Desde</Label>
                 <Input
                   id="invoice-start-date"
                   type="date"
                   value={startDate}
                   onChange={(event) => setStartDate(event.target.value)}
-                />
+                  className="border-white/10 bg-black/25" />
               </div>
-              <div className="grid gap-1">
+              <div className="grid gap-1 rounded-xl border border-rose-300/20 bg-white/10 p-3">
                 <Label htmlFor="invoice-end-date">Hasta</Label>
                 <Input
                   id="invoice-end-date"
                   type="date"
                   value={endDate}
                   onChange={(event) => setEndDate(event.target.value)}
-                />
+                  className="border-white/10 bg-black/25" />
               </div>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
