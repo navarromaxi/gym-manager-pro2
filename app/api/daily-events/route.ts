@@ -31,7 +31,17 @@ export async function POST(request: Request) {
     const authorization = await authorizeGymRequest(request, parsed.data.gymId);
     if (authorization.error) return authorization.error;
     const supabase = createClient();
-    const { data: event, error } = await supabase.from("daily_events").insert({ ...parsed.data }).select("id, gym_id, title, date, start_time, end_time, slot_interval_minutes, capacity_per_slot, accept_receipts, notes, created_at").single();
+    const { data: event, error } = await supabase.from("daily_events").insert({
+      gym_id: parsed.data.gymId,
+      title: parsed.data.title,
+      date: parsed.data.date,
+      start_time: parsed.data.start_time,
+      end_time: parsed.data.end_time,
+      slot_interval_minutes: parsed.data.slot_interval_minutes,
+      capacity_per_slot: parsed.data.capacity_per_slot,
+      notes: parsed.data.notes ?? null,
+      accept_receipts: parsed.data.accept_receipts,
+    }).select("id, gym_id, title, date, start_time, end_time, slot_interval_minutes, capacity_per_slot, accept_receipts, notes, created_at").single();
     if (error || !event) throw error ?? new Error("No se pudo crear el evento.");
     const slots = [];
     for (let start = minutes(parsed.data.start_time); start < minutes(parsed.data.end_time); start += parsed.data.slot_interval_minutes) {
