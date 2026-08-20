@@ -9,6 +9,14 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  async rewrites() {
+    return [
+      {
+        source: "/inscripciones/:gymId/turnos/:eventId",
+        destination: "/inscripciones/:gymId?diario=:eventId",
+      },
+    ]
+  },
 }
 
 export default nextConfig

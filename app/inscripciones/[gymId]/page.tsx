@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import { useParams, useSearchParams } from "next/navigation";
 import { Calendar, Clock, Ticket, Users } from "lucide-react";
 
@@ -236,6 +235,7 @@ function PublicClassRegistrationPageContent() {
   }, [selectedSessionId]);
 
   useEffect(() => {
+    if (successMessage) return;
     if (sortedSessions.length === 0) {
       setSelectedSessionId("");
       return;
@@ -261,7 +261,7 @@ function PublicClassRegistrationPageContent() {
 
       setSelectedSessionId((upcoming ?? sortedSessions[0]).id);
     }
-  }, [searchParams, sortedSessions, selectedSessionId]);
+  }, [searchParams, sortedSessions, selectedSessionId, successMessage]);
 
   const handleFormChange = (
     field: keyof RegistrationFormState,
@@ -397,6 +397,7 @@ function PublicClassRegistrationPageContent() {
         ).toLocaleDateString()} a las ${selectedSession.start_time} hs.`
       );
       setFormState(INITIAL_FORM_STATE);
+      setSelectedSessionId("");
       setReceiptFile(null);
       setReceiptError(null);
       setReceiptInputKey((prev) => prev + 1);
@@ -417,32 +418,10 @@ function PublicClassRegistrationPageContent() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#e0f2fe_0%,_#f8fafc_42%,_#f0fdf4_100%)] py-8 text-slate-900 sm:py-12">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-7 px-4 sm:px-6">
-        <header className="text-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="relative h-20 w-20 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-              <Image
-                src={gymLogoUrl ?? "/logos/demo-gym-logo.svg"}
-                alt={
-                  gymName
-                    ? `Logo del gimnasio ${gymName}`
-                    : "Logo del gimnasio"
-                }
-                fill
-                sizes="64px"
-                className="object-contain"
-                priority
-                unoptimized={Boolean(gymLogoUrl)}
-              />
-            </div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
-              {gymName
-                ? `Sistema de reservas`
-                : "Sistema de reservas del gimnasio"}
-            </p>
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-            {gymName ? `${gymName}` : "Reserva tu clase"}
-          </h1>
+        <header className="rounded-3xl border border-white/80 bg-white/75 px-6 py-7 text-center shadow-[0_16px_45px_rgba(15,23,42,0.08)] backdrop-blur sm:px-10">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-sky-700">Agenda online</p>
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">{dailyEvent?.title ?? gymName ?? "Agenda de reservas"}</h1>
+          <p className="mt-2 text-sm text-slate-600">Elegí el horario que mejor te quede y confirmá tu reserva.</p>
         </header>
 
         {loading ? (
@@ -464,12 +443,9 @@ function PublicClassRegistrationPageContent() {
           </Card>
         ) : (
           <>
-             <Card className="overflow-hidden border border-slate-200 bg-white shadow-[0_20px_55px_rgba(15,23,42,0.10)]">
-              <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-sky-50 to-emerald-50 px-5 py-6 sm:px-8">
-                <CardTitle className="text-2xl font-bold text-slate-950">
-                  Reserva tu lugar
-                </CardTitle>
-                <CardDescription className="text-slate-600">
+             <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_25px_65px_rgba(15,23,42,0.12)]">
+              <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-sky-50 via-white to-emerald-50 px-5 py-6 sm:px-8">
+                <CardDescription className="text-base leading-relaxed text-slate-600">
                   {dailyEvent
                     ? `Elegí un horario disponible para ${dailyEvent.title} y completá tus datos.`
                     : "Elegí una actividad y completá tus datos para confirmar tu cupo."}
@@ -477,7 +453,7 @@ function PublicClassRegistrationPageContent() {
               </CardHeader>
               <CardContent className="px-5 py-6 sm:px-8 sm:py-8">
                 <form
-                  className="space-y-7 [&_input]:!border [&_input]:!border-slate-300 [&_input]:!bg-white [&_input]:!text-slate-950 [&_input::placeholder]:!text-slate-400 [&_label]:!text-slate-800"
+                  className="space-y-7 [&_input]:!h-12 [&_input]:!rounded-xl [&_input]:!border [&_input]:!border-slate-300 [&_input]:!bg-white [&_input]:!text-slate-950 [&_input::placeholder]:!text-slate-400 [&_label]:!font-bold [&_label]:!text-slate-800"
                   onSubmit={handleSubmit}
                 >
                   <div className="space-y-2.5">
@@ -486,7 +462,7 @@ function PublicClassRegistrationPageContent() {
                       value={selectedSessionId}
                       onValueChange={setSelectedSessionId}
                     >
-                      <SelectTrigger className="h-12 border-slate-300 bg-white text-slate-950 shadow-sm focus:ring-sky-500">
+                      <SelectTrigger className="h-14 rounded-xl border-slate-300 bg-white text-slate-950 shadow-sm focus:ring-sky-500">
                         <SelectValue placeholder="Selecciona una clase" />
                       </SelectTrigger>
                       <SelectContent>

@@ -784,7 +784,7 @@ export function ClassRegistrationManagement({
   };
 
   const handleCopyDailyLink = async (dailyEvent: DailyEvent) => {
-    const url = `${shareBaseUrl}/inscripciones/${gymId}?diario=${dailyEvent.id}`;
+    const url = `${shareBaseUrl}/inscripciones/${gymId}/turnos/${dailyEvent.id}`;
     try { await navigator.clipboard.writeText(url); setCopySuccessId(dailyEvent.id); setTimeout(() => setCopySuccessId((current) => current === dailyEvent.id ? null : current), 3000); }
     catch { setFeedback({ type: "error", message: `No se pudo copiar el enlace. Copia manualmente: ${url}` }); }
   };
