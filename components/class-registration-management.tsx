@@ -17,11 +17,12 @@ import {
   RefreshCw,
   Trash2,
   Users,
+  CalendarDays,
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
-import type { ClassRegistration, ClassSession } from "@/lib/supabase";
+import type { ClassRegistration, ClassSession, DailyEvent } from "@/lib/supabase";
 import {
   Card,
   CardContent,
@@ -96,6 +97,16 @@ const INITIAL_FORM_STATE: ClassSessionFormState = {
   accept_receipts: false,
 };
 
+interface DailyEventFormState {
+  title: string; date: string; start_time: string; end_time: string;
+  slot_interval_minutes: number; capacity_per_slot: number; notes: string; accept_receipts: boolean;
+}
+
+const INITIAL_DAILY_EVENT_FORM: DailyEventFormState = {
+  title: "", date: "", start_time: "", end_time: "", slot_interval_minutes: 30,
+  capacity_per_slot: 1, notes: "", accept_receipts: false,
+};
+
 export function ClassRegistrationManagement({
   gymId,
   sessions,
@@ -131,11 +142,28 @@ export function ClassRegistrationManagement({
   const [editFormState, setEditFormState] =
     useState<ClassSessionFormState>(INITIAL_FORM_STATE);
   const [updating, setUpdating] = useState(false);
+  const [dailyEvents, setDailyEvents] = useState<DailyEvent[]>([]);
+  const [dailyEventForm, setDailyEventForm] = useState<DailyEventFormState>(INITIAL_DAILY_EVENT_FORM);
+  const [dailyDialogOpen, setDailyDialogOpen] = useState(false);
+  const [creatingDailyEvent, setCreatingDailyEvent] = useState(false);
+  const [selectedDailyEventId, setSelectedDailyEventId] = useState<string | null>(null);
   useEffect(() => {
     if (typeof window !== "undefined") {
       setShareBaseUrl(window.location.origin);
     }
   }, []);
+
+  const loadDailyEvents = async () => {
+    if (!gymId) return;
+    const response = await authenticatedFetch(`/api/daily-events?gymId=${encodeURIComponent(gymId)}`);
+    const payload = await response.json().catch(() => null) as { events?: DailyEvent[]; error?: string } | null;
+    if (!response.ok) throw new Error(payload?.error ?? "No se pudieron cargar los eventos diarios.");
+    setDailyEvents(payload?.events ?? []);
+  };
+
+  useEffect(() => {
+    void loadDailyEvents().catch((error) => console.error("Error cargando eventos diarios", error));
+  }, [gymId]);
 
   const sortedSessions = useMemo(() => {
     return [...sessions].sort((a, b) => {
@@ -174,7 +202,7 @@ export function ClassRegistrationManagement({
       supabase
         .from("class_sessions")
         .select(
-          "id, gym_id, title, date, start_time, capacity, price, notes, created_at, accept_receipts"
+          "id, gym_id, title, date, start_time, capacity, price, notes, created_at, accept_receipts, daily_event_id"
         )
         .eq("gym_id", gymId)
         .order("date", { ascending: true })
@@ -722,7 +750,7 @@ export function ClassRegistrationManagement({
 
     setRefreshing(true);
     try {
-      await fetchLatestData();
+      await Promise.all([fetchLatestData(), loadDailyEvents()]);
     } catch (error) {
       console.error("Error actualizando las clases", error);
       setFeedback({
@@ -732,6 +760,33 @@ export function ClassRegistrationManagement({
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const handleCreateDailyEvent = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!gymId) return;
+    if (!dailyEventForm.title.trim() || !dailyEventForm.date || !dailyEventForm.start_time || !dailyEventForm.end_time) {
+      setFeedback({ type: "error", message: "Completa el nombre, la fecha y ambos horarios." }); return;
+    }
+    if (dailyEventForm.end_time <= dailyEventForm.start_time) {
+      setFeedback({ type: "error", message: "La hora de fin debe ser posterior a la de inicio." }); return;
+    }
+    setCreatingDailyEvent(true); setFeedback(null);
+    try {
+      const response = await authenticatedFetch("/api/daily-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ gymId, ...dailyEventForm, title: dailyEventForm.title.trim(), notes: dailyEventForm.notes.trim() || null }) });
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "No se pudo crear el evento diario.");
+      setDailyEventForm(INITIAL_DAILY_EVENT_FORM); setDailyDialogOpen(false);
+      await Promise.all([fetchLatestData(), loadDailyEvents()]);
+      setFeedback({ type: "success", message: "Agenda diaria creada. Ya puedes copiar y compartir su enlace." });
+    } catch (error) { setFeedback({ type: "error", message: error instanceof Error ? error.message : "No se pudo crear el evento diario." }); }
+    finally { setCreatingDailyEvent(false); }
+  };
+
+  const handleCopyDailyLink = async (dailyEvent: DailyEvent) => {
+    const url = `${shareBaseUrl}/inscripciones/${gymId}?diario=${dailyEvent.id}`;
+    try { await navigator.clipboard.writeText(url); setCopySuccessId(dailyEvent.id); setTimeout(() => setCopySuccessId((current) => current === dailyEvent.id ? null : current), 3000); }
+    catch { setFeedback({ type: "error", message: `No se pudo copiar el enlace. Copia manualmente: ${url}` }); }
   };
 
   return (
@@ -744,17 +799,14 @@ export function ClassRegistrationManagement({
           socios para que reserven su lugar de forma sencilla.
         </p>
         </div>
-        <Button
-          type="button"
-          onClick={() => {
-            resetForm();
-            setFeedback(null);
-            setIsCreateDialogOpen(true);
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Crear evento
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 shadow-md shadow-violet-200 hover:from-violet-700 hover:to-fuchsia-700" onClick={() => { resetForm(); setFeedback(null); setIsCreateDialogOpen(true); }}>
+            <Plus className="mr-2 h-4 w-4" /> Crear evento
+          </Button>
+          <Button type="button" className="rounded-xl border border-cyan-200 bg-cyan-50 text-cyan-950 shadow-sm hover:bg-cyan-100" onClick={() => { setDailyEventForm(INITIAL_DAILY_EVENT_FORM); setFeedback(null); setDailyDialogOpen(true); }}>
+            <CalendarDays className="mr-2 h-4 w-4" /> Crear evento diario
+          </Button>
+        </div>
       </div>
 
       {feedback && (
@@ -886,7 +938,25 @@ export function ClassRegistrationManagement({
         </DialogContent>
       </Dialog>
 
+      <Dialog open={dailyDialogOpen} onOpenChange={setDailyDialogOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader><DialogTitle>Crear evento diario con turnos</DialogTitle><DialogDescription>Se generará un único enlace para que cada persona elija un horario disponible.</DialogDescription></DialogHeader>
+          <form onSubmit={handleCreateDailyEvent} className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2 md:col-span-2"><Label>Nombre del evento</Label><Input required value={dailyEventForm.title} onChange={(event) => setDailyEventForm((current) => ({ ...current, title: event.target.value }))} placeholder="Ej.: Jornada de depilación" /></div>
+            <div className="space-y-2"><Label>Fecha</Label><Input required type="date" value={dailyEventForm.date} onChange={(event) => setDailyEventForm((current) => ({ ...current, date: event.target.value }))} /></div>
+            <div className="space-y-2"><Label>Duración de cada turno</Label><Input required type="number" min={5} max={240} step={5} value={dailyEventForm.slot_interval_minutes} onChange={(event) => setDailyEventForm((current) => ({ ...current, slot_interval_minutes: Number(event.target.value) || 5 }))} /><p className="text-xs text-muted-foreground">Minutos entre cada horario.</p></div>
+            <div className="space-y-2"><Label>Hora de inicio</Label><Input required type="time" value={dailyEventForm.start_time} onChange={(event) => setDailyEventForm((current) => ({ ...current, start_time: event.target.value }))} /></div>
+            <div className="space-y-2"><Label>Hora de fin</Label><Input required type="time" value={dailyEventForm.end_time} onChange={(event) => setDailyEventForm((current) => ({ ...current, end_time: event.target.value }))} /></div>
+            <div className="space-y-2 md:col-span-2"><Label>Personas por horario</Label><Input required type="number" min={1} value={dailyEventForm.capacity_per_slot} onChange={(event) => setDailyEventForm((current) => ({ ...current, capacity_per_slot: Number(event.target.value) || 1 }))} /></div>
+            <div className="space-y-2 md:col-span-2"><Label>Notas (opcional)</Label><Textarea value={dailyEventForm.notes} onChange={(event) => setDailyEventForm((current) => ({ ...current, notes: event.target.value }))} /></div>
+            <label className="md:col-span-2 flex cursor-pointer items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4"><Checkbox checked={dailyEventForm.accept_receipts} onCheckedChange={(checked) => setDailyEventForm((current) => ({ ...current, accept_receipts: checked === true }))} /><span><b>Solicitar comprobante</b><span className="mt-1 block text-sm text-muted-foreground">Al reservar, será obligatorio adjuntar una imagen o PDF.</span></span></label>
+            <DialogFooter className="md:col-span-2"><Button type="button" variant="outline" onClick={() => setDailyDialogOpen(false)} disabled={creatingDailyEvent}>Cancelar</Button><Button disabled={creatingDailyEvent} className="bg-cyan-600 hover:bg-cyan-700">{creatingDailyEvent ? "Creando turnos..." : "Crear agenda diaria"}</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <div className="space-y-4">
+        {dailyEvents.length > 0 && <Card className="border-cyan-100 bg-gradient-to-br from-cyan-50 to-white"><CardHeader><CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-cyan-700" />Eventos diarios con turnos</CardTitle><CardDescription>Cada evento tiene un enlace único y sus horarios se ocupan de forma independiente.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-2">{dailyEvents.map((dailyEvent) => { const slots = sessions.filter((session) => session.daily_event_id === dailyEvent.id); const booked = slots.reduce((total, slot) => total + (registrationsBySession.get(slot.id)?.length ?? 0), 0); return <div key={dailyEvent.id} className="rounded-2xl border border-cyan-100 bg-white p-4 shadow-sm"><div className="flex justify-between gap-3"><div><p className="font-bold text-slate-950">{dailyEvent.title}</p><p className="mt-1 text-sm text-slate-600">{new Date(`${dailyEvent.date}T00:00:00`).toLocaleDateString()} · {dailyEvent.start_time} a {dailyEvent.end_time}</p></div><Badge className="bg-cyan-100 text-cyan-800 hover:bg-cyan-100">{slots.length} turnos</Badge></div><p className="mt-3 text-sm text-slate-600"><b>{booked}</b> reservas · {dailyEvent.capacity_per_slot} por horario{dailyEvent.accept_receipts ? " · con comprobante" : ""}</p><div className="mt-4 flex gap-2"><Button size="sm" variant="outline" onClick={() => handleCopyDailyLink(dailyEvent)}><Copy className="mr-2 h-4 w-4" />{copySuccessId === dailyEvent.id ? "Link copiado" : "Copiar enlace"}</Button><Button size="sm" variant="secondary" onClick={() => setSelectedDailyEventId(dailyEvent.id)}><Users className="mr-2 h-4 w-4" />Ver reservas</Button></div></div>; })}</CardContent></Card>}
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h3 className="text-xl font-semibold">Eventos programados</h3>
@@ -956,7 +1026,7 @@ export function ClassRegistrationManagement({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedSessions.map((session) => {
+                    {sortedSessions.filter((session) => !session.daily_event_id).map((session) => {
                       const sessionRegistrations =
                         registrationsBySession.get(session.id) ?? [];
                       const spotsLeft = Math.max(
@@ -1189,6 +1259,17 @@ export function ClassRegistrationManagement({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(selectedDailyEventId)} onOpenChange={(open) => !open && setSelectedDailyEventId(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader><DialogTitle>Reservas por horario</DialogTitle><DialogDescription>{dailyEvents.find((event) => event.id === selectedDailyEventId)?.title ?? "Evento diario"}</DialogDescription></DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto rounded-md border">
+            <Table><TableHeader><TableRow><TableHead>Horario</TableHead><TableHead>Nombre</TableHead><TableHead>Contacto</TableHead><TableHead>Comprobante</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader><TableBody>
+              {(sessions.filter((session) => session.daily_event_id === selectedDailyEventId).flatMap((slot) => (registrationsBySession.get(slot.id) ?? []).map((registration) => ({ slot, registration })))).length === 0 ? <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Todavía no hay reservas.</TableCell></TableRow> : sessions.filter((session) => session.daily_event_id === selectedDailyEventId).flatMap((slot) => (registrationsBySession.get(slot.id) ?? []).map((registration) => ({ slot, registration }))).map(({ slot, registration }) => <TableRow key={registration.id}><TableCell className="font-semibold">{slot.start_time} hs</TableCell><TableCell>{registration.full_name}</TableCell><TableCell className="text-muted-foreground">{registration.email || registration.phone || "-"}</TableCell><TableCell>{registration.receipt_url ? <Button variant="outline" size="sm" asChild><a href={registration.receipt_url} target="_blank" rel="noopener noreferrer">Ver</a></Button> : "-"}</TableCell><TableCell><Button variant="destructive" size="sm" onClick={() => handleDeleteRegistration(registration.id)} disabled={deletingRegistrationId === registration.id}>Eliminar</Button></TableCell></TableRow>)}
+            </TableBody></Table>
+          </div>
         </DialogContent>
       </Dialog>
 

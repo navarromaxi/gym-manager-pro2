@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useParams, useSearchParams } from "next/navigation";
 import { Calendar, Clock, Ticket, Users } from "lucide-react";
 
-import type { ClassSession } from "@/lib/supabase";
+import type { ClassSession, DailyEvent } from "@/lib/supabase";
 import {
   Card,
   CardContent,
@@ -75,6 +75,8 @@ function PublicClassRegistrationPageContent() {
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const [receiptInputKey, setReceiptInputKey] = useState(0);
+  const [dailyEvent, setDailyEvent] = useState<DailyEvent | null>(null);
+  const dailyEventId = searchParams?.get("diario") ?? "";
 
   const sortedSessions = useMemo(() => {
     return [...sessions].sort((a, b) => {
@@ -138,11 +140,13 @@ function PublicClassRegistrationPageContent() {
 
       try {
         const classesResponse = await fetch(
-          `/api/public-gyms/${gymId}/class-sessions`,
+          dailyEventId
+            ? `/api/public-gyms/${gymId}/daily-events/${dailyEventId}`
+            : `/api/public-gyms/${gymId}/class-sessions`,
           { method: "GET", cache: "no-store" }
         );
         const classesPayload = (await classesResponse.json().catch(() => null)) as
-          | { sessions?: ClassSession[]; occupiedSeats?: Record<string, number>; error?: string }
+          | { sessions?: ClassSession[]; occupiedSeats?: Record<string, number>; event?: DailyEvent; error?: string }
           | null;
 
         if (!classesResponse.ok) {
@@ -151,6 +155,7 @@ function PublicClassRegistrationPageContent() {
 
         setSessions(classesPayload?.sessions ?? []);
         setOccupiedSeats(classesPayload?.occupiedSeats ?? {});
+        setDailyEvent(classesPayload?.event ?? null);
 
         let resolvedGymName: string | null | undefined = undefined;
         let resolvedGymLogoUrl: string | null | undefined = undefined;
@@ -199,7 +204,7 @@ function PublicClassRegistrationPageContent() {
         setLoading(false);
       }
     },
-    [gymId]
+    [gymId, dailyEventId]
   );
 
   useEffect(() => {
@@ -465,7 +470,9 @@ function PublicClassRegistrationPageContent() {
                   Reserva tu lugar
                 </CardTitle>
                 <CardDescription className="text-slate-600">
-                  Elegí una actividad y completá tus datos para confirmar tu cupo.
+                  {dailyEvent
+                    ? `Elegí un horario disponible para ${dailyEvent.title} y completá tus datos.`
+                    : "Elegí una actividad y completá tus datos para confirmar tu cupo."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-5 py-6 sm:px-8 sm:py-8">
@@ -474,7 +481,7 @@ function PublicClassRegistrationPageContent() {
                   onSubmit={handleSubmit}
                 >
                   <div className="space-y-2.5">
-                    <Label className="text-sm font-semibold text-slate-800">Elegí clase o evento</Label>
+                    <Label className="text-sm font-semibold text-slate-800">{dailyEvent ? "Elegí tu horario" : "Elegí clase o evento"}</Label>
                     <Select
                       value={selectedSessionId}
                       onValueChange={setSelectedSessionId}
@@ -500,7 +507,7 @@ function PublicClassRegistrationPageContent() {
                           }`;
                           return (
                             <SelectItem key={session.id} value={session.id}>
-                              {session.title}
+                              {dailyEvent ? `${session.start_time} hs` : session.title}
                               <span className="block text-xs text-muted-foreground">
                                 {label}
                               </span>

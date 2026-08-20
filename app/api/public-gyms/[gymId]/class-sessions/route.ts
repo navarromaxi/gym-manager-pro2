@@ -27,6 +27,7 @@ export async function GET(
     .from("class_sessions")
     .select("id, gym_id, title, date, start_time, capacity, price, notes, created_at, accept_receipts")
     .eq("gym_id", parsed.data.gymId)
+    .is("daily_event_id", null)
     .order("date", { ascending: true })
     .order("start_time", { ascending: true });
 

@@ -399,6 +399,21 @@ export interface ClassSession {
   notes?: string | null
   created_at?: string | null
   accept_receipts: boolean
+  daily_event_id?: string | null
+}
+
+export interface DailyEvent {
+  id: string
+  gym_id: string
+  title: string
+  date: string
+  start_time: string
+  end_time: string
+  slot_interval_minutes: number
+  capacity_per_slot: number
+  accept_receipts: boolean
+  notes?: string | null
+  created_at?: string | null
 }
 
 export interface ClassRegistration {
