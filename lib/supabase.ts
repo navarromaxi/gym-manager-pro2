@@ -314,6 +314,7 @@ export interface Prospect {
   notes: string
   priority_level?: "green" | "yellow" | "red" // ¡NUEVA PROPIEDAD!
   scheduled_date?: string | null
+  scheduled_time?: string | null
   created_at?: string
   next_contact_date?: string | null
 }

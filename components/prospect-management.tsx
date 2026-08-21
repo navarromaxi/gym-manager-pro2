@@ -358,6 +358,7 @@ export function ProspectManagement({
     notes: "",
     priority_level: "green" as "green" | "yellow" | "red", // Nuevo campo con valor por defecto
     scheduled_date: "",
+    scheduled_time: "",
     next_contact_date: "",
   });
 
@@ -649,6 +650,9 @@ export function ProspectManagement({
       const scheduledDateValue = newProspect.scheduled_date
         ? newProspect.scheduled_date
         : null;
+      const scheduledTimeValue = scheduledDateValue && newProspect.scheduled_time
+        ? newProspect.scheduled_time
+        : null;
       const nextContactDateValue = newProspect.next_contact_date
         ? newProspect.next_contact_date
         : null;
@@ -666,6 +670,7 @@ export function ProspectManagement({
           notes: newProspect.notes,
           priority_level: newProspect.priority_level,
           scheduled_date: scheduledDateValue,
+          scheduled_time: scheduledTimeValue,
           next_contact_date: nextContactDateValue,
         },
       ]);
@@ -684,6 +689,7 @@ export function ProspectManagement({
         notes: newProspect.notes,
         priority_level: newProspect.priority_level,
         scheduled_date: scheduledDateValue,
+        scheduled_time: scheduledTimeValue,
         next_contact_date: nextContactDateValue,
       };
 
@@ -699,6 +705,7 @@ export function ProspectManagement({
         notes: "",
         priority_level: "green", // Resetear a verde por defecto
         scheduled_date: "",
+        scheduled_time: "",
         next_contact_date: "",
       });
       setIsAddDialogOpen(false);
@@ -728,6 +735,9 @@ export function ProspectManagement({
           notes: editingProspect.notes,
           priority_level: editingProspect.priority_level, // Incluir el nuevo campo
           scheduled_date: editingProspect.scheduled_date || null,
+          scheduled_time: editingProspect.scheduled_date
+            ? editingProspect.scheduled_time || null
+            : null,
           next_contact_date: editingProspect.next_contact_date || null,
         })
         .eq("id", editingProspect.id)
@@ -1137,11 +1147,32 @@ export function ProspectManagement({
                     setNewProspect({
                       ...newProspect,
                       scheduled_date: e.target.value,
+                      scheduled_time: e.target.value
+                        ? newProspect.scheduled_time
+                        : "",
                     })
                   }
                 />
                 <p className="text-xs text-muted-foreground">
                   Fecha prevista para la clase de prueba (opcional).
+                </p>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="scheduled_time">Hora agendada</Label>
+                <Input
+                  id="scheduled_time"
+                  type="time"
+                  value={newProspect.scheduled_time}
+                  disabled={!newProspect.scheduled_date}
+                  onChange={(e) =>
+                    setNewProspect({
+                      ...newProspect,
+                      scheduled_time: e.target.value,
+                    })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Elegí la hora una vez coordinada la fecha (opcional).
                 </p>
               </div>
               <div className="grid gap-2">
@@ -1481,6 +1512,7 @@ export function ProspectManagement({
               <TableBody>
                 {displayedProspects.map((prospect) => {
                   const scheduledDate = formatDate(prospect.scheduled_date);
+                  const scheduledTime = prospect.scheduled_time?.slice(0, 5);
                   const nextContactDate = formatDate(
                     prospect.next_contact_date
                   );
@@ -1516,14 +1548,24 @@ export function ProspectManagement({
                           </span>
                         )}
                       </TableCell>
-                       <TableCell>
+                      <TableCell>
                         {scheduledDate ? (
-                          <Badge
-                            variant="outline"
-                            className="border-cyan-500 text-cyan-600"
-                          >
-                            {scheduledDate}
-                          </Badge>
+                          <div className="flex flex-col items-start gap-1">
+                            <Badge
+                              variant="outline"
+                              className="border-cyan-500 text-cyan-600"
+                            >
+                              {scheduledDate}
+                            </Badge>
+                            {scheduledTime && (
+                              <Badge
+                                variant="outline"
+                                className="border-cyan-500 text-cyan-600"
+                              >
+                                {scheduledTime}
+                              </Badge>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">
                             Sin coordinar
@@ -1721,11 +1763,32 @@ export function ProspectManagement({
                       setEditingProspect({
                         ...editingProspect,
                         scheduled_date: e.target.value ? e.target.value : null,
+                        scheduled_time: e.target.value
+                          ? editingProspect.scheduled_time
+                          : null,
                       })
                     }
                   />
                   <p className="text-xs text-muted-foreground">
                     Fecha coordinada para la clase de prueba (opcional).
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-scheduled_time">Hora agendada</Label>
+                  <Input
+                    id="edit-scheduled_time"
+                    type="time"
+                    value={editingProspect.scheduled_time ?? ""}
+                    disabled={!editingProspect.scheduled_date}
+                    onChange={(e) =>
+                      setEditingProspect({
+                        ...editingProspect,
+                        scheduled_time: e.target.value || null,
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Hora coordinada para la clase de prueba (opcional).
                   </p>
                 </div>
                  <div className="grid gap-2">

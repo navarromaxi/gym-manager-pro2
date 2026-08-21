@@ -418,7 +418,7 @@ export default function GymManagementSystem() {
         supabase
           .from("prospects")
           .select(
-            "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, next_contact_date, created_at",
+            "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, scheduled_time, next_contact_date, created_at",
             { count: "exact" }
           )
           .eq("gym_id", gymId)
@@ -593,7 +593,7 @@ export default function GymManagementSystem() {
       const { data, error, count } = await supabase
         .from("prospects")
         .select(
-          "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, next_contact_date, created_at",
+          "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, scheduled_time, next_contact_date, created_at",
           { count: "exact" }
         )
         .eq("gym_id", gymData.id)
