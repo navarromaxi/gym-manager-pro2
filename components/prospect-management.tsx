@@ -444,8 +444,11 @@ export function ProspectManagement({
     return new Date(`${date}T00:00:00`).toLocaleDateString();
   };
 
-   const getScheduledReminderKey = (prospect: Prospect) =>
-    `scheduled:${prospect.id}:${prospect.scheduled_date ?? ""}`;
+  const getScheduledReminderKey = (prospect: Prospect) =>
+    `scheduled:${prospect.id}:${getTrialReminderScheduleKey(prospect)}`;
+
+  const getTrialReminderScheduleKey = (prospect: Prospect) =>
+    `${prospect.scheduled_date ?? ""}T${prospect.scheduled_time?.slice(0, 5) ?? ""}`;
 
   const getNextContactReminderKey = (prospect: Prospect) =>
     `next-contact:${prospect.id}:${prospect.next_contact_date ?? ""}`;
@@ -454,6 +457,31 @@ export function ProspectManagement({
     setDismissedReminders((prev) =>
       prev.includes(key) ? prev : [...prev, key]
     );
+  };
+
+  const handleMarkTrialReminderSent = async (prospect: Prospect) => {
+    const sentFor = getTrialReminderScheduleKey(prospect);
+
+    try {
+      const { error } = await supabase
+        .from("prospects")
+        .update({ trial_reminder_sent_for: sentFor })
+        .eq("id", prospect.id)
+        .eq("gym_id", gymId);
+
+      if (error) throw error;
+
+      setProspects((prev) =>
+        prev.map((item) =>
+          item.id === prospect.id
+            ? { ...item, trial_reminder_sent_for: sentFor }
+            : item
+        )
+      );
+    } catch (error) {
+      console.error("Error marcando recordatorio de clase como enviado:", error);
+      alert("Error al marcar el recordatorio como enviado. Inténtalo de nuevo.");
+    }
   };
 
   const handleMarkNextContactDone = async (prospectId: string) => {
@@ -509,7 +537,10 @@ export function ProspectManagement({
       }
 
       const reminderKey = getScheduledReminderKey(prospect);
-      if (dismissedReminders.includes(reminderKey)) {
+      if (
+        dismissedReminders.includes(reminderKey) ||
+        prospect.trial_reminder_sent_for === getTrialReminderScheduleKey(prospect)
+      ) {
         return false;
       }
 
@@ -2256,7 +2287,7 @@ export function ProspectManagement({
           {upcomingTrialReminders.map((prospect) => {
             const reminderKey = getScheduledReminderKey(prospect);
             const scheduledLabel = formatScheduledDateTime(
-              prospect.scheduled_date
+              `${prospect.scheduled_date ?? ""}${prospect.scheduled_time ? `T${prospect.scheduled_time}` : ""}`
             );
 
             return (
@@ -2275,14 +2306,26 @@ export function ProspectManagement({
                     </p>
                   ) : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleDismissReminder(reminderKey)}
-                  className="ml-2 text-green-600 transition hover:text-green-800"
-                  aria-label={`Cerrar recordatorio para ${prospect.name}`}
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="ml-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleMarkTrialReminderSent(prospect)}
+                    className="text-green-600 transition hover:text-green-800"
+                    aria-label={`Marcar recordatorio enviado para ${prospect.name}`}
+                    title="Marcar recordatorio como enviado"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDismissReminder(reminderKey)}
+                    className="text-green-600 transition hover:text-green-800"
+                    aria-label={`Cerrar recordatorio para ${prospect.name}`}
+                    title="Cerrar recordatorio"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             );
           })}

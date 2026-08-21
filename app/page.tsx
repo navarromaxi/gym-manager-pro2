@@ -195,6 +195,22 @@ const parseOptionalISODate = (iso?: string | null) => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
+const getLocalISODate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getTomorrowISODate = () => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return getLocalISODate(tomorrow);
+};
+
+const getTrialReminderScheduleKey = (prospect: Prospect) =>
+  `${prospect.scheduled_date ?? ""}T${prospect.scheduled_time?.slice(0, 5) ?? ""}`;
+
 const isOneTimePaymentDue = (payment: OneTimePayment): boolean => {
   const estimatedDate = parseOptionalISODate(payment.estimated_payment_date);
   if (!estimatedDate) {
@@ -316,6 +332,11 @@ export default function GymManagementSystem() {
     useState<Prospect["status"] | "all" | null>(null);
   const [dismissedNextContactReminders, setDismissedNextContactReminders] =
     useState<string[]>([]);
+  const [dismissedTrialReminders, setDismissedTrialReminders] = useState<
+    string[]
+  >([]);
+  const [dashboardTrialReminderProspects, setDashboardTrialReminderProspects] =
+    useState<Prospect[]>([]);
 
   const displayGymName = gymData?.name
     ? sanitizeGymName(gymData.name)
@@ -367,6 +388,7 @@ export default function GymManagementSystem() {
     setProspectsPage(1);
     setProspectsTotal(null);
     setProspectsLoadingMore(false);
+    setDashboardTrialReminderProspects([]);
     setExpenses([]);
     setPlans([]);
     setActivities([]);
@@ -395,6 +417,7 @@ export default function GymManagementSystem() {
         { data: paymentsData, error: paymentsError },
         { data: expensesData, error: expensesError },
         { data: prospectsData, error: prospectsError, count: prospectsCount },
+        { data: trialReminderData, error: trialReminderError },
         { data: plansData, error: plansError },
         { data: activitiesData, error: activitiesError },
         { data: customPlansData, error: customPlansError },
@@ -418,13 +441,21 @@ export default function GymManagementSystem() {
         supabase
           .from("prospects")
           .select(
-            "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, scheduled_time, next_contact_date, created_at",
+            "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, scheduled_time, trial_reminder_sent_for, next_contact_date, created_at",
             { count: "exact" }
           )
           .eq("gym_id", gymId)
           .order("contact_date", { ascending: false, nullsFirst: false })
           .order("created_at", { ascending: false })
           .range(0, PROSPECTS_PAGE_SIZE - 1),
+        supabase
+          .from("prospects")
+          .select(
+            "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, scheduled_time, trial_reminder_sent_for, next_contact_date, created_at"
+          )
+          .eq("gym_id", gymId)
+          .eq("scheduled_date", getTomorrowISODate())
+          .in("status", ["trial_scheduled", "waiting_response"]),
         supabase
           .from("plans")
           .select(
@@ -465,6 +496,13 @@ export default function GymManagementSystem() {
 
       if (prospectsError) {
         console.error("Error cargando interesados:", prospectsError);
+      }
+
+      if (trialReminderError) {
+        console.error(
+          "Error cargando recordatorios de clases de prueba:",
+          trialReminderError
+        );
       }
 
       if (plansError) {
@@ -508,6 +546,12 @@ export default function GymManagementSystem() {
         typeof prospectsCount === "number"
           ? prospectsCount
           : normalizedProspects.length
+      );
+      setDashboardTrialReminderProspects(
+        (trialReminderData ?? []).map((prospect: any) => ({
+          ...prospect,
+          status: mapProspectStatusFromDb(prospect.status),
+        })) as Prospect[]
       );
       setPlans((plansData ?? []).map(normalizePlan));
       setActivities((activitiesData ?? []) as Activity[]);
@@ -593,7 +637,7 @@ export default function GymManagementSystem() {
       const { data, error, count } = await supabase
         .from("prospects")
         .select(
-          "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, scheduled_time, next_contact_date, created_at",
+          "id, gym_id, name, email, phone, contact_date, interest, status, notes, priority_level, scheduled_date, scheduled_time, trial_reminder_sent_for, next_contact_date, created_at",
           { count: "exact" }
         )
         .eq("gym_id", gymData.id)
@@ -877,6 +921,60 @@ export default function GymManagementSystem() {
     setDismissedNextContactReminders((prev) =>
       prev.includes(key) ? prev : [...prev, key]
     );
+  };
+
+  const trialReminders = useMemo(() => {
+    const tomorrow = getTomorrowISODate();
+    const candidates = new Map<string, Prospect>();
+
+    [...dashboardTrialReminderProspects, ...prospects].forEach((prospect) => {
+      candidates.set(prospect.id, prospect);
+    });
+
+    return [...candidates.values()].filter((prospect) => {
+      const reminderKey = `trial:${prospect.id}:${getTrialReminderScheduleKey(prospect)}`;
+      return (
+        prospect.scheduled_date === tomorrow &&
+        (prospect.status === "trial_scheduled" || prospect.status === "reagendado") &&
+        prospect.trial_reminder_sent_for !== getTrialReminderScheduleKey(prospect) &&
+        !dismissedTrialReminders.includes(reminderKey)
+      );
+    });
+  }, [
+    dashboardTrialReminderProspects,
+    prospects,
+    dismissedTrialReminders,
+  ]);
+
+  const handleDismissTrialReminder = (key: string) => {
+    setDismissedTrialReminders((prev) =>
+      prev.includes(key) ? prev : [...prev, key]
+    );
+  };
+
+  const handleMarkTrialReminderSent = async (prospect: Prospect) => {
+    const sentFor = getTrialReminderScheduleKey(prospect);
+
+    try {
+      const { error } = await supabase
+        .from("prospects")
+        .update({ trial_reminder_sent_for: sentFor })
+        .eq("id", prospect.id)
+        .eq("gym_id", prospect.gym_id);
+
+      if (error) throw error;
+
+      const updateReminder = (item: Prospect) =>
+        item.id === prospect.id
+          ? { ...item, trial_reminder_sent_for: sentFor }
+          : item;
+
+      setProspects((prev) => prev.map(updateReminder));
+      setDashboardTrialReminderProspects((prev) => prev.map(updateReminder));
+    } catch (error) {
+      console.error("Error marcando recordatorio de clase como enviado:", error);
+      alert("Error al marcar el recordatorio como enviado. Inténtalo de nuevo.");
+    }
   };
 
   const handleMarkNextContactDone = async (prospectId: string) => {
@@ -1382,7 +1480,8 @@ export default function GymManagementSystem() {
           />
         )}
       </main>
-      {activeTab === "dashboard" && nextContactReminders.length > 0 && (
+      {activeTab === "dashboard" &&
+        (nextContactReminders.length > 0 || trialReminders.length > 0) && (
         <div className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2">
           {nextContactReminders.map((prospect) => {
             const reminderKey = getNextContactReminderKey(prospect);
@@ -1430,6 +1529,47 @@ export default function GymManagementSystem() {
                     type="button"
                     onClick={() => handleDismissNextContactReminder(reminderKey)}
                     className="text-purple-600 transition hover:text-purple-800"
+                    aria-label={`Cerrar recordatorio para ${prospect.name}`}
+                    title="Cerrar recordatorio"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {trialReminders.map((prospect) => {
+            const scheduleKey = getTrialReminderScheduleKey(prospect);
+            const reminderKey = `trial:${prospect.id}:${scheduleKey}`;
+            const scheduledTime = prospect.scheduled_time?.slice(0, 5);
+
+            return (
+              <div
+                key={reminderKey}
+                className="flex items-start gap-3 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800 shadow-lg"
+              >
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600" />
+                <div className="flex-1">
+                  <p className="font-semibold">
+                    {prospect.name} mañana
+                    {scheduledTime ? ` a las ${scheduledTime}` : ""} tiene
+                    una clase de prueba agendada.
+                  </p>
+                </div>
+                <div className="ml-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleMarkTrialReminderSent(prospect)}
+                    className="text-green-600 transition hover:text-green-800"
+                    aria-label={`Marcar recordatorio enviado para ${prospect.name}`}
+                    title="Marcar recordatorio como enviado"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDismissTrialReminder(reminderKey)}
+                    className="text-green-600 transition hover:text-green-800"
                     aria-label={`Cerrar recordatorio para ${prospect.name}`}
                     title="Cerrar recordatorio"
                   >
