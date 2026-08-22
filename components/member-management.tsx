@@ -110,6 +110,10 @@ export function MemberManagement({
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [editingPlanStartDate, setEditingPlanStartDate] = useState("");
+  const [editingPlanPaymentId, setEditingPlanPaymentId] = useState<string | null>(
+    null
+  );
   const editDescriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
@@ -304,6 +308,36 @@ export function MemberManagement({
     }
   };
 
+  const getLatestPlanPayment = (memberId: string) => {
+    let latestPayment: Payment | null = null;
+    let latestStartTime = -Infinity;
+
+    for (const payment of payments) {
+      if (
+        payment.member_id !== memberId ||
+        payment.type !== "plan" ||
+        !payment.start_date
+      ) {
+        continue;
+      }
+      const startTime = toLocalDate(payment.start_date).getTime();
+      if (!Number.isNaN(startTime) && startTime > latestStartTime) {
+        latestPayment = payment;
+        latestStartTime = startTime;
+      }
+    }
+
+    return latestPayment;
+  };
+
+  const openEditMember = (member: Member) => {
+    const latestPlanPayment = getLatestPlanPayment(member.id);
+    setEditingMember(member);
+    setEditingPlanPaymentId(latestPlanPayment?.id ?? null);
+    setEditingPlanStartDate(latestPlanPayment?.start_date ?? member.last_payment ?? "");
+    setIsEditDialogOpen(true);
+  };
+
   const handleAddMember = async () => {
     try {
       const startDate = new Date(newMember.planStartDate);
@@ -452,6 +486,12 @@ export function MemberManagement({
 
     try {
       const currentMember = members.find((member) => member.id === editingMember.id);
+      const originalPlanStartDate = editingPlanPaymentId
+        ? payments.find((payment) => payment.id === editingPlanPaymentId)?.start_date ?? ""
+        : currentMember?.last_payment ?? "";
+      const planStartDateChanged =
+        Boolean(editingPlanStartDate) &&
+        editingPlanStartDate !== originalPlanStartDate;
       const resetExpiringSoonContacted =
         !!currentMember &&
         currentMember.next_payment !== editingMember.next_payment;
@@ -475,6 +515,8 @@ export function MemberManagement({
         email: editingMember.email,
         phone: editingMember.phone,
         cedula: editingMember.cedula ?? null,
+        // Se conserva el fin del plan: este campo solo refleja el inicio elegido.
+        last_payment: editingPlanStartDate || editingMember.last_payment,
         next_payment: editingMember.next_payment,
         next_installment_due:
           editingMember.next_installment_due || editingMember.next_payment,
@@ -485,10 +527,21 @@ export function MemberManagement({
         inactive_level: newInactive,
       });
 
+      // El inicio que se muestra en Socios vive en el pago de plan más reciente.
+      // No se recalcula el vencimiento ni se modifica el plan al corregirlo.
+      if (editingPlanPaymentId && planStartDateChanged) {
+        const { error: paymentError } = await supabase
+          .from("payments")
+          .update({ start_date: editingPlanStartDate })
+          .eq("id", editingPlanPaymentId);
+        if (paymentError) throw paymentError;
+      }
+
       const updatedMembers = members.map((m) =>
         m.id === editingMember.id
           ? {
               ...editingMember,
+              last_payment: editingPlanStartDate || editingMember.last_payment,
               expiring_soon_contacted: resetExpiringSoonContacted
                 ? false
                 : editingMember.expiring_soon_contacted,
@@ -498,9 +551,15 @@ export function MemberManagement({
           : m
       );
       const updatedPayments = payments.map((payment) =>
-        payment.member_id === editingMember.id
-          ? { ...payment, member_name: editingMember.name }
-          : payment
+        payment.member_id !== editingMember.id
+          ? payment
+          : {
+              ...payment,
+              member_name: editingMember.name,
+              ...(payment.id === editingPlanPaymentId && planStartDateChanged
+                ? { start_date: editingPlanStartDate }
+                : {}),
+            }
       );
 
       const updatedCustomPlans = customPlans.map((plan) =>
@@ -1482,10 +1541,7 @@ export function MemberManagement({
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => {
-                            setEditingMember(member);
-                            setIsEditDialogOpen(true);
-                          }}
+                          onClick={() => openEditMember(member)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -1588,6 +1644,19 @@ export function MemberManagement({
                       })
                     }
                   />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-plan-start-date">Inicio del plan</Label>
+                  <Input
+                    id="edit-plan-start-date"
+                    type="date"
+                    value={editingPlanStartDate}
+                    required
+                    onChange={(e) => setEditingPlanStartDate(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Modifica solo la fecha de inicio; no cambia el plan ni su fecha de fin.
+                  </p>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="edit-next-payment">Fin del plan</Label>
