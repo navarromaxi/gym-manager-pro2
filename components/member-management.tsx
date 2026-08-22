@@ -1138,7 +1138,7 @@ export function MemberManagement({
               }}
             >
               <RotateCcw className="mr-2 h-3.5 w-3.5" />
-              Restablecer
+              Limpiar filtros
             </Button>
           </div>
         </CardHeader>
