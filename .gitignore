@@ -28,3 +28,5 @@ next-env.d.ts
 
 # Google service-account credentials. Never commit these private keys.
 rutinas-personalizadas-*.json
+
+.vercel

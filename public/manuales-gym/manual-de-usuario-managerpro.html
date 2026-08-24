@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Manual de usuario · ManagerPro 2.0</title>
+  <style>
+    :root { --ink:#102033; --muted:#607086; --brand:#1458df; --teal:#0f9d8a; --line:#dae3ee; --paper:#fff; --soft:#f4f8fc; }
+    * { box-sizing:border-box; } body { margin:0; background:#e9f0f7; color:var(--ink); font-family:"Segoe UI",Arial,sans-serif; }
+    .doc { width:min(100%,950px); margin:24px auto; background:var(--paper); box-shadow:0 18px 50px rgba(15,37,64,.12); }
+    header { padding:48px 56px 38px; color:white; background:linear-gradient(135deg,#09224e,#155bd6 62%,#0f9d8a); }
+    .tag { margin:0 0 10px; font-size:12px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; opacity:.85; }
+    h1 { margin:0; font-size:2.45rem; line-height:1.05; } .lead { max-width:750px; margin:16px 0 0; line-height:1.7; color:rgba(255,255,255,.9); }
+    main { padding:26px 56px 56px; } section { padding:23px 0; border-bottom:1px solid var(--line); } section:last-child { border:0; }
+    h2 { margin:0 0 9px; color:#0d4cba; font-size:1.38rem; } h3 { margin:16px 0 7px; font-size:1.03rem; } p { margin:0 0 11px; line-height:1.72; }
+    ul,ol { margin:8px 0 0 21px; padding:0; } li { margin:0 0 7px; line-height:1.6; }
+    .note { margin-top:13px; padding:14px 16px; border-left:4px solid var(--teal); border-radius:10px; background:#ebfbf8; line-height:1.65; }
+    .warn { border-left-color:#e49513; background:#fff9e9; } .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:12px; }
+    .card { padding:14px 16px; border:1px solid var(--line); border-radius:13px; background:var(--soft); } .card strong { display:block; color:#0d4cba; margin-bottom:5px; }
+    .steps { margin-top:12px; padding:15px 18px; border-radius:13px; background:#f7faff; border:1px solid #dbeafe; }
+    .toc { columns:2; column-gap:38px; margin:14px 0 0; padding:17px 20px; border-radius:14px; background:var(--soft); } .toc li { break-inside:avoid; }
+    footer { padding:22px 56px 32px; color:var(--muted); font-size:.9rem; }
+    @page { size:A4; margin:14mm; } @media print { body{background:#fff}.doc{margin:0;width:auto;box-shadow:none} header{break-after:avoid} }
+    @media (max-width:700px) { header,main,footer{padding-left:24px;padding-right:24px}.grid{grid-template-columns:1fr}.toc{columns:1} }
+  </style>
+</head>
+<body>
+  <article class="doc">
+    <header><p class="tag">ManagerPro 2.0 · Manual de usuario</p><h1>Guía de operación diaria</h1><p class="lead">Esta guía explica cómo usar los módulos principales del sistema para administrar socios, cobros, prospectos, clases, rutinas y la operación del gimnasio.</p></header>
+    <main>
+      <section><h2>Antes de comenzar</h2><p>Ingresá con tu usuario autorizado. La barra superior contiene los módulos y las pantallas públicas —reservas, rutinas y acceso— se comparten mediante enlaces, sin entregar acceso al panel administrativo.</p><div class="note"><strong>Regla de trabajo recomendada:</strong> registrá cada alta, pago, cambio de plan, clase y contacto en el momento en que sucede. De esa forma, el dashboard y los reportes reflejan la operación real.</div></section>
+      <section><h2>Índice de módulos</h2><ol class="toc"><li>Dashboard</li><li>Socios</li><li>Pagos</li><li>Leads</li><li>Inactivos</li><li>Planes</li><li>Plan complemento</li><li>Pagos únicos</li><li>Clases</li><li>Eventos</li><li>Ejercicios</li><li>Rutinas</li><li>Accesos</li><li>Gastos</li><li>Actividades</li><li>Reportes</li><li>Facturas</li></ol></section>
+      <section><h2>1. Dashboard</h2><p>Es el punto de partida. Resume socios activos, ingresos, ganancia mensual, vencimientos y alertas importantes.</p><div class="steps"><strong>Uso diario</strong><ol><li>Revisá las alertas al inicio de la jornada.</li><li>Abrí los accesos directos para ver socios vencidos, seguimientos pendientes o interesados nuevos.</li><li>Usá los indicadores como referencia rápida; el detalle se gestiona desde el módulo correspondiente.</li></ol></div></section>
+      <section><h2>2. Socios</h2><p>Centraliza la ficha y el estado de cada miembro. Podés buscar por nombre, email o teléfono y filtrar por plan o situación.</p><ul><li>Usá <strong>Nuevo socio</strong> para registrar una alta directa.</li><li>Consultá plan actual, inicio, fin, próxima cuota y saldo pendiente.</li><li>Editá la información cuando cambie el plan, contacto o estado.</li><li>Desde las alertas se accede rápidamente a vencidos y contactos pendientes.</li></ul></section>
+      <section><h2>3. Pagos</h2><p>Registra cobros y renovaciones de planes. El historial permite filtrar por socio, método, período, tipo y estado.</p><ul><li>Elegí <strong>Registrar pago</strong> y verificá socio, monto, método y detalle.</li><li>Al renovar un plan, confirmá correctamente las fechas de inicio y próxima cuota.</li><li>Usá <strong>Facturar</strong> cuando corresponda emitir un comprobante.</li></ul><div class="note warn"><strong>Importante:</strong> no borres pagos para corregir una diferencia sin verificar antes la operación. Mantené la trazabilidad del historial.</div></section>
+      <section><h2>4. Leads</h2><p>Sirve para administrar personas interesadas antes de que sean socias. Cada lead puede tener prioridad, estado, fecha de contacto, próximo contacto y clase de prueba.</p><div class="steps"><strong>Flujo recomendado de un lead</strong><ol><li>Creá el interesado con sus datos de contacto.</li><li>Registrá interés, prioridad y próximo contacto.</li><li>Si agenda una prueba, cargá fecha, hora y email.</li><li>Cuando confirme su ingreso, usá <strong>Convertir a socio</strong>, seleccioná plan y registrá el pago inicial.</li></ol></div><div class="note"><strong>Recordatorio automático de clase de prueba:</strong> todos los días a las 14:00 de Uruguay el sistema envía un email a quienes tienen una clase de prueba para el día siguiente. Solo aplica a estados <strong>clase agendada</strong> y <strong>reagendado</strong>, con email, fecha y hora cargados. Los leads en <strong>esperando respuesta</strong> no reciben ese email.</div></section>
+      <section><h2>5. Inactivos</h2><p>Reúne socios sin actividad para facilitar campañas de recuperación. Filtrá, revisá su información y registrá el seguimiento que realice el equipo.</p></section>
+      <section><h2>6. Planes</h2><p>Configurá las membresías base del gimnasio: nombre, precio, duración y actividades incluidas. Los planes quedan disponibles al crear socios, convertir leads y renovar pagos.</p><ul><li>Revisá precio y vigencia antes de asignarlo.</li><li>Desactivá planes que ya no se ofrezcan, en lugar de reutilizarlos para otro producto.</li></ul></section>
+      <section><h2>7. Plan complemento</h2><p>Gestiona propuestas personalizadas o complementarias a la membresía principal. Permite controlar vigencia, cuotas, renovaciones y estado de cada caso especial.</p></section>
+      <section><h2>8. Pagos únicos</h2><p>Usalo para cobros extraordinarios que no corresponden a una cuota recurrente. Cargá monto, fecha, método y descripción para que el ingreso quede incluido en los reportes.</p></section>
+      <section><h2>9. Clases</h2><p>Organiza las clases semanales por día, horario y cupo. El equipo puede consultar listados de asistentes y los socios pueden reservar online desde el enlace público.</p><ul><li>Configurá correctamente día, hora y capacidad.</li><li>Verificá el listado antes de iniciar la clase.</li><li>Compartí el enlace de reservas para que el socio gestione su lugar.</li></ul></section>
+      <section><h2>10. Eventos</h2><p>Para actividades puntuales con fecha o turnos propios. Creá el evento, configurá horarios y capacidad, y compartí su enlace de inscripción independiente.</p></section>
+      <section><h2>11. Ejercicios</h2><p>Es la biblioteca reutilizable para el armado de rutinas. Mantené nombres, indicaciones y enlaces actualizados para facilitar el trabajo de los entrenadores.</p></section>
+      <section><h2>12. Rutinas</h2><p>Creá rutinas generales o personalizadas y definí vigencia, semanas, días, secciones, ejercicios, series, repeticiones, peso, tiempo y notas.</p><div class="grid"><div class="card"><strong>Modo sala</strong>Vista operativa para trabajar junto al socio durante el entrenamiento.</div><div class="card"><strong>Rutina compartida</strong>Enlace público que podés enviar por WhatsApp para que el socio consulte su plan desde el celular.</div></div></section>
+      <section><h2>13. Accesos</h2><p>Permite controlar ingresos con un enlace público para tablet, notebook o pantalla de recepción. El socio ingresa su cédula y el sistema informa el estado del plan.</p><ul><li>Usá el historial para revisar accesos por persona, estado o rango de fechas.</li><li>Consultá los reportes semanales o mensuales para medir afluencia.</li></ul></section>
+      <section><h2>14. Gastos</h2><p>Registra egresos, gastos fijos y categorías. Mantené esta información al día para que ganancia, dashboard y reportes reflejen resultados reales.</p></section>
+      <section><h2>15. Actividades</h2><p>Define las disciplinas o servicios ofrecidos por el gimnasio. Se utilizan para ordenar la oferta, asociar planes y estructurar la operación.</p></section>
+      <section><h2>16. Reportes</h2><p>Concentra indicadores de ingresos, gastos, utilidad, métodos de pago, planes y socios. Elegí el período antes de analizar o exportar información.</p></section>
+      <section><h2>17. Facturas</h2><p>Consulta los comprobantes emitidos desde el sistema. Usá filtros para encontrar una factura y descargala cuando necesites compartirla o archivarla.</p></section>
+      <section><h2>Buenas prácticas</h2><ul><li>Registrá la información en el módulo correspondiente; evitá notas externas sin actualizar el sistema.</li><li>Revisá dashboard, leads y vencimientos todos los días.</li><li>Actualizá gastos y pagos en el momento para conservar reportes confiables.</li><li>Antes de compartir un enlace público, probalo desde un navegador sin sesión.</li></ul></section>
+    </main>
+    <footer>ManagerPro 2.0 · Manual de usuario · PyMes Sistemas</footer>
+  </article>
+</body>
+</html>
