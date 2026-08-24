@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, CalendarDays, CheckCircle2, ClipboardCopy, ClipboardList, Copy, ExternalLink, Filter, Loader2, Mail, MessageCircle, Pencil, Phone, RefreshCw, Search, Trash2, Users, X } from "lucide-react";
+import { CalendarClock, CalendarDays, CheckCircle2, ClipboardCopy, ClipboardList, Copy, ExternalLink, Filter, Loader2, Mail, MessageCircle, Pencil, Phone, RefreshCw, Save, Search, Trash2, Users, X } from "lucide-react";
 import { supabase, insertMemberWithFallback } from "@/lib/supabase";
 import { PersonalizedRoutineBuilder, type CreatedPersonalizedRoutine, type RoutineMemberSearch } from "@/features/routines/components/personalized-routine-builder";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ type OnlineClient = {
 };
 type Appointment = { client_id: string; starts_at: string; status: string };
 type RoutineInfo = { id: string; name: string; valid_from: string | null; valid_until: string | null; public_share_token: string | null; public_link_enabled: boolean | null; [key: string]: unknown };
-type RoutineFilter = "all" | "no_routine" | "no_current_routine" | "no_next_month_routine" | "expiring_soon";
+type RoutineFilter = "all" | "no_routine" | "has_current_routine" | "no_current_routine" | "has_next_period_routine" | "no_next_month_routine" | "expiring_soon" | "no_appointment";
 
 const statusLabel: Record<string, string> = { pending_payment: "Pendiente de pago", active: "Activo", payment_due: "Pago próximo", grace: "En espera de pago", expired: "Vencido", cancelled: "Cancelado" };
 const statusClass: Record<string, string> = { pending_payment: "bg-amber-100 text-amber-900", active: "bg-emerald-100 text-emerald-900", payment_due: "bg-blue-100 text-blue-900", grace: "bg-orange-100 text-orange-900", expired: "bg-rose-100 text-rose-900", cancelled: "bg-slate-200 text-slate-800" };
@@ -29,6 +29,10 @@ const routineIsActiveOn = (routine: RoutineInfo, date: string) => (!routine.vali
 const needsNextPeriodRoutine = (client: OnlineClient, routines: RoutineInfo[], today: string) => {
   const nextPeriodStartsAt = client.current_period_ends_at?.slice(0, 10);
   return Boolean(nextPeriodStartsAt && routines.some((routine) => routineIsActiveOn(routine, today)) && !routines.some((routine) => Boolean(routine.valid_from && routine.valid_from >= nextPeriodStartsAt)));
+};
+const hasNextPeriodRoutine = (client: OnlineClient, routines: RoutineInfo[]) => {
+  const nextPeriodStartsAt = client.current_period_ends_at?.slice(0, 10);
+  return Boolean(nextPeriodStartsAt && routines.some((routine) => Boolean(routine.valid_from && routine.valid_from >= nextPeriodStartsAt)));
 };
 
 export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
@@ -40,6 +44,8 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
   const [routineFilter, setRoutineFilter] = useState<RoutineFilter>("all");
   const [expiresFrom, setExpiresFrom] = useState("");
   const [expiresUntil, setExpiresUntil] = useState("");
+  const [notesDrafts, setNotesDrafts] = useState<Record<string, string>>({});
+  const [savingNotesFor, setSavingNotesFor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [routineTarget, setRoutineTarget] = useState<{ client: OnlineClient; member: RoutineMemberSearch; initialRoutine?: CreatedPersonalizedRoutine; createAsNew?: boolean } | null>(null);
@@ -99,6 +105,15 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
     if (error) return setMessage("No pudimos guardar ese cambio.");
     setClients((current) => current.map((item) => item.id === client.id ? { ...item, ...update } : item));
   };
+  const saveNotes = async (client: OnlineClient) => {
+    const notes = notesDrafts[client.id] ?? client.internal_notes ?? "";
+    setSavingNotesFor(client.id);
+    const { error } = await supabase.from("online_training_clients").update({ internal_notes: notes }).eq("id", client.id).eq("gym_id", gymId);
+    setSavingNotesFor(null);
+    if (error) return setMessage("No pudimos guardar las notas internas.");
+    setClients((current) => current.map((item) => item.id === client.id ? { ...item, internal_notes: notes } : item));
+    setMessage("Notas internas guardadas.");
+  };
   const nextAppointment = (clientId: string) => appointments.find((appointment) => appointment.client_id === clientId);
   const filterCounts = useMemo(() => {
     const today = localDate(new Date());
@@ -107,13 +122,16 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
     return clients.reduce<Record<RoutineFilter, number>>((counts, client) => {
       const routines = routinesByClient[client.id] ?? [];
       if (!routines.length) counts.no_routine += 1;
-      if (!routines.some((routine) => routineIsActiveOn(routine, today))) counts.no_current_routine += 1;
+      if (routines.some((routine) => routineIsActiveOn(routine, today))) counts.has_current_routine += 1;
+      else counts.no_current_routine += 1;
+      if (hasNextPeriodRoutine(client, routines)) counts.has_next_period_routine += 1;
       if (needsNextPeriodRoutine(client, routines, today)) counts.no_next_month_routine += 1;
       if (routines.some((routine) => Boolean(routine.valid_until && routine.valid_until >= today && routine.valid_until <= soonEnd))) counts.expiring_soon += 1;
+      if (!nextAppointment(client.id)) counts.no_appointment += 1;
       counts.all += 1;
       return counts;
-    }, { all: 0, no_routine: 0, no_current_routine: 0, no_next_month_routine: 0, expiring_soon: 0 });
-  }, [clients, routinesByClient]);
+    }, { all: 0, no_routine: 0, has_current_routine: 0, no_current_routine: 0, has_next_period_routine: 0, no_next_month_routine: 0, expiring_soon: 0, no_appointment: 0 });
+  }, [appointments, clients, routinesByClient]);
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const today = localDate(new Date());
@@ -124,13 +142,16 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
       const matchesSearch = !normalized || [client.full_name, client.cedula, client.email].some((value) => value.toLowerCase().includes(normalized));
       const matchesRoutineFilter = routineFilter === "all"
         || (routineFilter === "no_routine" && !routines.length)
+        || (routineFilter === "has_current_routine" && routines.some((routine) => routineIsActiveOn(routine, today)))
         || (routineFilter === "no_current_routine" && !routines.some((routine) => routineIsActiveOn(routine, today)))
+        || (routineFilter === "has_next_period_routine" && hasNextPeriodRoutine(client, routines))
         || (routineFilter === "no_next_month_routine" && needsNextPeriodRoutine(client, routines, today))
-        || (routineFilter === "expiring_soon" && routines.some((routine) => Boolean(routine.valid_until && routine.valid_until >= today && routine.valid_until <= soonEnd)));
+        || (routineFilter === "expiring_soon" && routines.some((routine) => Boolean(routine.valid_until && routine.valid_until >= today && routine.valid_until <= soonEnd)))
+        || (routineFilter === "no_appointment" && !nextAppointment(client.id));
       const matchesExpiryRange = !expiresFrom && !expiresUntil ? true : routines.some((routine) => Boolean(routine.valid_until && (!expiresFrom || routine.valid_until >= expiresFrom) && (!expiresUntil || routine.valid_until <= expiresUntil)));
       return matchesSearch && matchesRoutineFilter && matchesExpiryRange;
     });
-  }, [clients, expiresFrom, expiresUntil, query, routineFilter, routinesByClient]);
+  }, [appointments, clients, expiresFrom, expiresUntil, query, routineFilter, routinesByClient]);
   const clearFilters = () => { setRoutineFilter("all"); setExpiresFrom(""); setExpiresUntil(""); };
 
   const copy = async (value: string, success: string) => {
@@ -263,7 +284,7 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
       <Card className="rounded-3xl border-slate-200 bg-white text-slate-950 shadow-sm">
         <CardHeader className="items-center space-y-3 text-center"><CardTitle className="flex items-center gap-2 text-2xl text-slate-950"><Users className="h-6 w-6 text-blue-600" />Clientes recibidos</CardTitle><CardDescription className="text-slate-600">Priorizá entregas y renovaciones sin perder el seguimiento de ningún cliente.</CardDescription><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar nombre, cédula o email" className="h-12 max-w-xl rounded-xl border-2 border-blue-200 bg-white px-4 text-slate-950 placeholder:text-slate-400 focus-visible:border-blue-500" />
           <div className="w-full max-w-5xl rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left"><div className="flex flex-wrap items-center gap-2"><span className="mr-1 inline-flex items-center gap-1.5 text-sm font-bold text-slate-700"><Filter className="h-4 w-4 text-blue-600" />Filtrar rutinas</span>{([
-            ["all", "Todos"], ["no_routine", "Aún sin rutina"], ["no_current_routine", "Sin rutina vigente"], ["no_next_month_routine", "Sin rutina próximo período"], ["expiring_soon", "Vence en 7 días"],
+            ["all", "Todos"], ["no_routine", "Aún sin rutina"], ["has_current_routine", "Con rutina vigente"], ["no_current_routine", "Sin rutina vigente"], ["has_next_period_routine", "Con rutina próximo período"], ["no_next_month_routine", "Sin rutina próximo período"], ["expiring_soon", "Vence en 7 días"], ["no_appointment", "Sin entrevista futura"],
           ] as [RoutineFilter, string][]).map(([value, label]) => <Button key={value} type="button" size="sm" variant={routineFilter === value ? "default" : "outline"} onClick={() => setRoutineFilter(value)} className={routineFilter === value ? "bg-blue-600 text-white hover:bg-blue-700" : "border-slate-300 bg-white text-slate-700 hover:bg-blue-50 hover:text-blue-700"}>{label} ({filterCounts[value]})</Button>)}</div>
             <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-slate-200 pt-3"><label className="grid gap-1 text-xs font-semibold text-slate-600">Vence desde<Input type="date" value={expiresFrom} onChange={(event) => setExpiresFrom(event.target.value)} className="h-9 w-40 border-slate-300 bg-white text-slate-950" /></label><label className="grid gap-1 text-xs font-semibold text-slate-600">Vence hasta<Input type="date" value={expiresUntil} onChange={(event) => setExpiresUntil(event.target.value)} className="h-9 w-40 border-slate-300 bg-white text-slate-950" /></label>{(routineFilter !== "all" || expiresFrom || expiresUntil) && <Button type="button" size="sm" variant="ghost" onClick={clearFilters} className="h-9 text-slate-600 hover:bg-white hover:text-slate-950"><X className="mr-1 h-4 w-4" />Limpiar filtros</Button>}<p className="pb-1 text-xs text-slate-500">Mostrando {filtered.length} de {clients.length} clientes</p></div>
           </div></CardHeader>
@@ -272,9 +293,11 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
           const clientRoutines = routinesByClient[client.id] ?? [];
           return <article key={client.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex flex-col justify-between gap-4 lg:flex-row"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-bold text-slate-950">{client.full_name}</h3><Badge className={statusClass[client.status] ?? "bg-slate-200 text-slate-800"}>{statusLabel[client.status] ?? client.status}</Badge>{clientRoutines.length > 0 && <Badge className="bg-emerald-100 text-emerald-900"><CheckCircle2 className="mr-1 h-3 w-3" />{clientRoutines.length === 1 ? "Rutina entregada" : `${clientRoutines.length} rutinas`}</Badge>}</div><p className="mt-1 text-sm text-slate-600">{client.cedula} · {client.email}{client.phone ? ` · ${client.phone}` : ""}</p>{appointment ? <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-blue-800"><CalendarClock className="h-4 w-4" />Próxima entrevista: {dateLabel(appointment.starts_at)} · {new Date(appointment.starts_at).toLocaleTimeString("es-UY", { hour: "2-digit", minute: "2-digit" })}</p> : <p className="mt-2 text-sm text-slate-500">Sin entrevista futura agendada.</p>}</div><div className="flex flex-wrap items-center gap-2"><Select value={client.status} onValueChange={(status) => void updateClient(client, { status })}><SelectTrigger className="w-44 rounded-xl border-slate-300 bg-white text-slate-950"><SelectValue /></SelectTrigger><SelectContent className="bg-white text-slate-950">{Object.entries(statusLabel).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select><Button onClick={() => void startRoutine(client)} disabled={creating === client.id} className="rounded-xl bg-blue-600 text-white hover:bg-blue-700">{creating === client.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ClipboardList className="mr-2 h-4 w-4" />}{clientRoutines.length ? "Nueva rutina" : "Crear rutina"}</Button></div></div>
-            {clientRoutines.length ? <div className="mt-4 space-y-2 rounded-xl border border-slate-200 bg-white p-3">{clientRoutines.map((clientRoutine) => { const routineLink = clientRoutine.public_share_token && clientRoutine.public_link_enabled ? `${window.location.origin}/rutina/${clientRoutine.public_share_token}` : null; return <div key={clientRoutine.id} className="flex flex-col gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3 lg:flex-row lg:items-center lg:justify-between"><div><p className="font-semibold text-slate-950">{clientRoutine.name}</p><p className="text-sm text-slate-600">{clientRoutine.valid_from ? `Desde ${dateLabel(clientRoutine.valid_from)}` : "Sin fecha de inicio"}{clientRoutine.valid_until ? ` · hasta ${dateLabel(clientRoutine.valid_until)}` : ""}</p></div><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => editRoutine(client, clientRoutine)} className="border-blue-200 bg-white text-blue-700 hover:bg-blue-50"><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar</Button>{routineLink ? <><Button type="button" size="sm" variant="outline" onClick={() => void copy(routineLink, "Link de rutina copiado.")} className="border-blue-200 bg-white text-blue-700 hover:bg-blue-50"><ExternalLink className="mr-1.5 h-3.5 w-3.5" />Copiar link</Button><Button type="button" size="sm" disabled={!client.phone} onClick={() => sendRoutineWhatsApp(client, routineLink)} className="bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-slate-300"><MessageCircle className="mr-1.5 h-3.5 w-3.5" />Enviar por WhatsApp</Button></> : null}<Button type="button" size="sm" variant="outline" disabled={deletingRoutineId === clientRoutine.id} onClick={() => void deleteRoutine(client, clientRoutine)} className="border-rose-200 bg-white text-rose-700 hover:bg-rose-50"><Trash2 className="mr-1.5 h-3.5 w-3.5" />{deletingRoutineId === clientRoutine.id ? "Eliminando..." : "Eliminar"}</Button></div></div>; })}</div> : null}
-            <Textarea value={client.internal_notes ?? ""} onChange={(event) => setClients((current) => current.map((item) => item.id === client.id ? { ...item, internal_notes: event.target.value } : item))} onBlur={(event) => void updateClient(client, { internal_notes: event.target.value })} placeholder="Notas internas para el profesor" className="mt-4 min-h-16 rounded-xl border-slate-300 bg-white text-slate-950 placeholder:text-slate-400" />
-            {Object.keys(client.intake ?? {}).length > 0 && <details className="mt-3 text-sm"><summary className="cursor-pointer font-semibold text-blue-700">Ver cuestionario inicial</summary><pre className="mt-2 overflow-x-auto rounded-xl bg-white p-3 text-xs text-slate-700">{JSON.stringify(client.intake, null, 2)}</pre></details>}
+            <details className="group mt-4 rounded-xl border border-slate-200 bg-white"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-blue-700 hover:bg-blue-50"><span>Ver ficha, rutinas y notas</span><span className="text-xs font-medium text-slate-500">Desplegar</span></summary><div className="border-t border-slate-200 p-3">
+              {clientRoutines.length ? <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">{clientRoutines.map((clientRoutine) => { const routineLink = clientRoutine.public_share_token && clientRoutine.public_link_enabled ? `${window.location.origin}/rutina/${clientRoutine.public_share_token}` : null; return <div key={clientRoutine.id} className="flex flex-col gap-3 rounded-lg border border-slate-100 bg-white p-3 lg:flex-row lg:items-center lg:justify-between"><div><p className="font-semibold text-slate-950">{clientRoutine.name}</p><p className="text-sm text-slate-600">{clientRoutine.valid_from ? `Desde ${dateLabel(clientRoutine.valid_from)}` : "Sin fecha de inicio"}{clientRoutine.valid_until ? ` · hasta ${dateLabel(clientRoutine.valid_until)}` : ""}</p></div><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => editRoutine(client, clientRoutine)} className="border-blue-200 bg-white text-blue-700 hover:bg-blue-50"><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar</Button>{routineLink ? <><Button type="button" size="sm" variant="outline" onClick={() => void copy(routineLink, "Link de rutina copiado.")} className="border-blue-200 bg-white text-blue-700 hover:bg-blue-50"><ExternalLink className="mr-1.5 h-3.5 w-3.5" />Copiar link</Button><Button type="button" size="sm" disabled={!client.phone} onClick={() => sendRoutineWhatsApp(client, routineLink)} className="bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-slate-300"><MessageCircle className="mr-1.5 h-3.5 w-3.5" />Enviar por WhatsApp</Button></> : null}<Button type="button" size="sm" variant="outline" disabled={deletingRoutineId === clientRoutine.id} onClick={() => void deleteRoutine(client, clientRoutine)} className="border-rose-200 bg-white text-rose-700 hover:bg-rose-50"><Trash2 className="mr-1.5 h-3.5 w-3.5" />{deletingRoutineId === clientRoutine.id ? "Eliminando..." : "Eliminar"}</Button></div></div>; })}</div> : <p className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">Este cliente aún no tiene rutinas creadas.</p>}
+              <div className="mt-4"><div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-bold text-slate-800">Notas internas del profesor</p><Button type="button" size="sm" disabled={savingNotesFor === client.id || (notesDrafts[client.id] ?? client.internal_notes ?? "") === (client.internal_notes ?? "")} onClick={() => void saveNotes(client)} className="bg-blue-600 text-white hover:bg-blue-700"><Save className="mr-1.5 h-3.5 w-3.5" />{savingNotesFor === client.id ? "Guardando..." : "Guardar nota"}</Button></div><Textarea value={notesDrafts[client.id] ?? client.internal_notes ?? ""} onChange={(event) => setNotesDrafts((current) => ({ ...current, [client.id]: event.target.value }))} placeholder="Notas internas para el profesor" className="min-h-20 rounded-xl border-slate-300 bg-white text-slate-950 placeholder:text-slate-400" /></div>
+              {Object.keys(client.intake ?? {}).length > 0 && <details className="mt-3 text-sm"><summary className="cursor-pointer font-semibold text-blue-700">Ver cuestionario inicial</summary><pre className="mt-2 overflow-x-auto rounded-xl bg-slate-50 p-3 text-xs text-slate-700">{JSON.stringify(client.intake, null, 2)}</pre></details>}
+            </div></details>
           </article>;
         })}</div>}</CardContent>
       </Card>
