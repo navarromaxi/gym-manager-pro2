@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
-const DAYS = new Set([1, 3, 4]); // lunes, miércoles y jueves
-const HOURS = [18, 18.5, 19, 19.5];
+const DAYS = new Set([3, 5]); // miércoles y viernes
+const HOURS = [16, 16.5, 17, 17.5, 18, 18.5]; // último turno: 18:30
 const publicCorsHeaders = {
   "Access-Control-Allow-Origin": "https://www.pymessistemas.com",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
