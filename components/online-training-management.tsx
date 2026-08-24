@@ -20,7 +20,7 @@ type OnlineClient = {
 };
 type Appointment = { id: string; client_id: string; starts_at: string; ends_at: string; status: string; outcome_notes: string | null; outcome_recorded_at: string | null };
 type RoutineInfo = { id: string; name: string; valid_from: string | null; valid_until: string | null; public_share_token: string | null; public_link_enabled: boolean | null; [key: string]: unknown };
-type RoutineFilter = "all" | "no_routine" | "has_current_routine" | "no_current_routine" | "has_next_period_routine" | "no_next_month_routine" | "expiring_soon";
+type RoutineFilter = "all" | "no_routine" | "has_current_routine" | "no_current_routine" | "has_next_period_routine" | "no_next_month_routine" | "expiring_in_3_days" | "expiring_soon";
 type AppointmentFilter = "all" | "no_future";
 type ValidityPeriodFilter = "all" | "current_month" | "last_month" | "last_3_months" | "current_year" | "previous_year" | "last_12_months" | "custom";
 
@@ -145,6 +145,8 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
   };
   const filterCounts = useMemo(() => {
     const today = localDate(new Date());
+    const threeDays = new Date(); threeDays.setDate(threeDays.getDate() + 3);
+    const threeDayEnd = localDate(threeDays);
     const soon = new Date(); soon.setDate(soon.getDate() + 7);
     const soonEnd = localDate(soon);
     return clients.reduce<Record<RoutineFilter, number>>((counts, client) => {
@@ -154,14 +156,17 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
       else counts.no_current_routine += 1;
       if (hasRoutineAfterCurrent(routines, today)) counts.has_next_period_routine += 1;
       if (needsNextPeriodRoutine(routines, today)) counts.no_next_month_routine += 1;
+      if (routines.some((routine) => Boolean(routine.valid_until && routine.valid_until >= today && routine.valid_until <= threeDayEnd))) counts.expiring_in_3_days += 1;
       if (routines.some((routine) => Boolean(routine.valid_until && routine.valid_until >= today && routine.valid_until <= soonEnd))) counts.expiring_soon += 1;
       counts.all += 1;
       return counts;
-    }, { all: 0, no_routine: 0, has_current_routine: 0, no_current_routine: 0, has_next_period_routine: 0, no_next_month_routine: 0, expiring_soon: 0 });
+    }, { all: 0, no_routine: 0, has_current_routine: 0, no_current_routine: 0, has_next_period_routine: 0, no_next_month_routine: 0, expiring_in_3_days: 0, expiring_soon: 0 });
   }, [appointments, clients, routinesByClient]);
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const today = localDate(new Date());
+    const threeDays = new Date(); threeDays.setDate(threeDays.getDate() + 3);
+    const threeDayEnd = localDate(threeDays);
     const validityBounds = (() => {
       const now = new Date();
       const startOfYear = (year: number) => localDate(new Date(year, 0, 1));
@@ -189,6 +194,7 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
         || (routineFilter === "no_current_routine" && !routines.some((routine) => routineIsActiveOn(routine, today)))
         || (routineFilter === "has_next_period_routine" && hasRoutineAfterCurrent(routines, today))
         || (routineFilter === "no_next_month_routine" && needsNextPeriodRoutine(routines, today))
+        || (routineFilter === "expiring_in_3_days" && routines.some((routine) => Boolean(routine.valid_until && routine.valid_until >= today && routine.valid_until <= threeDayEnd)))
         || (routineFilter === "expiring_soon" && routines.some((routine) => Boolean(routine.valid_until && routine.valid_until >= today && routine.valid_until <= soonEnd)));
       const matchesExpiryRange = !validityBounds.from && !validityBounds.until ? true : routines.some((routine) => {
         const startsAt = routine.valid_from ?? "0000-01-01";
@@ -344,7 +350,7 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
       <Card className="rounded-3xl border-slate-200 bg-white text-slate-950 shadow-sm">
         <CardHeader className="items-center space-y-3 text-center"><CardTitle className="flex items-center gap-2 text-2xl text-slate-950"><Users className="h-6 w-6 text-blue-600" />Clientes recibidos</CardTitle><CardDescription className="text-slate-600">Priorizá entregas y renovaciones sin perder el seguimiento de ningún cliente.</CardDescription><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar nombre, cédula o email" className="h-12 max-w-xl rounded-xl border-2 border-blue-200 bg-white px-4 text-slate-950 placeholder:text-slate-400 focus-visible:border-blue-500" />
           <div className="w-full max-w-5xl rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left"><div className="flex flex-wrap items-end gap-3"><span className="mb-2 inline-flex items-center gap-1.5 text-sm font-bold text-slate-700"><Filter className="h-4 w-4 text-blue-600" />Filtros</span><label className="grid gap-1 text-xs font-semibold text-slate-600">Rutinas<Select value={routineFilter} onValueChange={(value) => setRoutineFilter(value as RoutineFilter)}><SelectTrigger className="h-9 w-56 border-slate-300 bg-white text-slate-950"><SelectValue /></SelectTrigger><SelectContent className="bg-white text-slate-950">{([
-            ["all", "Todas las rutinas"], ["no_routine", "Aún sin rutina"], ["has_current_routine", "Con rutina vigente"], ["no_current_routine", "Sin rutina vigente"], ["has_next_period_routine", "Con rutina próximo período"], ["no_next_month_routine", "Sin rutina próximo período"], ["expiring_soon", "Vence en 7 días"],
+            ["all", "Todas las rutinas"], ["no_routine", "Aún sin rutina"], ["has_current_routine", "Con rutina vigente"], ["no_current_routine", "Sin rutina vigente"], ["has_next_period_routine", "Con rutina próximo período"], ["no_next_month_routine", "Sin rutina próximo período"], ["expiring_in_3_days", "Vence en 3 días"], ["expiring_soon", "Vence en 7 días"],
           ] as [RoutineFilter, string][]).map(([value, label]) => <SelectItem key={value} value={value}>{label} ({filterCounts[value]})</SelectItem>)}</SelectContent></Select></label><label className="grid gap-1 text-xs font-semibold text-slate-600">Estado del cliente<Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-9 w-48 border-slate-300 bg-white text-slate-950"><SelectValue /></SelectTrigger><SelectContent className="bg-white text-slate-950"><SelectItem value="all">Todos los estados</SelectItem>{Object.entries(statusLabel).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></label><label className="grid gap-1 text-xs font-semibold text-slate-600">Seguimiento<Select value={appointmentFilter} onValueChange={(value) => setAppointmentFilter(value as AppointmentFilter)}><SelectTrigger className="h-9 w-48 border-slate-300 bg-white text-slate-950"><SelectValue /></SelectTrigger><SelectContent className="bg-white text-slate-950"><SelectItem value="all">Todos</SelectItem><SelectItem value="no_future">Sin entrevista futura</SelectItem></SelectContent></Select></label></div>
             <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-slate-200 pt-3"><label className="grid gap-1 text-xs font-semibold text-slate-600">Vigencia de la rutina<Select value={validityPeriod} onValueChange={(value) => setValidityPeriod(value as ValidityPeriodFilter)}><SelectTrigger className="h-9 w-56 border-slate-300 bg-white text-slate-950"><SelectValue /></SelectTrigger><SelectContent className="bg-white text-slate-950"><SelectItem value="all">Cualquier fecha</SelectItem><SelectItem value="current_month">Mes actual</SelectItem><SelectItem value="last_month">Último mes</SelectItem><SelectItem value="last_3_months">Últimos 3 meses</SelectItem><SelectItem value="current_year">Año actual</SelectItem><SelectItem value="previous_year">Año anterior</SelectItem><SelectItem value="last_12_months">Últimos 12 meses</SelectItem><SelectItem value="custom">Personalizado…</SelectItem></SelectContent></Select></label>{validityPeriod === "custom" && <><label className="grid gap-1 text-xs font-semibold text-slate-600">Desde<Input type="date" value={expiresFrom} onChange={(event) => setExpiresFrom(event.target.value)} className="h-9 w-40 border-slate-300 bg-white text-slate-950" /></label><label className="grid gap-1 text-xs font-semibold text-slate-600">Hasta<Input type="date" value={expiresUntil} onChange={(event) => setExpiresUntil(event.target.value)} className="h-9 w-40 border-slate-300 bg-white text-slate-950" /></label></>}<p className="pb-1 text-xs text-slate-500">Mostrando {shownClients.length} de {filtered.length} clientes</p>{(routineFilter !== "all" || statusFilter !== "all" || appointmentFilter !== "all" || validityPeriod !== "all") && <Button type="button" size="sm" onClick={clearFilters} className="ml-auto rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 px-5 text-white shadow-md shadow-blue-200 hover:from-blue-700 hover:to-cyan-600"><X className="mr-1.5 h-4 w-4" />Restablecer filtros</Button>}</div>
           </div></CardHeader>
