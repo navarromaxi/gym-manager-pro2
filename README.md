@@ -26,3 +26,5 @@ Centralizar la administración de gimnasios en una plataforma web moderna, permi
 ## Demo
 
 https://gym-manager-pro2.vercel.app
+
+<!-- Verifies the Vercel deployment trigger after reconnecting GitHub. -->
