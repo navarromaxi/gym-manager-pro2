@@ -1077,14 +1077,14 @@ export function ProspectManagement({
               Nuevo Interesado
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Agregar Nuevo Interesado</DialogTitle>
-              <DialogDescription>
+          <DialogContent className="max-h-[92vh] overflow-y-auto border-0 bg-slate-950 p-0 text-slate-50 shadow-2xl sm:max-w-3xl">
+            <DialogHeader className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-6 py-5 text-left text-white">
+              <DialogTitle className="text-xl text-white">Agregar Nuevo Interesado</DialogTitle>
+              <DialogDescription className="text-blue-100">
                 Registra los datos de un nuevo prospecto.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
+            <div className="grid gap-4 px-6 py-5 md:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="name">Nombre completo</Label>
                 <Input
@@ -1244,7 +1244,7 @@ export function ProspectManagement({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-2 md:col-span-2">
                 <Label htmlFor="notes">Notas</Label>
                 <Textarea
                   id="notes"
@@ -1257,8 +1257,8 @@ export function ProspectManagement({
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button type="submit" onClick={handleAddProspect}>
+            <DialogFooter className="border-t border-slate-800 bg-slate-900/70 px-6 py-4">
+              <Button className="bg-emerald-500 text-slate-950 hover:bg-emerald-400" type="submit" onClick={handleAddProspect}>
                 Agregar Interesado
               </Button>
             </DialogFooter>
@@ -1296,7 +1296,7 @@ export function ProspectManagement({
               }}
             >
               <RotateCcw className="mr-2 h-3.5 w-3.5" />
-              Restablecer
+              Limpiar Filtros
             </Button>
           </div>
         </CardHeader>
@@ -1523,21 +1523,16 @@ export function ProspectManagement({
           <CardTitle>Lista de Interesados ({totalFiltered})</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="w-full overflow-x-auto">
-            <Table className="min-w-[1100px]">
+          <div className="w-full">
+            <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Teléfono</TableHead>
-                  <TableHead>Fecha Contacto</TableHead>
-                  <TableHead>Interés</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Próximo contacto</TableHead>
-                  <TableHead>Fecha agendada</TableHead>
-                  <TableHead>Prioridad</TableHead>
-                  {/* Nueva columna en la tabla */}
-                  <TableHead>Acciones</TableHead>
+                  <TableHead className="w-[18%]">Interesado</TableHead>
+                  <TableHead className="w-[20%]">Seguimiento</TableHead>
+                  <TableHead className="w-[18%]">Interés y estado</TableHead>
+                  <TableHead className="w-[18%]">Clase de prueba</TableHead>
+                  <TableHead className="w-[10%]">Prioridad</TableHead>
+                  <TableHead className="w-[16%] text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1549,37 +1544,41 @@ export function ProspectManagement({
                   );
                   return (
                     <TableRow key={prospect.id}>
-                      <TableCell className="font-medium">
-                        {prospect.name}
+                      <TableCell className="align-top">
+                        <p className="font-medium leading-tight">{prospect.name}</p>
+                        <p className="mt-1 break-all text-xs text-muted-foreground">
+                          {prospect.email || "Sin email"}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {prospect.phone || "Sin teléfono"}
+                        </p>
                       </TableCell>
-                      <TableCell>{prospect.email}</TableCell>
-                      <TableCell>{prospect.phone}</TableCell>
-                      <TableCell>
-                         {prospect.contact_date
-                          ? new Date(
-                              `${prospect.contact_date}T00:00:00`
-                            ).toLocaleDateString()
-                          : "-"}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {prospect.interest}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(prospect.status)}</TableCell>
-                      <TableCell>
+                      <TableCell className="align-top text-sm">
+                        <p>
+                          Contacto: {prospect.contact_date
+                            ? new Date(`${prospect.contact_date}T00:00:00`).toLocaleDateString()
+                            : "Sin fecha"}
+                        </p>
                         {nextContactDate ? (
                           <Badge
                             variant="outline"
-                            className="border-purple-400 text-purple-600"
+                            className="mt-1 border-purple-400 text-purple-600"
                           >
-                            {nextContactDate}
+                            Próximo: {nextContactDate}
                           </Badge>
                         ) : (
-                          <span className="text-xs text-muted-foreground">
-                            Sin definir
+                          <span className="mt-1 block text-xs text-muted-foreground">
+                            Próximo sin definir
                           </span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top">
+                        <p className="break-words text-sm">
+                          {prospect.interest || "Sin interés definido"}
+                        </p>
+                        <div className="mt-2">{getStatusBadge(prospect.status)}</div>
+                      </TableCell>
+                      <TableCell className="align-top">
                         {scheduledDate ? (
                           <div className="flex flex-col items-start gap-1">
                             <Badge
@@ -1603,12 +1602,11 @@ export function ProspectManagement({
                           </span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top">
                         {getPriorityBadge(prospect.priority_level)}
                       </TableCell>
-                      {/* Mostrar prioridad */}
-                      <TableCell>
-                        <div className="flex space-x-2">
+                      <TableCell className="align-top">
+                        <div className="flex justify-end gap-1.5">
                           <Button
                             variant="outline"
                             size="sm"
@@ -1897,16 +1895,16 @@ export function ProspectManagement({
           open={isConvertDialogOpen}
           onOpenChange={handleConvertDialogOpenChange}
         >
-          <DialogContent className="sm:max-w-5xl">
-            <DialogHeader>
-              <DialogTitle>Convertir a Socio</DialogTitle>
-              <DialogDescription>
+          <DialogContent className="max-h-[92vh] overflow-y-auto border-0 bg-slate-950 p-0 text-slate-50 shadow-2xl sm:max-w-5xl">
+            <DialogHeader className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 px-6 py-5 text-left text-slate-950">
+              <DialogTitle className="text-xl text-slate-950">Convertir a Socio</DialogTitle>
+              <DialogDescription className="text-slate-900/80">
                 Convierte a {convertingProspect?.name} en un nuevo socio.
               </DialogDescription>
             </DialogHeader>
             {convertingProspect && (
-              <div className="grid gap-6 py-4 max-h-[80vh] overflow-y-auto pr-2">
-                <div className="grid gap-4 md:grid-cols-2">
+              <div className="px-6 py-5">
+                <div className="grid gap-5 md:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor="convert-plan-start">
                       Fecha de inicio del plan
@@ -2214,8 +2212,9 @@ export function ProspectManagement({
                 </div>
               </div>
             )}
-            <DialogFooter>
+            <DialogFooter className="border-t border-slate-800 bg-slate-900/70 px-6 py-4">
               <Button
+                className="bg-emerald-500 text-slate-950 hover:bg-emerald-400"
                 type="submit"
                 onClick={handleConvertProspectToMember}
                 disabled={
