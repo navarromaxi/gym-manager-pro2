@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
     .select(
       "id, gym_id, name, email, scheduled_date, scheduled_time, trial_email_reminder_sent_for"
     )
-    .in("status", ["trial_scheduled", "waiting_response", "reagendado"])
+    .in("status", ["trial_scheduled", "reagendado"])
     .not("email", "is", null)
     .neq("email", "");
 
