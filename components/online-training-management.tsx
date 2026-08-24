@@ -126,7 +126,7 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
   const nextAppointment = (clientId: string) => appointments.find((appointment) => appointment.client_id === clientId && appointment.status === "confirmed" && new Date(appointment.starts_at) >= new Date());
   const appointmentHistory = (clientId: string) => appointments.filter((appointment) => appointment.client_id === clientId).sort((a, b) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime());
   const clientHistory = (clientId: string, routines: RoutineInfo[]) => [
-    ...routines.map((routine) => ({ kind: "routine" as const, at: String((routine as Record<string, unknown>).created_date ?? routine.valid_from ?? routine.valid_until ?? "0000-01-01"), routine })),
+    ...routines.map((routine) => ({ kind: "routine" as const, at: String(routine.valid_from ?? (routine as Record<string, unknown>).created_date ?? routine.valid_until ?? "0000-01-01"), routine })),
     ...appointmentHistory(clientId).map((appointment) => ({ kind: "appointment" as const, at: appointment.starts_at, appointment })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   const openAppointmentOutcome = (appointment: Appointment, client: OnlineClient, outcome: "completed" | "no_show" | "not_completed") => {
