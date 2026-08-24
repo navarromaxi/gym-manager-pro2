@@ -40,6 +40,30 @@ const formatClassTime = (date: Date) =>
     hour12: false,
   }).format(date);
 
+const getTomorrowInMontevideo = () => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: MONTEVIDEO_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(
+    parts
+      .filter(({ type }) => type !== "literal")
+      .map(({ type, value }) => [type, value])
+  );
+
+  const tomorrow = new Date(
+    Date.UTC(
+      Number(values.year),
+      Number(values.month) - 1,
+      Number(values.day) + 1
+    )
+  );
+
+  return tomorrow.toISOString().slice(0, 10);
+};
+
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
@@ -58,7 +82,7 @@ export async function GET(request: NextRequest) {
     .select(
       "id, gym_id, name, email, scheduled_date, scheduled_time, trial_email_reminder_sent_for"
     )
-    .in("status", ["trial_scheduled", "waiting_response"])
+    .in("status", ["trial_scheduled", "waiting_response", "reagendado"])
     .not("email", "is", null)
     .neq("email", "");
 
@@ -67,9 +91,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unable to load prospects" }, { status: 500 });
   }
 
-  const now = new Date();
-  const minimumScheduledAt = new Date(now.getTime() + 23.5 * 60 * 60 * 1000);
-  const maximumScheduledAt = new Date(now.getTime() + 24.5 * 60 * 60 * 1000);
+  const tomorrow = getTomorrowInMontevideo();
   const prospects = (data ?? []) as ProspectEmail[];
   let sent = 0;
   let skipped = 0;
@@ -82,8 +104,7 @@ export async function GET(request: NextRequest) {
       !scheduledAt ||
       !prospect.email?.trim() ||
       prospect.trial_email_reminder_sent_for === scheduleKey ||
-      scheduledAt < minimumScheduledAt ||
-      scheduledAt > maximumScheduledAt
+      prospect.scheduled_date !== tomorrow
     ) {
       skipped += 1;
       continue;
