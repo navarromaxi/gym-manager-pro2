@@ -25,6 +25,11 @@ const statusLabel: Record<string, string> = { pending_payment: "Pendiente de pag
 const statusClass: Record<string, string> = { pending_payment: "bg-amber-100 text-amber-900", active: "bg-emerald-100 text-emerald-900", payment_due: "bg-blue-100 text-blue-900", grace: "bg-orange-100 text-orange-900", expired: "bg-rose-100 text-rose-900", cancelled: "bg-slate-200 text-slate-800" };
 const dateLabel = (value?: string | null) => value ? new Date(value.includes("T") ? value : `${value}T00:00:00`).toLocaleDateString("es-UY", { day: "numeric", month: "short", year: "numeric" }) : null;
 const localDate = (date: Date) => new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+const routineIsActiveOn = (routine: RoutineInfo, date: string) => (!routine.valid_from || routine.valid_from <= date) && (!routine.valid_until || routine.valid_until >= date);
+const needsNextPeriodRoutine = (client: OnlineClient, routines: RoutineInfo[], today: string) => {
+  const nextPeriodStartsAt = client.current_period_ends_at?.slice(0, 10);
+  return Boolean(nextPeriodStartsAt && routines.some((routine) => routineIsActiveOn(routine, today)) && !routines.some((routine) => Boolean(routine.valid_from && routine.valid_from >= nextPeriodStartsAt)));
+};
 
 export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
   const [clients, setClients] = useState<OnlineClient[]>([]);
@@ -97,16 +102,13 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
   const nextAppointment = (clientId: string) => appointments.find((appointment) => appointment.client_id === clientId);
   const filterCounts = useMemo(() => {
     const today = localDate(new Date());
-    const nextMonth = new Date(); nextMonth.setMonth(nextMonth.getMonth() + 1, 1);
-    const nextMonthStart = localDate(nextMonth);
     const soon = new Date(); soon.setDate(soon.getDate() + 7);
     const soonEnd = localDate(soon);
-    const isActiveOn = (routine: RoutineInfo, date: string) => (!routine.valid_from || routine.valid_from <= date) && (!routine.valid_until || routine.valid_until >= date);
     return clients.reduce<Record<RoutineFilter, number>>((counts, client) => {
       const routines = routinesByClient[client.id] ?? [];
       if (!routines.length) counts.no_routine += 1;
-      if (!routines.some((routine) => isActiveOn(routine, today))) counts.no_current_routine += 1;
-      if (!routines.some((routine) => isActiveOn(routine, nextMonthStart))) counts.no_next_month_routine += 1;
+      if (!routines.some((routine) => routineIsActiveOn(routine, today))) counts.no_current_routine += 1;
+      if (needsNextPeriodRoutine(client, routines, today)) counts.no_next_month_routine += 1;
       if (routines.some((routine) => Boolean(routine.valid_until && routine.valid_until >= today && routine.valid_until <= soonEnd))) counts.expiring_soon += 1;
       counts.all += 1;
       return counts;
@@ -115,18 +117,15 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const today = localDate(new Date());
-    const nextMonth = new Date(); nextMonth.setMonth(nextMonth.getMonth() + 1, 1);
-    const nextMonthStart = localDate(nextMonth);
     const soon = new Date(); soon.setDate(soon.getDate() + 7);
     const soonEnd = localDate(soon);
-    const isActiveOn = (routine: RoutineInfo, date: string) => (!routine.valid_from || routine.valid_from <= date) && (!routine.valid_until || routine.valid_until >= date);
     return clients.filter((client) => {
       const routines = routinesByClient[client.id] ?? [];
       const matchesSearch = !normalized || [client.full_name, client.cedula, client.email].some((value) => value.toLowerCase().includes(normalized));
       const matchesRoutineFilter = routineFilter === "all"
         || (routineFilter === "no_routine" && !routines.length)
-        || (routineFilter === "no_current_routine" && !routines.some((routine) => isActiveOn(routine, today)))
-        || (routineFilter === "no_next_month_routine" && !routines.some((routine) => isActiveOn(routine, nextMonthStart)))
+        || (routineFilter === "no_current_routine" && !routines.some((routine) => routineIsActiveOn(routine, today)))
+        || (routineFilter === "no_next_month_routine" && needsNextPeriodRoutine(client, routines, today))
         || (routineFilter === "expiring_soon" && routines.some((routine) => Boolean(routine.valid_until && routine.valid_until >= today && routine.valid_until <= soonEnd)));
       const matchesExpiryRange = !expiresFrom && !expiresUntil ? true : routines.some((routine) => Boolean(routine.valid_until && (!expiresFrom || routine.valid_until >= expiresFrom) && (!expiresUntil || routine.valid_until <= expiresUntil)));
       return matchesSearch && matchesRoutineFilter && matchesExpiryRange;
@@ -264,7 +263,7 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
       <Card className="rounded-3xl border-slate-200 bg-white text-slate-950 shadow-sm">
         <CardHeader className="items-center space-y-3 text-center"><CardTitle className="flex items-center gap-2 text-2xl text-slate-950"><Users className="h-6 w-6 text-blue-600" />Clientes recibidos</CardTitle><CardDescription className="text-slate-600">Priorizá entregas y renovaciones sin perder el seguimiento de ningún cliente.</CardDescription><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar nombre, cédula o email" className="h-12 max-w-xl rounded-xl border-2 border-blue-200 bg-white px-4 text-slate-950 placeholder:text-slate-400 focus-visible:border-blue-500" />
           <div className="w-full max-w-5xl rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left"><div className="flex flex-wrap items-center gap-2"><span className="mr-1 inline-flex items-center gap-1.5 text-sm font-bold text-slate-700"><Filter className="h-4 w-4 text-blue-600" />Filtrar rutinas</span>{([
-            ["all", "Todos"], ["no_routine", "Aún sin rutina"], ["no_current_routine", "Sin rutina vigente"], ["no_next_month_routine", "Sin rutina próximo mes"], ["expiring_soon", "Vence en 7 días"],
+            ["all", "Todos"], ["no_routine", "Aún sin rutina"], ["no_current_routine", "Sin rutina vigente"], ["no_next_month_routine", "Sin rutina próximo período"], ["expiring_soon", "Vence en 7 días"],
           ] as [RoutineFilter, string][]).map(([value, label]) => <Button key={value} type="button" size="sm" variant={routineFilter === value ? "default" : "outline"} onClick={() => setRoutineFilter(value)} className={routineFilter === value ? "bg-blue-600 text-white hover:bg-blue-700" : "border-slate-300 bg-white text-slate-700 hover:bg-blue-50 hover:text-blue-700"}>{label} ({filterCounts[value]})</Button>)}</div>
             <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-slate-200 pt-3"><label className="grid gap-1 text-xs font-semibold text-slate-600">Vence desde<Input type="date" value={expiresFrom} onChange={(event) => setExpiresFrom(event.target.value)} className="h-9 w-40 border-slate-300 bg-white text-slate-950" /></label><label className="grid gap-1 text-xs font-semibold text-slate-600">Vence hasta<Input type="date" value={expiresUntil} onChange={(event) => setExpiresUntil(event.target.value)} className="h-9 w-40 border-slate-300 bg-white text-slate-950" /></label>{(routineFilter !== "all" || expiresFrom || expiresUntil) && <Button type="button" size="sm" variant="ghost" onClick={clearFilters} className="h-9 text-slate-600 hover:bg-white hover:text-slate-950"><X className="mr-1 h-4 w-4" />Limpiar filtros</Button>}<p className="pb-1 text-xs text-slate-500">Mostrando {filtered.length} de {clients.length} clientes</p></div>
           </div></CardHeader>
