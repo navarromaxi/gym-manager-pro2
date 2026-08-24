@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, CalendarDays, CheckCircle2, ClipboardCopy, ClipboardList, Copy, ExternalLink, Filter, Loader2, Mail, MessageCircle, Pencil, Phone, RefreshCw, Save, Search, Trash2, Users, X } from "lucide-react";
+import { BookOpen, CalendarClock, CalendarDays, CheckCircle2, ClipboardCopy, ClipboardList, Copy, ExternalLink, Filter, Loader2, Mail, MessageCircle, Pencil, Phone, RefreshCw, Save, Search, Trash2, Users, X } from "lucide-react";
 import { supabase, insertMemberWithFallback } from "@/lib/supabase";
 import { PersonalizedRoutineBuilder, type CreatedPersonalizedRoutine, type RoutineMemberSearch } from "@/features/routines/components/personalized-routine-builder";
+import { ExerciseLibraryManagement } from "@/components/exercise-library-management";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +41,7 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
   const [routinesByClient, setRoutinesByClient] = useState<Record<string, RoutineInfo[]>>({});
   const [price, setPrice] = useState(549);
   const [query, setQuery] = useState("");
+  const [portalSection, setPortalSection] = useState<"subscribers" | "library">("subscribers");
   const [routineFilter, setRoutineFilter] = useState<RoutineFilter>("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [appointmentFilter, setAppointmentFilter] = useState<AppointmentFilter>("all");
@@ -315,6 +317,14 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
     .filter((entry): entry is { appointment: Appointment; client: OnlineClient } => Boolean(entry.client))
     .sort((a, b) => new Date(a.appointment.starts_at).getTime() - new Date(b.appointment.starts_at).getTime()), [appointments, clients]);
 
+  if (portalSection === "library") return (
+    <div className="space-y-6">
+      <header className="flex flex-col items-center gap-3 text-center"><p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-600">Portal privado</p><h2 className="text-4xl font-bold tracking-tight text-slate-950">Gestión de entrenamiento</h2><p className="text-slate-600">Clientes, entrevistas y rutinas en un solo lugar.</p></header>
+      <nav className="mx-auto flex w-fit rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm" aria-label="Secciones del portal"><button type="button" onClick={() => setPortalSection("subscribers")} className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><Users className="h-4 w-4" />Suscriptores</button><button type="button" aria-current="page" className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm"><BookOpen className="h-4 w-4" />Biblioteca de ejercicios</button></nav>
+      <ExerciseLibraryManagement gymId={gymId} />
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col items-center gap-3 text-center">
@@ -323,6 +333,7 @@ export function OnlineTrainingManagement({ gymId }: { gymId: string }) {
         <p className="text-slate-600">Clientes, entrevistas y rutinas en un solo lugar.</p>
         <div className="flex flex-wrap justify-center gap-2"><Button type="button" variant="outline" onClick={() => setIsScheduleOpen(true)} className="rounded-xl border-blue-200 bg-white text-blue-700 hover:bg-blue-50 hover:text-blue-800"><CalendarDays className="mr-2 h-4 w-4" />Agenda de reuniones{upcomingSchedule.length ? ` (${upcomingSchedule.length})` : ""}</Button><Button onClick={() => void load()} disabled={loading} className="rounded-xl bg-blue-600 text-white hover:bg-blue-700"><RefreshCw className="mr-2 h-4 w-4" />Actualizar</Button></div>
       </header>
+      <nav className="mx-auto flex w-fit rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm" aria-label="Secciones del portal"><button type="button" aria-current="page" className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm"><Users className="h-4 w-4" />Suscriptores</button><button type="button" onClick={() => setPortalSection("library")} className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"><BookOpen className="h-4 w-4" />Biblioteca de ejercicios</button></nav>
       <Card className="rounded-3xl border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 text-slate-950 shadow-sm">
         <CardContent className="flex flex-col items-center justify-between gap-4 p-6 text-center sm:flex-row sm:text-left">
           <div><p className="text-sm font-semibold text-slate-600">Plan mensual</p><p className="text-3xl font-bold text-slate-950">$ {price} UYU</p></div>
