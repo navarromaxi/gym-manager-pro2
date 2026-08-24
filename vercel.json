@@ -14,7 +14,7 @@
     },
     {
       "path": "/api/cron/prospect-trial-reminders",
-      "schedule": "0 12 * * *"
+      "schedule": "0 17 * * *"
     }
   ]
 }
