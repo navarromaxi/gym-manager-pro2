@@ -13,6 +13,19 @@ const BRAND_LOGO_URL =
 export const metadata: Metadata = {
   title: "GymManagerPro 2.0",
   description: "Sistema de Gestión para Gimnasios",
+  metadataBase: new URL("https://www.gymsistemas.com"),
+  openGraph: {
+    title: "ManagerPro | Tu rutina personalizada",
+    description: "Tu espacio de entrenamiento, rutinas y seguimiento.",
+    siteName: "ManagerPro",
+    locale: "es_UY",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ManagerPro | Tu rutina personalizada",
+    description: "Tu espacio de entrenamiento, rutinas y seguimiento.",
+  },
   icons: {
     icon: [{ url: BRAND_LOGO_URL, type: "image/png" }],
     apple: [{ url: BRAND_LOGO_URL, type: "image/png" }],
