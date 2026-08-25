@@ -108,15 +108,15 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
   const visibleSlots = groupedSlots[selectedSlotGroup] ?? [];
 
   return (
-    <main id="gestionar-reunion" className="relative min-h-screen overflow-hidden bg-[#07152b] px-4 py-6 text-slate-950 sm:px-6 sm:py-10">
+    <main id="gestionar-reunion" className="relative min-h-screen overflow-hidden bg-[#07152b] px-3 py-4 text-slate-950 sm:px-6 sm:py-8">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-32 -top-28 h-96 w-96 rounded-full bg-blue-500/25 blur-3xl" />
         <div className="absolute -bottom-36 right-[-8rem] h-[30rem] w-[30rem] rounded-full bg-cyan-400/15 blur-3xl" />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.05)_1px,transparent_1px)] bg-[size:32px_32px]" />
       </div>
 
-      <div className="relative mx-auto max-w-6xl">
-        <header className="flex items-center justify-between py-3 text-white sm:py-5">
+      <div className="relative mx-auto max-w-7xl">
+        <header className="flex items-center justify-between py-2 text-white sm:py-4">
           <div className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-white/10 shadow-lg shadow-blue-950/30 backdrop-blur">
               <Sparkles className="h-5 w-5 text-cyan-200" />
@@ -129,24 +129,24 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
           <span className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-xs font-bold text-emerald-100 sm:inline-flex">Seguimiento mensual</span>
         </header>
 
-        <section className="grid items-start gap-8 py-8 lg:grid-cols-[0.86fr_1.14fr] lg:py-16">
-          <div className="pt-2 text-white lg:pt-12">
+        <section className="grid items-start gap-6 py-6 lg:grid-cols-[minmax(340px,0.72fr)_minmax(0,1.28fr)] lg:gap-10 lg:py-10">
+          <div className="pt-2 text-white lg:pt-8">
             <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200/20 bg-cyan-200/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.18em] text-cyan-100">
               <CalendarDays className="h-3.5 w-3.5" /> Tu espacio de seguimiento
             </div>
-            <h1 className="mt-6 max-w-xl text-4xl font-black leading-[1.02] tracking-tight sm:text-5xl">
+            <h1 className="mt-5 max-w-xl text-4xl font-black leading-[1.02] tracking-tight sm:text-5xl xl:text-6xl">
               Gestioná tus reuniones.
             </h1>
             <p className="mt-5 max-w-lg text-base leading-7 text-slate-300 sm:text-lg">
               Consultá tus reuniones programadas, revisá el historial y coordiná tu próximo encuentro con el profesor.
             </p>
-            <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+            <div className="mt-7 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
               {[
                 ["01", "Identificate", "Verificamos tu suscripción."],
                 ["02", "Revisá tus reuniones", "Consultá las ya programadas."],
                 ["03", "Coordiná la próxima", "Elegí un horario disponible."],
               ].map(([number, title, description]) => (
-                <div key={number} className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
+                <div key={number} className="rounded-2xl border border-white/10 bg-white/[0.06] p-3.5 backdrop-blur-sm">
                   <span className="text-xs font-black text-cyan-200">{number}</span>
                   <p className="mt-3 text-sm font-bold text-white">{title}</p>
                   <p className="mt-1 text-xs leading-5 text-slate-300">{description}</p>
@@ -155,7 +155,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-white/70 bg-white p-5 shadow-[0_28px_80px_rgba(2,12,27,0.42)] sm:p-8">
+          <div className="rounded-3xl border border-white/70 bg-white p-4 shadow-[0_28px_80px_rgba(2,12,27,0.42)] sm:p-6 lg:p-7">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Tu reunión</p>
@@ -194,7 +194,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
               <div>
                 <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-black text-slate-950">Horarios disponibles</h3><span className="text-xs font-semibold text-slate-500">30 min por reunión</span></div>
                 {groupedSlots.length ? <div className="mt-3">
-                  <div className="mb-3 flex gap-2 overflow-x-auto pb-1">{groupedSlots.map((slots, index) => <button key={slots[0]} type="button" onClick={() => setSelectedSlotGroup(index)} className={`shrink-0 rounded-xl border px-3 py-2 text-left transition ${selectedSlotGroup === index ? "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/20" : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50"}`}><span className="block text-[11px] font-bold uppercase tracking-wide opacity-75">{index === 0 ? "Próximo" : `Fecha ${index + 1}`}</span><span className="block text-sm font-black capitalize">{label(slots[0], false)}</span></button>)}</div>
+                  <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{groupedSlots.map((slots, index) => <button key={slots[0]} type="button" onClick={() => setSelectedSlotGroup(index)} className={`min-w-40 shrink-0 rounded-xl border px-3 py-2 text-left transition ${selectedSlotGroup === index ? "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/20" : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50"}`}><span className="block text-[11px] font-bold uppercase tracking-wide opacity-75">{index === 0 ? "Próximo" : `Fecha ${index + 1}`}</span><span className="block text-sm font-black capitalize">{label(slots[0], false)}</span></button>)}</div>
                   <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><button type="button" aria-label="Ver fecha anterior" disabled={selectedSlotGroup === 0} onClick={() => setSelectedSlotGroup((current) => Math.max(0, current - 1))} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35"><ChevronLeft className="h-4 w-4" /></button><p className="capitalize text-center text-sm font-black text-slate-950">{visibleSlots[0] ? label(visibleSlots[0], false) : ""}</p><button type="button" aria-label="Ver fecha siguiente" disabled={selectedSlotGroup === groupedSlots.length - 1} onClick={() => setSelectedSlotGroup((current) => Math.min(groupedSlots.length - 1, current + 1))} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35"><ChevronRight className="h-4 w-4" /></button></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{visibleSlots.map((slot) => <button key={slot} type="button" disabled={loading} onClick={() => setPendingSlot(slot)} className="rounded-xl border border-blue-100 bg-white px-3 py-3 text-sm font-black text-blue-800 transition hover:-translate-y-0.5 hover:border-blue-500 hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-600/20 disabled:cursor-not-allowed disabled:opacity-50">{timeLabel(slot)}</button>)}</div></section>
                 </div> : <div className="mt-3 rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">No hay horarios disponibles por el momento. Volvé a intentar más tarde.</div>}
               </div>
