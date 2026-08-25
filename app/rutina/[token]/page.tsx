@@ -44,7 +44,7 @@ export default function PublicRoutinePage() {
 
   const { gym, routine } = payload;
   const isOnlineTraining = gym.id === "entrenamiento_online";
-  const meetingManagementUrl = `/entrenamiento/${gym.id}/agenda${payload.onlineClientCedula ? `?cedula=${encodeURIComponent(payload.onlineClientCedula)}` : ""}`;
+  const meetingManagementUrl = `/entrenamiento/${gym.id}/agenda?rutina=${encodeURIComponent(token)}${payload.onlineClientCedula ? `&cedula=${encodeURIComponent(payload.onlineClientCedula)}` : ""}`;
   const weekCount = routine.planCycle === "monthly" ? 4 : routine.planCycle === "biweekly" ? 2 : 1;
   const plan = routine.cyclePlan[`week_${weekIndex + 1}`] ?? routine.weeklyPlan;
   const activeDay = WEEK_DAYS[dayIndex];

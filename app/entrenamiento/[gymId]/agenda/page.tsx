@@ -34,6 +34,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [routineToken, setRoutineToken] = useState("");
   const [selectedSlotGroup, setSelectedSlotGroup] = useState(0);
   const [pendingSlot, setPendingSlot] = useState<string | null>(null);
   const [cancelingAppointmentId, setCancelingAppointmentId] = useState<string | null>(null);
@@ -66,7 +67,9 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
   };
   const load = async (event: FormEvent) => { event.preventDefault(); await loadAgenda(cedula); };
   useEffect(() => {
-    const queryCedula = new URLSearchParams(window.location.search).get("cedula")?.trim();
+    const query = new URLSearchParams(window.location.search);
+    const queryCedula = query.get("cedula")?.trim();
+    setRoutineToken(query.get("rutina")?.trim() ?? "");
     if (!queryCedula) return;
     setCedula(queryCedula);
     void loadAgenda(queryCedula);
@@ -126,7 +129,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
               <p className="text-xs text-blue-200">Entrenamiento personalizado</p>
             </div>
           </div>
-          <span className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-xs font-bold text-emerald-100 sm:inline-flex">Seguimiento mensual</span>
+          <div className="flex items-center gap-2"><span className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-xs font-bold text-emerald-100 sm:inline-flex">Seguimiento mensual</span>{routineToken ? <a href={`/rutina/${routineToken}`} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20">← Volver a mi rutina</a> : null}</div>
         </header>
 
         <section className="grid items-start gap-5 py-5 lg:grid-cols-[minmax(280px,0.7fr)_minmax(0,1.3fr)] lg:gap-8 lg:py-7">
