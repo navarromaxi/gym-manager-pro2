@@ -1,11 +1,13 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type Appointment = { id: string; startsAt: string };
-type Data = { clientName: string; slots: string[]; appointments: Appointment[] };
+type AppointmentHistory = Appointment & { status: string };
+type Data = { clientName: string; slots: string[]; appointments: Appointment[]; history: AppointmentHistory[] };
 
 function label(value: string, includeTime = true) {
   return new Intl.DateTimeFormat("es-UY", {
@@ -25,8 +27,10 @@ function timeLabel(value: string) {
     timeZone: "America/Montevideo",
   }).format(new Date(value));
 }
+const historyStatusLabel: Record<string, string> = { confirmed: "Confirmada", completed: "Realizada", no_show: "No se presentó", not_completed: "No se realizó", cancelled: "Cancelada" };
 
 export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{ gymId: string }> }) {
+  const searchParams = useSearchParams();
   const [gymId, setGymId] = useState("");
   const [cedula, setCedula] = useState("");
   const [data, setData] = useState<Data | null>(null);
@@ -50,19 +54,25 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
     return [...grouped.values()];
   }, [data]);
 
-  const load = async (event: FormEvent) => {
-    event.preventDefault();
+  const loadAgenda = async (cedulaValue: string) => {
     setLoading(true);
     setMessage("");
     const id = gymId || (await params).gymId;
     setGymId(id);
-    const response = await fetch(`/api/public-online-training/${id}/appointments?cedula=${encodeURIComponent(cedula)}`);
+    const response = await fetch(`/api/public-online-training/${id}/appointments?cedula=${encodeURIComponent(cedulaValue)}`);
     const body = await response.json() as Data & { error?: string };
     setLoading(false);
     if (!response.ok) return setMessage(body.error || "No pudimos cargar la agenda.");
     setData(body);
     setSelectedSlotGroup(0);
   };
+  const load = async (event: FormEvent) => { event.preventDefault(); await loadAgenda(cedula); };
+  useEffect(() => {
+    const queryCedula = searchParams.get("cedula")?.trim();
+    if (!queryCedula) return;
+    setCedula(queryCedula);
+    void loadAgenda(queryCedula);
+  }, [searchParams]);
 
   const book = async (startsAt: string) => {
     setLoading(true);
@@ -76,7 +86,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
     const body = await response.json() as { error?: string };
     setLoading(false);
     if (!response.ok) return setMessage(body.error || "No pudimos confirmar el turno.");
-    await load({ preventDefault() {} } as FormEvent);
+    await loadAgenda(cedula);
     setMessage("Tu reunión quedó confirmada. Te enviaremos un recordatorio antes de la llamada.");
   };
 
@@ -93,7 +103,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
     const body = await response.json() as { error?: string };
     setCancelingAppointmentId(null);
     if (!response.ok) return setMessage(body.error || "No pudimos cancelar el turno.");
-    await load({ preventDefault() {} } as FormEvent);
+    await loadAgenda(cedula);
     setMessage("Tu reunión fue cancelada. Ya podés elegir otro horario disponible.");
   };
 
@@ -127,16 +137,16 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
               <CalendarDays className="h-3.5 w-3.5" /> Tu espacio de seguimiento
             </div>
             <h1 className="mt-6 max-w-xl text-4xl font-black leading-[1.02] tracking-tight sm:text-5xl">
-              Elegí el momento para avanzar.
+              Gestioná tus reuniones.
             </h1>
             <p className="mt-5 max-w-lg text-base leading-7 text-slate-300 sm:text-lg">
-              Con tu suscripción activa tenés una reunión individual de 30 minutos por mes calendario para revisar tu progreso.
+              Consultá tus reuniones programadas, revisá el historial y coordiná tu próximo encuentro con el profesor.
             </p>
             <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
               {[
-                ["01", "Ingresá tu cédula", "Identificamos tu suscripción."],
-                ["02", "Elegí un horario", "Una reunión incluida por mes."],
-                ["03", "Confirmá tu lugar", "Recibís el recordatorio."],
+                ["01", "Identificate", "Verificamos tu suscripción."],
+                ["02", "Revisá tus reuniones", "Consultá las ya programadas."],
+                ["03", "Coordiná la próxima", "Elegí un horario disponible."],
               ].map(([number, title, description]) => (
                 <div key={number} className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
                   <span className="text-xs font-black text-cyan-200">{number}</span>
@@ -151,7 +161,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Tu reunión</p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">Agendá tu llamada</h2>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">Tus reuniones</h2>
               </div>
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/25"><CalendarDays className="h-5 w-5" /></span>
             </div>
@@ -181,6 +191,7 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
               </div>
 
               {data.appointments.length > 0 ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">Tus reuniones agendadas</p><div className="mt-3 space-y-2">{data.appointments.map((appointment) => <div key={appointment.id} className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-white/80 p-3 sm:flex-row sm:items-center sm:justify-between"><p className="capitalize font-bold text-emerald-950">{label(appointment.startsAt)}</p><button type="button" disabled={cancelingAppointmentId === appointment.id} onClick={() => void cancelAppointment(appointment)} className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60">{cancelingAppointmentId === appointment.id ? "Cancelando..." : "Cancelar turno"}</button></div>)}</div><p className="mt-3 text-xs text-emerald-800">Tu suscripción activa incluye una reunión por mes calendario. Si necesitás cambiarla, cancelala y elegí otro horario disponible.</p></div> : null}
+              {data.history.length ? <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-black uppercase tracking-[0.14em] text-slate-600">Historial de reuniones</p><div className="mt-3 space-y-2">{data.history.map((appointment) => <div key={appointment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3"><p className="capitalize font-bold text-slate-800">{label(appointment.startsAt)}</p><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{historyStatusLabel[appointment.status] ?? appointment.status}</span></div>)}</div></div> : null}
 
               <div>
                 <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-black text-slate-950">Horarios disponibles</h3><span className="text-xs font-semibold text-slate-500">30 min por reunión</span></div>

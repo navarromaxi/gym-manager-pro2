@@ -31,14 +31,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     return NextResponse.json({ error: "Esta rutina no está vigente en este momento." }, { status: 404 });
   }
 
-  const [{ data: gym }, { data: member }] = await Promise.all([
+  const [{ data: gym }, { data: member }, { data: onlineClient }] = await Promise.all([
     supabase.from("gyms").select("name, logo_url").eq("id", routine.gym_id).maybeSingle(),
     routine.member_id ? supabase.from("members").select("name").eq("id", routine.member_id).maybeSingle() : Promise.resolve({ data: null }),
+    routine.member_id ? supabase.from("online_training_clients").select("cedula").eq("gym_id", routine.gym_id).eq("linked_member_id", routine.member_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   await supabase.from("routines").update({ last_opened_at: new Date().toISOString() }).eq("id", routine.id);
 
   return NextResponse.json({
     gym: { id: routine.gym_id, name: gym?.name ?? null, logoUrl: gym?.logo_url ?? null },
+    onlineClientCedula: onlineClient?.cedula ?? null,
     routine: {
       name: routine.name, description: routine.description ?? "", duration: routine.duration ?? 0,
       memberName: member?.name ?? null, exercises: Array.isArray(routine.exercises) ? routine.exercises : [],

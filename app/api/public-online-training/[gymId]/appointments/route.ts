@@ -176,7 +176,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     googleBusy = [];
   }
   const supabase = createClient();
-  const { data: appointments } = await supabase.from("online_training_appointments").select("id, starts_at, client_id, status").eq("gym_id", gymId).gte("starts_at", now.toISOString()).eq("status", "confirmed");
+  const [{ data: appointments }, { data: history }] = await Promise.all([
+    supabase.from("online_training_appointments").select("id, starts_at, client_id, status").eq("gym_id", gymId).gte("starts_at", now.toISOString()).eq("status", "confirmed"),
+    supabase.from("online_training_appointments").select("id, starts_at, status").eq("gym_id", gymId).eq("client_id", client.id).order("starts_at", { ascending: false }).limit(12),
+  ]);
   const taken = new Set((appointments || []).filter((appointment) => appointment.client_id !== client.id).map((appointment) => appointment.starts_at));
   const own = (appointments || []).filter((appointment) => appointment.client_id === client.id).map((appointment) => ({ id: appointment.id, startsAt: appointment.starts_at }));
   const monthsWithOwnAppointment = new Set(own.map((appointment) => montevideoMonth(new Date(appointment.startsAt))));
@@ -188,6 +191,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .filter((start) => !overlaps(start, new Date(start.getTime() + 30 * 60 * 1000), googleBusy))
       .map((start) => start.toISOString()),
     appointments: own,
+    history: (history || []).map((appointment) => ({ id: appointment.id, startsAt: appointment.starts_at, status: appointment.status })),
   });
 }
 
