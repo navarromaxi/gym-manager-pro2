@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShieldCheck, Sparkles } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type Appointment = { id: string; startsAt: string };
@@ -30,7 +29,6 @@ function timeLabel(value: string) {
 const historyStatusLabel: Record<string, string> = { confirmed: "Confirmada", completed: "Realizada", no_show: "No se presentó", not_completed: "No se realizó", cancelled: "Cancelada" };
 
 export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{ gymId: string }> }) {
-  const searchParams = useSearchParams();
   const [gymId, setGymId] = useState("");
   const [cedula, setCedula] = useState("");
   const [data, setData] = useState<Data | null>(null);
@@ -68,11 +66,11 @@ export default function OnlineTrainingAgendaPage({ params }: { params: Promise<{
   };
   const load = async (event: FormEvent) => { event.preventDefault(); await loadAgenda(cedula); };
   useEffect(() => {
-    const queryCedula = searchParams.get("cedula")?.trim();
+    const queryCedula = new URLSearchParams(window.location.search).get("cedula")?.trim();
     if (!queryCedula) return;
     setCedula(queryCedula);
     void loadAgenda(queryCedula);
-  }, [searchParams]);
+  }, []);
 
   const book = async (startsAt: string) => {
     setLoading(true);
