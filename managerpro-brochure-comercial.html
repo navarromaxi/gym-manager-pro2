@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ManagerPro 2.0 — Presentación comercial</title>
+    <style>
+      @page { size: A4 landscape; margin: 0; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; color: #f8fafc; background: #07111f; }
+      .page { width: 297mm; height: 210mm; page-break-after: always; position: relative; overflow: hidden; padding: 15mm 17mm 13mm; background: linear-gradient(135deg, #07111f 0%, #0d1d36 60%, #111827 100%); }
+      .page:last-child { page-break-after: auto; }
+      .page::before { content: ""; position: absolute; width: 140mm; height: 140mm; border: 1px solid rgba(45, 212, 191, .16); border-radius: 50%; right: -65mm; top: -76mm; }
+      .page::after { content: ""; position: absolute; width: 95mm; height: 95mm; border: 1px solid rgba(59, 130, 246, .14); border-radius: 50%; left: -48mm; bottom: -56mm; }
+      .eyebrow { position: relative; z-index: 1; color: #5eead4; font-size: 10pt; text-transform: uppercase; letter-spacing: 2.2px; font-weight: 700; margin-bottom: 5mm; }
+      h1, h2, p { position: relative; z-index: 1; margin: 0; }
+      h1 { font-size: 42pt; line-height: 1.03; max-width: 170mm; letter-spacing: -1.4px; }
+      h2 { font-size: 26pt; line-height: 1.1; max-width: 175mm; letter-spacing: -.6px; }
+      .lead { margin-top: 6mm; max-width: 158mm; color: #cbd5e1; font-size: 15pt; line-height: 1.42; }
+      .cover { display: flex; flex-direction: column; justify-content: space-between; }
+      .cover-main { padding-top: 16mm; }
+      .cover h1 strong { color: #5eead4; }
+      .cover-badge { display: inline-flex; align-items: center; gap: 5mm; margin-top: 12mm; padding: 4mm 6mm; border: 1px solid rgba(94, 234, 212, .38); border-radius: 999px; background: rgba(15, 23, 42, .48); color: #e2e8f0; font-size: 11pt; }
+      .logo { width: 30mm; height: 30mm; border-radius: 6mm; object-fit: cover; }
+      .brand { display: flex; align-items: center; gap: 5mm; position: relative; z-index: 1; }
+      .brand-text { color: #cbd5e1; font-size: 10pt; line-height: 1.35; }
+      .brand-text strong { display: block; color: #fff; font-size: 13pt; letter-spacing: .3px; }
+      .feature-list { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; margin-top: 11mm; max-width: 228mm; }
+      .feature { border: 1px solid rgba(148, 163, 184, .24); border-radius: 4mm; padding: 4mm; background: rgba(15, 23, 42, .56); color: #e2e8f0; font-size: 10pt; }
+      .feature b { color: #5eead4; display: block; margin-bottom: 1.5mm; }
+      .module { display: grid; grid-template-columns: 1.05fr 1.6fr; gap: 10mm; align-items: center; height: 100%; }
+      .module-copy { position: relative; z-index: 1; }
+      .module-copy p { margin-top: 5mm; color: #cbd5e1; font-size: 12.5pt; line-height: 1.45; }
+      .benefits { list-style: none; margin: 7mm 0 0; padding: 0; display: grid; gap: 3mm; }
+      .benefits li { color: #e2e8f0; font-size: 10.5pt; line-height: 1.3; padding-left: 5mm; position: relative; }
+      .benefits li::before { content: "✓"; position: absolute; left: 0; color: #5eead4; font-weight: 700; }
+      .shot-wrap { position: relative; z-index: 1; padding: 3mm; border-radius: 5mm; background: linear-gradient(135deg, rgba(94,234,212,.85), rgba(59,130,246,.8)); box-shadow: 0 18px 42px rgba(0,0,0,.32); }
+      .shot { display: block; width: 100%; max-height: 158mm; object-fit: contain; border-radius: 3mm; background: #fff; }
+      .dual { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; margin-top: 7mm; }
+      .dual .shot { max-height: 105mm; }
+      .dual .shot-wrap { padding: 2mm; }
+      .footer { position: absolute; z-index: 2; bottom: 7mm; left: 17mm; right: 17mm; display: flex; justify-content: space-between; color: #94a3b8; font-size: 8.5pt; }
+      .footer b { color: #5eead4; }
+      .wide .module { grid-template-columns: .9fr 1.85fr; }
+      .cta { display: flex; flex-direction: column; justify-content: center; }
+      .cta h2 { font-size: 33pt; max-width: 175mm; }
+      .cta .lead { max-width: 150mm; }
+      .cta-box { position: relative; z-index: 1; margin-top: 13mm; padding: 8mm; max-width: 170mm; border-radius: 5mm; border: 1px solid rgba(94,234,212,.42); background: rgba(8, 27, 47, .75); font-size: 13pt; color: #e2e8f0; }
+      .cta-box strong { color: #5eead4; }
+    </style>
+  </head>
+  <body>
+    <section class="page cover">
+      <div class="cover-main">
+        <div class="eyebrow">Gestión inteligente para gimnasios</div>
+        <h1>Todo tu gimnasio.<br /><strong>Un solo sistema.</strong></h1>
+        <p class="lead">ManagerPro 2.0 centraliza la gestión de socios, cobros, clases, rutinas y accesos para que tu equipo trabaje mejor cada día.</p>
+        <div class="cover-badge">Diseñado para gimnasios, clubes y centros de entrenamiento</div>
+        <div class="feature-list">
+          <div class="feature"><b>Administración simple</b>Socios, planes y pagos siempre organizados.</div>
+          <div class="feature"><b>Más seguimiento</b>Alertas, prospectos y recordatorios en el momento indicado.</div>
+          <div class="feature"><b>Mejor experiencia</b>Reservas y rutinas accesibles para cada socio.</div>
+        </div>
+      </div>
+      <div class="brand"><img class="logo" src="file:///C:/Users/maxi_/Downloads/Capturas%20del%20programa/Logo%20Pymes%20Sistemas.jpeg" /><div class="brand-text"><strong>PyMes Sistemas</strong>Soluciones digitales para tu negocio</div></div>
+    </section>
+
+    <section class="page wide"><div class="module"><div class="module-copy"><div class="eyebrow">01 · Dashboard</div><h2>Tu operación, clara desde el primer vistazo.</h2><p>El panel reúne los indicadores que importan para tomar decisiones rápidas y mantener el gimnasio bajo control.</p><ul class="benefits"><li>Socios activos, ingresos y ganancia mensual.</li><li>Vencimientos, inactivos y seguimiento pendiente.</li><li>Alertas accionables para no dejar tareas atrás.</li></ul></div><div class="shot-wrap"><img class="shot" src="file:///C:/Users/maxi_/Downloads/Capturas%20del%20programa/Archivo%20adjunto%20del%20usuario.png" /></div></div><div class="footer"><span><b>ManagerPro 2.0</b> · Gestión que acompaña tu día</span><span>01</span></div></section>
+
+    <section class="page"><div class="module"><div class="module-copy"><div class="eyebrow">02 · Leads y conversión</div><h2>De consulta a socio, sin perder oportunidades.</h2><p>Administrá interesados, registrá cada contacto y transformá una clase de prueba en un nuevo socio con su plan y pago inicial.</p><ul class="benefits"><li>Filtros por estado, prioridad, agenda y próximo contacto.</li><li>Clases de prueba y recordatorios automatizados.</li><li>Conversión directa: socio, plan y primer pago en un único flujo.</li></ul></div><div class="dual"><div class="shot-wrap"><img class="shot" src="file:///C:/Users/maxi_/Downloads/Capturas%20del%20programa/Archivo%20adjunto%20del%20usuario1.png" /></div><div class="shot-wrap"><img class="shot" src="file:///C:/Users/maxi_/Downloads/Capturas%20del%20programa/Archivo%20adjunto%20del%20usuario2.png" /></div></div></div><div class="footer"><span><b>ManagerPro 2.0</b> · Seguimiento comercial integrado</span><span>02</span></div></section>
+
+    <section class="page"><div class="module"><div class="module-copy"><div class="eyebrow">03 · Socios y pagos</div><h2>Administración ordenada, cobros bajo control.</h2><p>Encontrá la información de cada socio al instante y mantené una visión precisa de cuotas, planes, vencimientos e ingresos.</p><ul class="benefits"><li>Buscador y filtros por plan o estado.</li><li>Alertas de cuotas vencidas y seguimientos pendientes.</li><li>Historial de pagos, métodos de cobro y facturación.</li></ul></div><div class="dual"><div class="shot-wrap"><img class="shot" src="file:///C:/Users/maxi_/Downloads/Capturas%20del%20programa/Archivo%20adjunto%20del%20usuario3.png" /></div><div class="shot-wrap"><img class="shot" src="file:///C:/Users/maxi_/Downloads/Capturas%20del%20programa/Archivo%20adjunto%20del%20usuario4.png" /></div></div></div><div class="footer"><span><b>ManagerPro 2.0</b> · El estado de cada cuenta, siempre disponible</span><span>03</span></div></section>
+
+    <section class="page"><div class="module"><div class="module-copy"><div class="eyebrow">04 · Clases y reservas</div><h2>Más organización para tu equipo. Más autonomía para tus socios.</h2><p>Planificá la semana, controlá cupos y permití que cada socio reserve su lugar desde una experiencia online simple.</p><ul class="benefits"><li>Agenda semanal de clases, horarios y cupos libres.</li><li>Reservas confirmadas y listados por actividad.</li><li>Portal público de reservas, optimizado para celular.</li></ul></div><div class="dual"><div class="shot-wrap"><img class="shot" src="file:///C:/Users/maxi_/Downloads/Capturas%20del%20programa/Archivo%20adjunto%20del%20usuario5.png" /></div><div class="shot-wrap"><img class="shot" src="file:///C:/Users/maxi_/Downloads/Capturas%20del%20programa/Archivo%20adjunto%20del%20usuario6.png" /></div></div></div><div class="footer"><span><b>ManagerPro 2.0</b> · Clases sin planillas ni mensajes interminables</span><span>04</span></div></section>
+
+    <section class="page"><div class="module"><div class="module-copy"><div class="eyebrow">05 · Rutinas y entrenamiento</div><h2>Planes de entrenamiento que acompañan a cada socio.</h2><p>Creá rutinas generales o personalizadas, administrá vigencias y ordená ejercicios, series, repeticiones, tiempos y notas.</p><ul class="benefits"><li>Biblioteca y buscador de rutinas.</li><li>Planes por objetivo, grupo o persona.</li><li>Semanas, días, secciones y detalle de cada ejercicio.</li></ul></div><div class="dual"><div class="shot-wrap"><img class="shot" src="file:///C:/Users/maxi_/Downloads/Capturas%20del%20programa/Archivo%20adjunto%20del%20usuario7.png" /></div><div class="shot-wrap"><img class="shot" src="file:///C:/Users/maxi_/Downloads/Capturas%20del%20programa/Archivo%20adjunto%20del%20usuario8.png" /></div></div></div><div class="footer"><span><b>ManagerPro 2.0</b> · Entrenamiento personalizado, sin complicaciones</span><span>05</span></div></section>
+
+    <section class="page"><div class="module"><div class="module-copy"><div class="eyebrow">06 · Rutinas para el socio</div><h2>Compartí cada plan por WhatsApp y mejorá la experiencia del socio.</h2><p>El socio recibe un enlace claro y adaptado a celular para consultar su rutina, semana, días de entrenamiento y detalles de cada ejercicio.</p><ul class="benefits"><li>Acceso público, simple y profesional.</li><li>Información ordenada para entrenar con autonomía.</li><li>La rutina siempre actualizada desde el panel.</li></ul></div><div class="shot-wrap"><img class="shot" src="file:///C:/Users/maxi_/Downloads/Capturas%20del%20programa/Archivo%20adjunto%20del%20usuario9.png" /></div></div><div class="footer"><span><b>ManagerPro 2.0</b> · Tu servicio también acompaña fuera del gimnasio</span><span>06</span></div></section>
+
+    <section class="page"><div class="module"><div class="module-copy"><div class="eyebrow">07 · Control de acceso</div><h2>Una recepción más ágil y un acceso siempre informado.</h2><p>Validá el ingreso mediante cédula, conocé el estado del plan al instante y consultá el historial de accesos desde un mismo lugar.</p><ul class="benefits"><li>Link público para tablet, notebook o pantalla de entrada.</li><li>Estados visuales: activo, por vencer o vencido.</li><li>Historial, filtros y reportes por período.</li></ul></div><div class="shot-wrap"><img class="shot" src="file:///C:/Users/maxi_/Downloads/Capturas%20del%20programa/Archivo%20adjunto%20del%20usuario10.png" /></div></div><div class="footer"><span><b>ManagerPro 2.0</b> · Más control desde la puerta de entrada</span><span>07</span></div></section>
+
+    <section class="page cta"><div class="eyebrow">ManagerPro 2.0</div><h2>Menos tareas manuales.<br /><span style="color:#5eead4">Más tiempo para hacer crecer tu gimnasio.</span></h2><p class="lead">Centralizá la administración, mejorá el seguimiento comercial y ofrecé una experiencia más moderna a tus socios.</p><div class="cta-box"><strong>PyMes Sistemas</strong><br />Soluciones digitales diseñadas para ordenar, medir y potenciar tu operación.</div><div class="footer"><span><b>ManagerPro 2.0</b> · Presentación comercial</span><span>PyMes Sistemas</span></div></section>
+  </body>
+</html>
