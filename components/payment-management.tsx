@@ -1708,6 +1708,17 @@ export function PaymentManagement({
               paymentDate.getMonth() === previousMonth &&
               paymentDate.getFullYear() === previousYear
             );
+          case "next_month":
+            const nextMonth =
+              currentDate.getMonth() === 11 ? 0 : currentDate.getMonth() + 1;
+            const nextYear =
+              currentDate.getMonth() === 11
+                ? currentDate.getFullYear() + 1
+                : currentDate.getFullYear();
+            return (
+              paymentDate.getMonth() === nextMonth &&
+              paymentDate.getFullYear() === nextYear
+            );
           case "last_6_months":
             const sixMonthsAgo = new Date();
             sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
@@ -3056,6 +3067,14 @@ export function PaymentManagement({
                           <strong>Monto:</strong> $
                           {newPayment.amount.toLocaleString()}
                         </p>
+                        <p>
+                          <strong>Fecha de inicio:</strong>{" "}
+                          {formatDueDate(newPayment.startDate)}
+                        </p>
+                        <p>
+                          <strong>Próximo vencimiento:</strong>{" "}
+                          {formatDueDate(nextInstallmentDueValue)}
+                        </p>
                         <p className="mt-1 text-xs">
                           ✅ El socio se activará y se actualizará su próximo
                           vencimiento
@@ -3275,6 +3294,7 @@ export function PaymentManagement({
                 <SelectItem value="all">Todos los períodos</SelectItem>
                 <SelectItem value="current_month">Mes actual</SelectItem>
                 <SelectItem value="previous_month">Mes anterior</SelectItem>
+                <SelectItem value="next_month">Mes siguiente</SelectItem>
                 <SelectItem value="last_6_months">Últimos 6 meses</SelectItem>
                 <SelectItem value="current_year">Año actual</SelectItem>
               </SelectContent>
