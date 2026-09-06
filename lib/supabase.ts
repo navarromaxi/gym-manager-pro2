@@ -8,6 +8,18 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 //export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+function getTabAuthStorageKey() {
+  if (typeof window === "undefined") return undefined
+  const key = "gym-management-auth-tab"
+  let tabId = window.sessionStorage.getItem(key)
+  if (!tabId) {
+    tabId = window.crypto.randomUUID()
+    window.sessionStorage.setItem(key, tabId)
+  }
+  // Supabase también usa storageKey para BroadcastChannel entre pestañas.
+  return `sb-${new URL(supabaseUrl).hostname}-auth-${tabId}`
+}
+
 export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -16,6 +28,10 @@ export const supabase = createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      // Cada pestaña conserva su cuenta: el portal de entrenamiento no debe
+      // reemplazar la sesión de un gimnasio abierto en otra pestaña.
+      storage: typeof window !== "undefined" ? window.sessionStorage : undefined,
+      storageKey: getTabAuthStorageKey(),
     },
   }
 );
@@ -236,9 +252,35 @@ async function runMembersWriteWithFallback<T>(
 }
 
 export async function insertMemberWithFallback(member: Record<string, any>) {
+  await assertGymSession(member.gym_id)
   return runMembersWriteWithFallback(member, (payload) =>
     supabase.from("members").insert([payload]).then((result) => result)
   )
+}
+
+/** Comprueba la cuenta y los metadatos antes de que un trigger asigne el gimnasio. */
+export async function assertGymSession(gymId: string) {
+  const { data, error } = await supabase.auth.getUser()
+  if (error || !data.user || !gymId) {
+    throw new Error("Tu sesión no es válida. Inicia sesión nuevamente antes de agregar el socio.")
+  }
+
+  const user = data.user
+  const claims = [user.app_metadata?.gym_id, user.user_metadata?.gym_id]
+    .filter((value) => typeof value === "string" && value.length > 0)
+  const { data: gym, error: gymError } = await supabase
+    .from("gyms")
+    .select("id")
+    .eq("id", gymId)
+    .eq("user_id", user.id)
+    .maybeSingle()
+
+  if (gymError) {
+    throw new Error("No se pudo verificar el gimnasio de tu sesión. Inténtalo nuevamente.")
+  }
+  if (!gym || claims.some((claim) => claim !== gymId)) {
+    throw new Error("La sesión corresponde a otro gimnasio. Cierra sesión e ingresa con la cuenta del gimnasio correcto antes de agregar el socio.")
+  }
 }
 
 export async function updateMemberWithFallback(

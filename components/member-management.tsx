@@ -477,7 +477,7 @@ export function MemberManagement({
       setIsAddDialogOpen(false);
     } catch (error) {
       console.error("Error agregando miembro:", error);
-      alert("Error al agregar el miembro. Inténtalo de nuevo.");
+      alert(error instanceof Error ? error.message : "Error al agregar el miembro. Inténtalo de nuevo.");
     }
   };
 

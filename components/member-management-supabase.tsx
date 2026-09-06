@@ -33,7 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Edit, Trash2, Search } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase, insertMemberWithFallback } from "@/lib/supabase";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import type { Member, Payment, Plan } from "@/lib/supabase";
 import { TableVirtuoso } from "react-virtuoso";
@@ -391,9 +391,7 @@ export function MemberManagement({
       };
 
       // Guardar en Supabase
-      const { error: memberError } = await supabase
-        .from("members")
-        .insert([member]);
+      const { error: memberError } = await insertMemberWithFallback(member);
 
       if (memberError) throw memberError;
 
@@ -465,6 +463,10 @@ export function MemberManagement({
       setIsAddDialogOpen(false);
     } catch (error) {
       console.error("Error agregando miembro:", error);
+      if (error instanceof Error) {
+        alert(error.message);
+        return;
+      }
       alert("Error al agregar el miembro. Inténtalo de nuevo.");
     }
   };
