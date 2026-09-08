@@ -1147,20 +1147,20 @@ export function MemberManagement({
             <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 p-3">
               <Label htmlFor="member-search" className="mb-2 block text-sm font-medium text-emerald-100">Buscar socio</Label>
               <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
                   id="member-search"
                   placeholder="Buscar por nombre, email o telefono..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="h-11 border-white/10 bg-black/30 pl-8"
+                  className="h-11 border-white/10 bg-black/30 pl-8 text-white caret-white placeholder:text-slate-400"
                 />
               </div>
             </div>
             <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 p-3">
               <Label htmlFor="member-sort" className="mb-2 block text-sm font-medium text-cyan-100">Ordenar por</Label>
               <Select value={sortOption} onValueChange={(value) => setSortOption(value as MemberSortOption)}>
-                <SelectTrigger id="member-sort" className="h-11 w-full border-white/10 bg-black/30"><SelectValue placeholder="Ordenar por" /></SelectTrigger>
+                <SelectTrigger id="member-sort" className="h-11 w-full border-white/10 bg-black/30 text-white"><SelectValue placeholder="Ordenar por" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="recent_activity_desc">Orden actual (mas recientes primero)</SelectItem>
                   <SelectItem value="plan_end_asc">Fin del plan ascendente</SelectItem>
@@ -1175,7 +1175,7 @@ export function MemberManagement({
             <div className="rounded-xl border border-violet-400/20 bg-violet-500/10 p-3">
               <Label htmlFor="member-status" className="mb-2 block text-sm font-medium text-violet-100">Estado</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger id="member-status" className="h-11 w-full border-white/10 bg-black/30"><SelectValue placeholder="Estado" /></SelectTrigger>
+                <SelectTrigger id="member-status" className="h-11 w-full border-white/10 bg-black/30 text-white"><SelectValue placeholder="Estado" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="active">Activos</SelectItem>
@@ -1193,7 +1193,7 @@ export function MemberManagement({
             <div className="rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/10 p-3">
               <Label htmlFor="member-plan" className="mb-2 block text-sm font-medium text-fuchsia-100">Plan</Label>
               <Select value={planFilter} onValueChange={setPlanFilter}>
-                <SelectTrigger id="member-plan" className="h-11 w-full border-white/10 bg-black/30"><SelectValue placeholder="Tipo de plan" /></SelectTrigger>
+                <SelectTrigger id="member-plan" className="h-11 w-full border-white/10 bg-black/30 text-white"><SelectValue placeholder="Tipo de plan" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los planes</SelectItem>
                   <SelectItem value="without_plan">Sin plan asignado</SelectItem>
