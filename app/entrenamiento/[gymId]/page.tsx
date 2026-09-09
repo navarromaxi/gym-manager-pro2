@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { trackMetaCustomEvent, trackMetaEvent } from "@/components/meta-pixel";
 
 type PublicConfig = { monthly_price: number; payment_url: string | null; whatsapp_url: string | null };
 type ExistingRegistration = { exists: true; clientName: string; status: string; routinePath: string | null };
@@ -37,12 +38,19 @@ export default function OnlineTrainingIntakePage({ params }: { params: Promise<{
     });
   }, [params]);
 
+  useEffect(() => {
+    if (gymId === "entrenamiento_online") {
+      trackMetaEvent("ViewContent", { content_name: "Formulario de rutina online" });
+    }
+  }, [gymId]);
+
   const update = (key: Exclude<keyof typeof form, "consent">, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const next = async () => {
     const missingStepOne = !form.fullName || !form.cedula || !form.email || !form.phone;
     const missingStepTwo = !form.goal || !form.trainingPlace || !form.experience || !form.injuries || !form.availableTime || !form.weeklyDays;
     if ((step === 1 && missingStepOne) || (step === 2 && missingStepTwo)) return setError("Completá todos los campos obligatorios antes de continuar.");
     if (step === 1) {
+      trackMetaCustomEvent("FormStepOneComplete", { content_name: "Formulario de rutina online" });
       setLoading(true);
       const response = await fetch(`/api/public-online-training/${gymId}/registration-status?cedula=${encodeURIComponent(form.cedula.trim())}`).catch(() => null);
       const result = response ? await response.json().catch(() => null) as ExistingRegistration | { exists?: false; error?: string } | null : null;
@@ -54,6 +62,7 @@ export default function OnlineTrainingIntakePage({ params }: { params: Promise<{
   };
   const resumePayment = async () => {
     setSubmitting(true); setError("");
+    trackMetaEvent("InitiateCheckout", { currency: "UYU", value: config?.monthly_price });
     const payment = await fetch("/api/online-training/subscription", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -76,6 +85,8 @@ export default function OnlineTrainingIntakePage({ params }: { params: Promise<{
       p_intake: { objetivo: form.goal, lugar_entrenamiento: form.trainingPlace, experiencia: form.experience, lesiones_o_limitaciones: form.injuries, tiempo_diario: form.availableTime, dias_por_semana: form.weeklyDays },
     });
     if (rpcError) { setSubmitting(false); return setError("No pudimos guardar tus datos. Intentá nuevamente."); }
+    trackMetaEvent("Lead", { content_name: "Formulario de rutina online", currency: "UYU", value: config?.monthly_price });
+    trackMetaEvent("InitiateCheckout", { currency: "UYU", value: config?.monthly_price });
     const payment = await fetch("/api/online-training/subscription", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
