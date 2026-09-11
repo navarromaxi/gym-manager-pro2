@@ -3348,13 +3348,13 @@ export function PaymentManagement({
       </Card>
 
       {/* Payments Table */}
-      <Card className="overflow-hidden rounded-2xl border-slate-200 bg-white text-slate-900 shadow-sm [--background:0_0%_100%] [--foreground:222_47%_11%] [--muted:210_40%_96%] [--muted-foreground:215_16%_40%] [--border:214_32%_88%] [--accent:210_40%_96%] [--accent-foreground:222_47%_11%] [--secondary:210_40%_96%] [--secondary-foreground:222_47%_11%]">
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-lg text-slate-900"><Receipt className="h-5 w-5 text-teal-600" />Historial de pagos <span className="rounded-full bg-teal-50 px-2.5 py-1 text-sm font-semibold text-teal-700">{filteredPayments.length}</span></CardTitle>
+          <CardTitle>Historial de Pagos ({filteredPayments.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
-            <TableHeader className="bg-slate-100 [&_th]:text-xs [&_th]:font-semibold [&_th]:text-slate-600">
+            <TableHeader>
               <TableRow>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Socio</TableHead>
@@ -3369,7 +3369,6 @@ export function PaymentManagement({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPayments.length === 0 && <TableRow className="hover:bg-white"><TableCell colSpan={10} className="py-12 text-center text-slate-500">No hay pagos que coincidan con los filtros.</TableCell></TableRow>}
               {visiblePayments.map((payment) => {
                 const insight = paymentInsights.get(payment.id);
                 const member = membersById.get(payment.member_id);
@@ -3464,7 +3463,7 @@ export function PaymentManagement({
                   isSendingInvoice && invoicePayment?.id === payment.id;
 
                 return (
-                  <TableRow key={payment.id} className="border-slate-200 odd:bg-white even:bg-slate-50/70 hover:bg-teal-50/70">
+                  <TableRow key={payment.id}>
                     <TableCell>
                       {parseLocalDate(payment.date).toLocaleDateString()}
                     </TableCell>
