@@ -3,6 +3,7 @@
 "use client";
 //import { LoginSystem } from "@/components/login-system";
 import { useState, useEffect, useMemo } from "react";
+import { getMembersToFollowUp } from "@/features/members/member-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -773,7 +774,6 @@ export default function GymManagementSystem() {
     expiredMembers,
     inactiveMembers,
     upcomingExpirations,
-    followUpCount,
   } = useMemo(() => {
     const now = new Date();
     const todayMs = now.getTime();
@@ -781,7 +781,6 @@ export default function GymManagementSystem() {
     let expired = 0;
     let inactive = 0;
     let upcoming = 0;
-    let followUp = 0;
 
     members.forEach((member) => {
       const status = getRealStatus(member);
@@ -800,17 +799,6 @@ export default function GymManagementSystem() {
         upcoming += 1;
       }
 
-      const join = toLocalDate(member.join_date);
-      const diffDaysFromJoin = Math.floor(
-        (todayMs - join.getTime()) / 86400000
-      );
-      if (
-        !member.followed_up &&
-        diffDaysFromJoin >= 5 &&
-        diffDaysFromJoin <= 12
-      ) {
-        followUp += 1;
-      }
     });
 
     return {
@@ -818,9 +806,13 @@ export default function GymManagementSystem() {
       expiredMembers: expired,
       inactiveMembers: inactive,
       upcomingExpirations: upcoming,
-      followUpCount: followUp,
     };
   }, [members]);
+
+  const followUpCount = useMemo(
+    () => getMembersToFollowUp(members, payments).length,
+    [members, payments]
+  );
 
   const { monthlyIncome, monthlyExpenses, monthlyProfit } = useMemo(() => {
     const reference = new Date();

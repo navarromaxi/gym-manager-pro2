@@ -61,6 +61,9 @@ import {
   sortProspectsByContactDate,
 } from "@/features/prospects/prospect-filters";
 
+const formatLocalFilterDate = (date: Date) =>
+  [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
+
 interface ProspectManagementProps {
   prospects: Prospect[];
   setProspects: (updater: (prev: Prospect[]) => Prospect[]) => void;
@@ -1066,9 +1069,6 @@ export function ProspectManagement({
           <h2 className="text-3xl font-bold tracking-tight">
             Gestión de Interesados
           </h2>
-          <p className="text-muted-foreground">
-            Administra los prospectos y conviértelos en socios.
-          </p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
@@ -1266,16 +1266,16 @@ export function ProspectManagement({
         </Dialog>
       </div>
       {/* Filters */}
-      <Card className="overflow-hidden border-0 bg-slate-950 shadow-xl shadow-indigo-950/20">
-        <CardHeader className="border-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-5 py-4 text-white">
+      <Card className="overflow-hidden rounded-2xl border-slate-200 bg-white text-slate-900 shadow-sm [--background:0_0%_100%] [--foreground:222_47%_11%] [--accent:226_100%_97%] [--accent-foreground:222_47%_11%]">
+        <CardHeader className="border-b border-slate-100 px-5 py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-white ring-1 ring-white/20">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
                 <Filter className="h-4 w-4" />
               </div>
               <div>
-                <CardTitle className="text-base text-white">Filtrar interesados</CardTitle>
-                <p className="text-sm text-white/80">
+                <CardTitle className="text-base text-slate-900">Filtrar interesados</CardTitle>
+                <p className="text-sm text-slate-500">
                   Combiná criterios para encontrar el seguimiento que necesitás.
                 </p>
               </div>
@@ -1284,7 +1284,7 @@ export function ProspectManagement({
               type="button"
               size="sm"
               variant="outline"
-              className="self-start border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:self-auto"
+              className="self-start border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 sm:self-auto"
               onClick={() => {
                 setSearchTerm("");
                 setStatusFilter("all");
@@ -1300,30 +1300,30 @@ export function ProspectManagement({
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="bg-gradient-to-br from-slate-950 via-slate-950 to-indigo-950/70 p-5">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="space-y-2 rounded-xl border border-blue-400/20 bg-blue-500/10 p-3 xl:col-span-2">
+        <CardContent className="p-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.5fr_1fr_1fr_1fr]">
+            <div className="space-y-2 min-w-0">
               <Label
                 htmlFor="prospect-search"
-                className="text-sm font-medium text-muted-foreground"
+                className="text-xs font-semibold text-slate-600"
               >
                 Buscar
               </Label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 <Input
                   id="prospect-search"
                   placeholder="Buscar por nombre, cel, email o notas..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="h-11 border-white/10 bg-black/30 pl-9"
+                  className="h-11 rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                 />
               </div>
             </div>
-            <div className="space-y-2 rounded-xl border border-violet-400/20 bg-violet-500/10 p-3">
+            <div className="space-y-2 min-w-0">
               <Label
                 htmlFor="status-filter"
-                className="text-sm font-medium text-muted-foreground"
+                className="text-xs font-semibold text-slate-600"
               >
                 Estado
               </Label>
@@ -1333,10 +1333,10 @@ export function ProspectManagement({
                   setStatusFilter(value as Prospect["status"] | "all")
                 }
               >
-                <SelectTrigger id="status-filter" className="h-11 w-full border-white/10 bg-black/30">
+                <SelectTrigger id="status-filter" className="h-11 w-full rounded-lg border-slate-300 bg-white text-slate-900 focus:ring-indigo-500">
                   <SelectValue placeholder="Todos los estados" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-slate-200 bg-white text-slate-900 [&_[role=option]:focus]:bg-indigo-50 [&_[role=option]:focus]:text-indigo-900">
                   <SelectItem value="all">Todos los estados</SelectItem>
                   <SelectItem value="averiguador">Averiguador</SelectItem>
                   <SelectItem value="trial_scheduled">
@@ -1350,18 +1350,18 @@ export function ProspectManagement({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/10 p-3">
+            <div className="space-y-2 min-w-0">
               <Label
                 htmlFor="priority-filter"
-                className="text-sm font-medium text-muted-foreground"
+                className="text-xs font-semibold text-slate-600"
               >
                 Prioridad
               </Label>
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger id="priority-filter" className="h-11 w-full border-white/10 bg-black/30">
+                <SelectTrigger id="priority-filter" className="h-11 w-full rounded-lg border-slate-300 bg-white text-slate-900 focus:ring-indigo-500">
                   <SelectValue placeholder="Tipo prioridad" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-slate-200 bg-white text-slate-900 [&_[role=option]:focus]:bg-indigo-50 [&_[role=option]:focus]:text-indigo-900">
                   <SelectItem value="all">Tipo prioridad</SelectItem>
                   <SelectItem value="red">Alta</SelectItem>
                   <SelectItem value="yellow">Media</SelectItem>
@@ -1369,10 +1369,49 @@ export function ProspectManagement({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 p-3">
+            <div className="space-y-2 min-w-0">
+              <Label
+                htmlFor="contact-date-range-filter"
+                className="text-xs font-semibold text-slate-600"
+              >
+                Rango temporal
+              </Label>
+              <Select
+                value={contactDateRangeFilter}
+                onValueChange={setContactDateRangeFilter}
+              >
+                <SelectTrigger
+                  id="contact-date-range-filter"
+                  className="h-11 w-full rounded-lg border-slate-300 bg-white text-slate-900 focus:ring-indigo-500"
+                >
+                  <SelectValue placeholder="Rango temporal" />
+                </SelectTrigger>
+                <SelectContent className="border-slate-200 bg-white text-slate-900 [&_[role=option]:focus]:bg-indigo-50 [&_[role=option]:focus]:text-indigo-900">
+                  <SelectItem value="current-month">Este mes</SelectItem>
+                  <SelectItem value="previous-month">Mes anterior</SelectItem>
+                  <SelectItem value="last-3-months">Últimos 3 meses</SelectItem>
+                  <SelectItem value="last-6-months">Últimos 6 meses</SelectItem>
+                  <SelectItem value="current-year">Todo el año</SelectItem>
+                  <SelectItem value="previous-year">Año anterior</SelectItem>
+                  <SelectItem value="all-history">Todo el historial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-700 marker:text-indigo-500">
+              Filtrar por fechas
+              <span className="ml-2 text-xs font-normal text-slate-500">
+                {[scheduledDateFilter, nextContactDateFilter, contactDateFilter].filter(Boolean).length > 0
+                  ? "(" + [scheduledDateFilter, nextContactDateFilter, contactDateFilter].filter(Boolean).length + " filtros activos)"
+                  : "Opcional"}
+              </span>
+            </summary>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <div className="space-y-2 min-w-0">
               <Label
                 htmlFor="scheduled-date-filter"
-                className="text-sm font-medium text-muted-foreground"
+                className="text-xs font-semibold text-slate-600"
               >
                 Fecha agendada
               </Label>
@@ -1381,7 +1420,7 @@ export function ProspectManagement({
                 type="date"
                 value={scheduledDateFilter}
                 onChange={(event) => setScheduledDateFilter(event.target.value)}
-                className="border-white/10 bg-black/30"
+                className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 [color-scheme:light] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
               />
               <div className="flex gap-2">
                 <Button
@@ -1391,7 +1430,7 @@ export function ProspectManagement({
                   className="flex-1"
                   onClick={() =>
                     setScheduledDateFilter(
-                      new Date().toISOString().split("T")[0]
+                      formatLocalFilterDate(new Date())
                     )
                   }
                 >
@@ -1408,10 +1447,10 @@ export function ProspectManagement({
                 </Button>
               </div>
             </div>
-            <div className="space-y-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 p-3">
+            <div className="space-y-2 min-w-0">
               <Label
                 htmlFor="next-contact-date-filter"
-                className="text-sm font-medium text-muted-foreground"
+                className="text-xs font-semibold text-slate-600"
               >
                 Próximo contacto
               </Label>
@@ -1422,7 +1461,7 @@ export function ProspectManagement({
                 onChange={(event) =>
                   setNextContactDateFilter(event.target.value)
                 }
-                className="border-white/10 bg-black/30"
+                className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 [color-scheme:light] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
               />
               <div className="flex gap-2">
                 <Button
@@ -1432,7 +1471,7 @@ export function ProspectManagement({
                   className="flex-1"
                   onClick={() =>
                     setNextContactDateFilter(
-                      new Date().toISOString().split("T")[0]
+                      formatLocalFilterDate(new Date())
                     )
                   }
                 >
@@ -1449,10 +1488,10 @@ export function ProspectManagement({
                 </Button>
               </div>
             </div>
-            <div className="space-y-2 rounded-xl border border-amber-400/20 bg-amber-500/10 p-3">
+            <div className="space-y-2 min-w-0">
               <Label
                 htmlFor="contact-date-filter"
-                className="text-sm font-medium text-muted-foreground"
+                className="text-xs font-semibold text-slate-600"
               >
                 Fecha de contacto
               </Label>
@@ -1461,7 +1500,7 @@ export function ProspectManagement({
                 type="date"
                 value={contactDateFilter}
                 onChange={(event) => setContactDateFilter(event.target.value)}
-                className="border-white/10 bg-black/30"
+                className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 [color-scheme:light] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
               />
               <div className="flex gap-2">
                 <Button
@@ -1470,7 +1509,7 @@ export function ProspectManagement({
                   variant="outline"
                   className="flex-1"
                   onClick={() =>
-                    setContactDateFilter(new Date().toISOString().split("T")[0])
+                    setContactDateFilter(formatLocalFilterDate(new Date()))
                   }
                 >
                   Hoy
@@ -1486,35 +1525,8 @@ export function ProspectManagement({
                 </Button>
               </div>
             </div>
-            <div className="space-y-2 rounded-xl border border-pink-400/20 bg-pink-500/10 p-3">
-              <Label
-                htmlFor="contact-date-range-filter"
-                className="text-sm font-medium text-muted-foreground"
-              >
-                Rango temporal
-              </Label>
-              <Select
-                value={contactDateRangeFilter}
-                onValueChange={setContactDateRangeFilter}
-              >
-                <SelectTrigger
-                  id="contact-date-range-filter"
-                  className="h-11 w-full border-white/10 bg-black/30"
-                >
-                  <SelectValue placeholder="Rango temporal" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="current-month">Este mes</SelectItem>
-                  <SelectItem value="previous-month">Mes anterior</SelectItem>
-                  <SelectItem value="last-3-months">Últimos 3 meses</SelectItem>
-                  <SelectItem value="last-6-months">Últimos 6 meses</SelectItem>
-                  <SelectItem value="current-year">Todo el año</SelectItem>
-                  <SelectItem value="previous-year">Año anterior</SelectItem>
-                  <SelectItem value="all-history">Todo el historial</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
-          </div>
+          </details>
         </CardContent>
       </Card>
       {/* Prospects Table */}

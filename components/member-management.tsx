@@ -1,4 +1,4 @@
-﻿﻿"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1144,24 +1144,24 @@ export function MemberManagement({
         </CardHeader>
         <CardContent className="bg-gradient-to-br from-slate-950 via-slate-950 to-emerald-950/70 p-5">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.7fr_1fr_1fr_1fr]">
-            <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 p-3">
-              <Label htmlFor="member-search" className="mb-2 block text-sm font-medium text-emerald-100">Buscar socio</Label>
+            <div className="rounded-xl border-2 border-slate-300 bg-white p-3 shadow-sm">
+              <Label htmlFor="member-search" className="mb-2 block text-sm font-semibold text-slate-900">Buscar socio</Label>
               <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
+                <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
                 <Input
                   id="member-search"
                   placeholder="Buscar por nombre, email o telefono..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="h-11 border-white/10 bg-black/30 pl-8 text-white caret-white placeholder:text-slate-400"
+                  className="h-11 rounded-md border-2 border-slate-400 bg-white pl-9 pr-3 text-sm text-slate-900 caret-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:border-teal-600 focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
                 />
               </div>
             </div>
-            <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 p-3">
-              <Label htmlFor="member-sort" className="mb-2 block text-sm font-medium text-cyan-100">Ordenar por</Label>
+            <div className="rounded-xl border-2 border-slate-300 bg-white p-3 shadow-sm">
+              <Label htmlFor="member-sort" className="mb-2 block text-sm font-semibold text-slate-900">Ordenar por</Label>
               <Select value={sortOption} onValueChange={(value) => setSortOption(value as MemberSortOption)}>
-                <SelectTrigger id="member-sort" className="h-11 w-full border-white/10 bg-black/30 text-white"><SelectValue placeholder="Ordenar por" /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger id="member-sort" className="h-11 w-full border-2 border-slate-400 bg-white text-slate-900 hover:border-teal-600 focus:border-teal-600 focus:ring-teal-600 [&>svg]:text-slate-600 [&>svg]:opacity-100"><SelectValue placeholder="Ordenar por" /></SelectTrigger>
+                <SelectContent className="border-slate-300 bg-white text-slate-900 [&_[role=option]:focus]:bg-teal-50 [&_[role=option]:focus]:text-slate-900">
                   <SelectItem value="recent_activity_desc">Orden actual (mas recientes primero)</SelectItem>
                   <SelectItem value="plan_end_asc">Fin del plan ascendente</SelectItem>
                   <SelectItem value="plan_end_desc">Fin del plan descendente</SelectItem>
@@ -1172,11 +1172,11 @@ export function MemberManagement({
                 </SelectContent>
               </Select>
             </div>
-            <div className="rounded-xl border border-violet-400/20 bg-violet-500/10 p-3">
-              <Label htmlFor="member-status" className="mb-2 block text-sm font-medium text-violet-100">Estado</Label>
+            <div className="rounded-xl border-2 border-slate-300 bg-white p-3 shadow-sm">
+              <Label htmlFor="member-status" className="mb-2 block text-sm font-semibold text-slate-900">Estado</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger id="member-status" className="h-11 w-full border-white/10 bg-black/30 text-white"><SelectValue placeholder="Estado" /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger id="member-status" className="h-11 w-full border-2 border-slate-400 bg-white text-slate-900 hover:border-teal-600 focus:border-teal-600 focus:ring-teal-600 [&>svg]:text-slate-600 [&>svg]:opacity-100"><SelectValue placeholder="Estado" /></SelectTrigger>
+                <SelectContent className="border-slate-300 bg-white text-slate-900 [&_[role=option]:focus]:bg-teal-50 [&_[role=option]:focus]:text-slate-900">
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="active">Activos</SelectItem>
                   <SelectItem value="expired">Vencidos (hasta 30 días)</SelectItem>
@@ -1190,11 +1190,11 @@ export function MemberManagement({
                 </SelectContent>
               </Select>
             </div>
-            <div className="rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/10 p-3">
-              <Label htmlFor="member-plan" className="mb-2 block text-sm font-medium text-fuchsia-100">Plan</Label>
+            <div className="rounded-xl border-2 border-slate-300 bg-white p-3 shadow-sm">
+              <Label htmlFor="member-plan" className="mb-2 block text-sm font-semibold text-slate-900">Plan</Label>
               <Select value={planFilter} onValueChange={setPlanFilter}>
-                <SelectTrigger id="member-plan" className="h-11 w-full border-white/10 bg-black/30 text-white"><SelectValue placeholder="Tipo de plan" /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger id="member-plan" className="h-11 w-full border-2 border-slate-400 bg-white text-slate-900 hover:border-teal-600 focus:border-teal-600 focus:ring-teal-600 [&>svg]:text-slate-600 [&>svg]:opacity-100"><SelectValue placeholder="Tipo de plan" /></SelectTrigger>
+                <SelectContent className="border-slate-300 bg-white text-slate-900 [&_[role=option]:focus]:bg-teal-50 [&_[role=option]:focus]:text-slate-900">
                   <SelectItem value="all">Todos los planes</SelectItem>
                   <SelectItem value="without_plan">Sin plan asignado</SelectItem>
                   {availablePlanNames.map((planName) => <SelectItem key={planName} value={planName}>{planName}</SelectItem>)}
@@ -1361,8 +1361,9 @@ export function MemberManagement({
           {membersToFollowUp.length > 0 && (
             <div className="mt-2 text-sm text-yellow-700 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded flex items-center justify-between">
               <span>
-                ⚠️ Tienes socios que ingresaron hace entre 5 y 12 días y aún no
-                fueron contactados.
+                ⚠️ Seguimiento pendiente: {membersToFollowUp.length} socio{membersToFollowUp.length === 1 ? "" : "s"} sin contactar.
+                Se consideran entre 5 y 12 días desde el inicio del último plan
+                (o desde el ingreso si no hay un inicio de plan registrado).
               </span>
               <Button
                 variant="outline"

@@ -41,6 +41,8 @@ import {
   Trash2,
   Receipt,
   ShieldAlert,
+  SlidersHorizontal,
+  RotateCcw,
 } from "lucide-react";
 import { supabase, updateMemberWithFallback } from "@/lib/supabase";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
@@ -3253,28 +3255,35 @@ export function PaymentManagement({
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
+      <Card className="rounded-2xl border-slate-200 bg-white text-slate-900 shadow-sm">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-teal-50 p-2.5 text-teal-700"><SlidersHorizontal className="h-5 w-5" /></div>
+            <div><CardTitle className="text-lg text-slate-900">Encontrá un pago</CardTitle><p className="mt-1 text-sm text-slate-500">Buscá por socio o combiná los filtros.</p></div>
+          </div>
+          <Button type="button" variant="ghost" size="sm" className="text-slate-600 hover:bg-slate-100 hover:text-slate-900" onClick={() => {
+            setSearchTerm(""); setMethodFilter("all"); setPeriodFilter("all"); setReferenceFilter("all"); setInstallmentFilter("all");
+          }}><RotateCcw className="mr-2 h-4 w-4" />Limpiar filtros</Button>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
-            <div className="flex-1">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[1.5fr_1fr_1fr_1fr_1fr]">
+            <div className="min-w-0 sm:col-span-2 xl:col-span-1">
+              <Label htmlFor="payment-search" className="mb-2 block text-xs font-semibold text-slate-600">Socio</Label>
               <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
+                <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                <Input id="payment-search"
                   placeholder="Buscar por nombre del socio..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
+                  className="h-11 rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
                 />
               </div>
             </div>
-            <Select value={methodFilter} onValueChange={setMethodFilter}>
-              <SelectTrigger className="w-[180px]">
+            <div className="min-w-0"><Label htmlFor="payment-method" className="mb-2 block text-xs font-semibold text-slate-600">Método</Label><Select value={methodFilter} onValueChange={setMethodFilter}>
+              <SelectTrigger id="payment-method" className="h-11 w-full rounded-lg border-slate-300 bg-white text-slate-900 focus:ring-teal-600">
                 <SelectValue placeholder="Método de pago" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="border-slate-200 bg-white text-slate-900 [&_[role=option]:focus]:bg-teal-50 [&_[role=option]:focus]:text-teal-900">
                 <SelectItem value="all">Todos los métodos</SelectItem>
                 <SelectItem value="Efectivo">Efectivo</SelectItem>
                 <SelectItem value="Transferencia">Transferencia</SelectItem>
@@ -3285,12 +3294,12 @@ export function PaymentManagement({
                   Tarjeta de Crédito
                 </SelectItem>
               </SelectContent>
-            </Select>
-            <Select value={periodFilter} onValueChange={setPeriodFilter}>
-              <SelectTrigger className="w-[200px]">
+            </Select></div>
+            <div className="min-w-0"><Label htmlFor="payment-period" className="mb-2 block text-xs font-semibold text-slate-600">Período</Label><Select value={periodFilter} onValueChange={setPeriodFilter}>
+              <SelectTrigger id="payment-period" className="h-11 w-full rounded-lg border-slate-300 bg-white text-slate-900 focus:ring-teal-600">
                 <SelectValue placeholder="Período" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="border-slate-200 bg-white text-slate-900 [&_[role=option]:focus]:bg-teal-50 [&_[role=option]:focus]:text-teal-900">
                 <SelectItem value="all">Todos los períodos</SelectItem>
                 <SelectItem value="current_month">Mes actual</SelectItem>
                 <SelectItem value="previous_month">Mes anterior</SelectItem>
@@ -3298,32 +3307,32 @@ export function PaymentManagement({
                 <SelectItem value="last_6_months">Últimos 6 meses</SelectItem>
                 <SelectItem value="current_year">Año actual</SelectItem>
               </SelectContent>
-            </Select>
-            <Select
+            </Select></div>
+            <div className="min-w-0"><Label htmlFor="payment-type" className="mb-2 block text-xs font-semibold text-slate-600">Tipo de pago</Label><Select
               value={referenceFilter}
               onValueChange={(value) =>
                 setReferenceFilter(value as ReferenceFilterOption)
               }
             >
-              <SelectTrigger className="w-[220px]">
+              <SelectTrigger id="payment-type" className="h-11 w-full rounded-lg border-slate-300 bg-white text-slate-900 focus:ring-teal-600">
                 <SelectValue placeholder="Referencia del pago" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="border-slate-200 bg-white text-slate-900 [&_[role=option]:focus]:bg-teal-50 [&_[role=option]:focus]:text-teal-900">
                 <SelectItem value="all">Todos los tipos</SelectItem>
                 <SelectItem value="new_plan">Plan nuevo</SelectItem>
                 <SelectItem value="existing_plan">Plan existente</SelectItem>
                 <SelectItem value="product">Producto</SelectItem>
                 <SelectItem value="custom_plan">Plan personalizado</SelectItem>
               </SelectContent>
-            </Select>
-            <Select
+            </Select></div>
+            <div className="min-w-0"><Label htmlFor="payment-installment" className="mb-2 block text-xs font-semibold text-slate-600">Estado de cuotas</Label><Select
               value={installmentFilter}
               onValueChange={setInstallmentFilter}
             >
-              <SelectTrigger className="w-[220px]">
+              <SelectTrigger id="payment-installment" className="h-11 w-full rounded-lg border-slate-300 bg-white text-slate-900 focus:ring-teal-600">
                 <SelectValue placeholder="Estado de cuotas" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="border-slate-200 bg-white text-slate-900 [&_[role=option]:focus]:bg-teal-50 [&_[role=option]:focus]:text-teal-900">
                 <SelectItem value="all">Todos los estados</SelectItem>
                 <SelectItem value="pending_balance">
                   Con saldo pendiente
@@ -3333,19 +3342,19 @@ export function PaymentManagement({
                 </SelectItem>
                 <SelectItem value="overdue">Cuotas vencidas</SelectItem>
               </SelectContent>
-            </Select>
+            </Select></div>
           </div>
         </CardContent>
       </Card>
 
       {/* Payments Table */}
-      <Card>
+      <Card className="overflow-hidden rounded-2xl border-slate-200 bg-white text-slate-900 shadow-sm [--background:0_0%_100%] [--foreground:222_47%_11%] [--muted:210_40%_96%] [--muted-foreground:215_16%_40%] [--border:214_32%_88%] [--accent:210_40%_96%] [--accent-foreground:222_47%_11%] [--secondary:210_40%_96%] [--secondary-foreground:222_47%_11%]">
         <CardHeader>
-          <CardTitle>Historial de Pagos ({filteredPayments.length})</CardTitle>
+          <CardTitle className="flex items-center gap-3 text-lg text-slate-900"><Receipt className="h-5 w-5 text-teal-600" />Historial de pagos <span className="rounded-full bg-teal-50 px-2.5 py-1 text-sm font-semibold text-teal-700">{filteredPayments.length}</span></CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-slate-100 [&_th]:text-xs [&_th]:font-semibold [&_th]:text-slate-600">
               <TableRow>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Socio</TableHead>
@@ -3360,6 +3369,7 @@ export function PaymentManagement({
               </TableRow>
             </TableHeader>
             <TableBody>
+              {filteredPayments.length === 0 && <TableRow className="hover:bg-white"><TableCell colSpan={10} className="py-12 text-center text-slate-500">No hay pagos que coincidan con los filtros.</TableCell></TableRow>}
               {visiblePayments.map((payment) => {
                 const insight = paymentInsights.get(payment.id);
                 const member = membersById.get(payment.member_id);
@@ -3454,7 +3464,7 @@ export function PaymentManagement({
                   isSendingInvoice && invoicePayment?.id === payment.id;
 
                 return (
-                  <TableRow key={payment.id}>
+                  <TableRow key={payment.id} className="border-slate-200 odd:bg-white even:bg-slate-50/70 hover:bg-teal-50/70">
                     <TableCell>
                       {parseLocalDate(payment.date).toLocaleDateString()}
                     </TableCell>
