@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { supabase, updateMemberWithFallback } from "@/lib/supabase";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
+import { confirmRecentPayment } from "@/features/payments/recent-payment";
 import type {
   Member,
   Payment,
@@ -714,6 +715,8 @@ export function PaymentManagement({
   setInvoices,
   gymInvoiceConfig,
 }: PaymentManagementProps) {
+  const paymentSubmissionRef = useRef(false);
+  const [isRegisteringPayment, setIsRegisteringPayment] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
@@ -1939,8 +1942,15 @@ export function PaymentManagement({
 
   // FUNCIÓN ACTUALIZADA PARA REGISTRAR PAGO Y RENOVAR SOCIO
   const handleAddPayment = async () => {
+    if (paymentSubmissionRef.current) return;
+    paymentSubmissionRef.current = true;
+    setIsRegisteringPayment(true);
     try {
       if (!selectedMember) return;
+
+      if (!(await confirmRecentPayment(gymId, selectedMember.id, newPayment.date))) {
+        return;
+      }
 
       const paymentId = `${gymId}_payment_${Date.now()}`;
 
@@ -2267,6 +2277,9 @@ export function PaymentManagement({
     } catch (error) {
       console.error("Error registrando pago:", error);
       alert("Error al registrar el pago. Inténtalo de nuevo.");
+    } finally {
+      paymentSubmissionRef.current = false;
+      setIsRegisteringPayment(false);
     }
   };
 
@@ -3152,6 +3165,7 @@ export function PaymentManagement({
                 type="submit"
                 onClick={handleAddPayment}
                 disabled={
+                  isRegisteringPayment ||
                   !newPayment.memberId ||
                   !newPayment.method ||
                   (["Tarjeta de Crédito", "Tarjeta de Débito"].includes(
@@ -3171,7 +3185,7 @@ export function PaymentManagement({
                     : !newPayment.description || !newPayment.amount)
                 }
               >
-                Registrar Pago
+                {isRegisteringPayment ? "Verificando y registrando…" : "Registrar Pago"}
               </Button>
             </DialogFooter>
           </DialogContent>
