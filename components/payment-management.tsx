@@ -2543,6 +2543,17 @@ export function PaymentManagement({
                               Plan actual: {member.plan} - Estado:{" "}
                               {member.status}
                             </div>
+                            <div className="mt-1 text-sm font-medium">
+                              Último vencimiento de plan:{" "}
+                              {parseDueDate(member.next_payment)?.toLocaleDateString(
+                                "es-UY",
+                                {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                }
+                              ) ?? "Sin vencimiento registrado"}
+                            </div>
                           </div>
                         ))
                       ) : (
